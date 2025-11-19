@@ -7,6 +7,10 @@
 # Smart Focus
 cmd - escape : yabai -m window --focus mouse
 
+# disable keys
+
+alt - escape : /usr/bin/shortcuts run "ToggleKeyboard"
+
 # ───────────────────────────────────────────────────────────
 # Window Focus Navigation (Vim-Style)
 # ───────────────────────────────────────────────────────────

@@ -101,15 +101,23 @@ yabai -m rule --add app="^Microsoft PowerPoint$" space=^8
 yabai -m rule --add app="^Slack$" space=^9
 yabai -m rule --add app="^Discord$" space=^9
 yabai -m rule --add app="^Mail$" space=^9
+yabai -m rule --add app="^Telegram$" space=^9
+
+# ───────────────────────────────────────────────────────────
+# Space 10: AI
+# ───────────────────────────────────────────────────────────
+yabai -m rule --add app="^Claude$" space=^10
+yabai -m rule --add app="^Perplexity$" space=^10
+
 
 # ───────────────────────────────────────────────────────────
 # Space 4: Everything else (Catch-all)
-# (Spaces 6 & 10 are now free/flexible)
 # ───────────────────────────────────────────────────────────
 # This rule MUST be last. It catches all apps that
 # did not match any rule above. '^' for focus.
 
-yabai -m rule --add app!="^(Safari|Brave Browser|Obsidian|WezTerm|Code|Xcode|Preview|PDF Expert|Raindrop.io|Spotify|Microsoft Word|Microsoft Excel|Microsoft PowerPoint|Slack|Discord|Mail)$" space=^4
+yabai -m rule --add app!="^(Perplexity|Claude|Safari|Brave Browser|Obsidian|WezTerm|Code|Xcode|Preview|PDF Expert|Raindrop.io|Spotify|Microsoft Word|Microsoft Excel|Microsoft PowerPoint|Slack|Discord|Mail|WhatsApp|Telegram)$" space=^4
+yabai -m rule --add app="WhatsApp" role="AXWindow" space=^9
 
 # ───────────────────────────────────────────────────────────
 # Space 10: free Space2
