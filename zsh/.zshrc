@@ -52,7 +52,7 @@ zstyle ':completion:*' menu select
 # Key Bindings (Respect Ctrl Layer!)
 # ───────────────────────────────────────────────────────────
 # Use emacs-style keybindings (Ctrl+A, Ctrl+E, etc.)
-b# indkey -e
+# indkey -e
 
 # Ctrl+A: Beginning of line (preserved for Tmux when in tmux!)
 # Ctrl+E: End of line
@@ -164,8 +164,8 @@ alias tl='tmux list-sessions'
 alias zshrc='nvim ~/.zshrc'
 alias vimrc='nvim ~/.config/nvim/init.lua'
 alias tmuxrc='nvim ~/.tmux.conf'
-alias yabaircrc='nvim ~/.config/yabai/yabairc'
-alias skhdrc='nvim ~/.config/skdh/skhdrc'
+alias yabairc='nvim ~/.config/yabai/yabairc'
+alias skhdrc='nvim ~/.config/skhd/skhdrc'
 
 # Reload shell config
 alias reload='source ~/.zshrc'
@@ -185,10 +185,10 @@ fi
 # ───────────────────────────────────────────────────────────
 if [ "$OS" = "macos" ]; then
     # macOS specific
-    alias yabai-restart='brew services restart yabai'
-    alias skhd-restart='brew services restart skhd'
-    alias yabai-r='brew services restart yabai'
-    alias skhd-r='brew services restart skhd'
+    alias yabai-restart='yabai --restart-service'
+    alias skhd-restart='skhd --restart-service'
+    alias yabai-r='yabai --restart-service'
+    alias skhd-r='skhd --restart-service'
     alias yabai-log='tail -f /tmp/yabai_*.err.log'
     alias skhd-log='tail -f /tmp/skhd_*.err.log'
     
@@ -426,4 +426,5 @@ envinfo() {
 # ───────────────────────────────────────────────────────────
 # Welcome Message (optional - comment out if not wanted)
 # ───────────────────────────────────────────────────────────
-# echo "🚀 Unified Keyboard Environment ready! Type 'envinfo' for details."
+# echo "🚀 Unified Keyboard Environment ready!"
+

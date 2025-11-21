@@ -111,18 +111,22 @@ cmd + shift - 0x1D : yabai -m window --space 10 --focus
 # Gather (Cleanup) Current Workspace
 # ───────────────────────────────────────────────────────────
 # This is the new hotkey you requested
-cmd - 0x32 : ~/OneDrive/workflow/bunches/gather-current-space.sh # Cmd + `
+cmd - 0x32 : ~/OneDrive/workflow/scripts/gather-current-space.sh # Cmd + `
 
 
 # ───────────────────────────────────────────────────────────
 # Quick App Launchers - Cmd + Alt + Letter
 # ───────────────────────────────────────────────────────────
-cmd + alt - b : open -a "Brave"              # Browser
+
+
+
+cmd + alt - r : open -b io.raindrop.macapp    # Raindrop
+cmd + alt - b : open -b com.brave.Browser     # Browser
 cmd + alt - o : open -a "Obsidian"            # Obsidian (notes)
-cmd + alt - c : open -a "Code"  # Code editor
-cmd + alt - r : open -a "Raindrop.io"               # Raindrop
+cmd + alt - c : open -a "Visual Studio Code"  # Code editor
 cmd + alt - m : open -a "Spotify"             # Music
 cmd + alt - t : open -a "WezTerm"             # Terminal
+cmd + alt - f : open -a "ForkLift"            # Forklift
 
 # ───────────────────────────────────────────────────────────
 # Bunches - Environment Switching - Cmd + Ctrl + Number
