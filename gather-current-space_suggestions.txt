@@ -1,0 +1,17 @@
+Here's the suggested change for the `local-bin/.local/bin/gather-current-space` script:
+
+**Original line:**
+    yabai -m query --windows | jq -r ".[] | select(.space != $CURRENT_SPACE) | .id" | \
+
+**Suggested new line:**
+    yabai -m query --windows | jq -r ".[] | select(.space != $CURRENT_SPACE and .[\"is-visible\"] == true and .[\"is-minimized\"] == false) | .id" | \
+
+**Explanation:**
+The error "could not locate the window to act on!" occurs because yabai sometimes cannot manipulate windows that are minimized or hidden, even if they appear in the `query --windows` output.
+
+This change modifies the `jq` filter to include two additional conditions:
+1.  `.["is-visible"] == true`: Ensures that only visible windows are considered.
+2.  `.["is-minimized"] == false`: Excludes minimized windows from the selection.
+
+This should prevent the script from attempting to move windows that yabai cannot act upon, thus eliminating the "could not locate the window to act on!" errors.
+

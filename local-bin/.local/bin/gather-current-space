@@ -9,16 +9,25 @@ OS=$(detect_os)
 if [[ "$OS" == "macos" ]]; then
     # --- macOS (Yabai) ---
     if ! command -v yabai &> /dev/null; then echo "Error: yabai missing"; exit 1; fi
+    
     CURRENT_SPACE=$(yabai -m query --spaces --space | jq '.index')
     echo "🍏 macOS: Gathering windows to Space $CURRENT_SPACE..."
-    yabai -m query --windows | jq -r ".[] | select(.space != $CURRENT_SPACE) | .id" | \
-    while read -r window_id; do yabai -m window "$window_id" --space "$CURRENT_SPACE"; done
+    
+    # FIX: Added .["is-minimized"] == false to prevent errors on hidden windows
+    yabai -m query --windows | \
+    jq -r ".[] | select(.space != $CURRENT_SPACE and .[\"is-minimized\"] == false) | .id" | \
+    while read -r window_id; do
+        yabai -m window "$window_id" --space "$CURRENT_SPACE"
+    done
 
 elif [[ "$OS" == "linux" ]]; then
     # --- Linux (Hyprland) ---
     if ! command -v hyprctl &> /dev/null; then echo "Error: hyprctl missing"; exit 1; fi
     CURRENT_WS=$(hyprctl activeworkspace -j | jq '.id')
     echo "🐧 Linux: Gathering windows to Workspace $CURRENT_WS..."
-    hyprctl clients -j | jq -r ".[] | select(.workspace.id != $CURRENT_WS) | .address" | \
-    while read -r addr; do hyprctl dispatch movetoworkspacesilent "$CURRENT_WS,address:$addr"; done
+    hyprctl clients -j | \
+    jq -r ".[] | select(.workspace.id != $CURRENT_WS) | .address" | \
+    while read -r addr; do 
+        hyprctl dispatch movetoworkspacesilent "$CURRENT_WS,address:$addr"
+    done
 fi

@@ -1,6 +1,0 @@
-#!/bin/bash
-# Gather windows to current space (Stable Logic)
-if ! command -v yabai &> /dev/null; then echo "Error: yabai missing"; exit 1; fi
-CURRENT=$(yabai -m query --spaces --space | jq '.index')
-echo "Gathering windows to Space $CURRENT..."
-yabai -m query --windows | jq -r ".[] | select(.space != $CURRENT) | .id" | xargs -I{} yabai -m window {} --space $CURRENT
