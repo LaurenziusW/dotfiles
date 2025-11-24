@@ -111,7 +111,7 @@ cmd + shift - 0x1D : yabai -m window --space 10 --focus
 # Gather (Cleanup) Current Workspace
 # ───────────────────────────────────────────────────────────
 # This is the new hotkey you requested
-cmd - 0x32 : gather-current-space.sh # Cmd + `
+cmd - 0x32 : /Users/laurenz/.local/bin/gather-current-space # Cmd + `
 
 
 # ───────────────────────────────────────────────────────────

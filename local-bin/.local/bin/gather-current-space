@@ -1,33 +1,79 @@
-#!/bin/bash
-# Gather all windows to the current space (Hybrid: macOS + Linux)
 
-detect_os() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then echo "macos"; else echo "linux"; fi
-}
-OS=$(detect_os)
+#!/usr/bin/env bash
 
-if [[ "$OS" == "macos" ]]; then
-    # --- macOS (Yabai) ---
-    if ! command -v yabai &> /dev/null; then echo "Error: yabai missing"; exit 1; fi
-    
+# This script detects the current workspace and gathers ONLY the
+# windows that "belong" to it, based on the Unified Config.
+
+# Load the OS detection library (No extension in your repo)
+source "$(dirname "$0")/lib-os-detect"
+
+# Capture the output of detect_os
+OS_TYPE=$(detect_os)
+
+# --- macOS (Yabai) Implementation ---
+if [ "$OS_TYPE" = "macos" ]; then
     CURRENT_SPACE=$(yabai -m query --spaces --space | jq '.index')
-    echo "🍏 macOS: Gathering windows to Space $CURRENT_SPACE..."
-    
-    # FIX: Added .["is-minimized"] == false to prevent errors on hidden windows
-    yabai -m query --windows | \
-    jq -r ".[] | select(.space != $CURRENT_SPACE and .[\"is-minimized\"] == false) | .id" | \
-    while read -r window_id; do
-        yabai -m window "$window_id" --space "$CURRENT_SPACE"
-    done
+    echo "🍏 macOS: Gathering apps for Space $CURRENT_SPACE..."
 
-elif [[ "$OS" == "linux" ]]; then
-    # --- Linux (Hyprland) ---
-    if ! command -v hyprctl &> /dev/null; then echo "Error: hyprctl missing"; exit 1; fi
-    CURRENT_WS=$(hyprctl activeworkspace -j | jq '.id')
-    echo "🐧 Linux: Gathering windows to Workspace $CURRENT_WS..."
-    hyprctl clients -j | \
-    jq -r ".[] | select(.workspace.id != $CURRENT_WS) | .address" | \
-    while read -r addr; do 
-        hyprctl dispatch movetoworkspacesilent "$CURRENT_WS,address:$addr"
-    done
+    # Helper to pull windows (excludes minimized to prevent errors)
+    pull_macos() {
+        local target_space=$1
+        local app_query=$2
+        
+        # We add 'is-minimized == false' to every query to ensure stability
+        yabai -m query --windows | \
+        jq -r ".[] | select(($app_query) and .[\"is-minimized\"] == false) | .id" | \
+        while read -r id; do
+            yabai -m window "$id" --space "$target_space"
+        done
+    }
+
+    case $CURRENT_SPACE in
+        1) # Browser
+            pull_macos 1 '.app == "Safari" or .app == "Brave Browser" or .app == "Arc"' ;;
+        2) # Notes
+            pull_macos 2 '.app == "Obsidian"' ;;
+        3) # Terminal & Code
+            pull_macos 3 '.app == "WezTerm" or .app == "Code" or .app == "Xcode"' ;;
+        4) # Files
+            pull_macos 4 '.app == "Finder" or .app == "ForkLift"' ;;
+        5) # PDF
+            pull_macos 5 '.app == "Preview" or .app == "PDF Expert"' ;;
+        7) # Media
+            pull_macos 7 '.app == "Spotify"' ;;
+        8) # Comms
+            pull_macos 8 '.app == "Slack" or .app == "Discord" or .app == "Mail" or .app == "Telegram"' ;;
+        9) # Office
+            pull_macos 9 '.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint"' ;;
+        10) # AI
+            pull_macos 10 '.app == "Claude" or .app == "Perplexity" or .app == "GeminiAPP"' ;;
+        *) 
+            echo "⚠️ No specific apps assigned to Space $CURRENT_SPACE" ;;
+    esac
+
+# --- Linux (Hyprland) Implementation ---
+elif [ "$OS_TYPE" = "linux" ]; then
+    # Determine current workspace ID
+    CURRENT_SPACE=$(hyprctl activeworkspace -j | jq '.id')
+    echo "🐧 Linux: Gathering apps for Workspace $CURRENT_SPACE..."
+
+    move_windows() {
+        local workspace=$1
+        local query=$2
+        hyprctl clients -j | jq -r ".[] | select($query) | .address" | while read -r addr; do
+            hyprctl dispatch movetoworkspacesilent "$workspace,address:$addr"
+        done
+    }
+
+    case $CURRENT_SPACE in
+        1) move_windows 1 '.class == "Brave-browser" or .class == "Safari"' ;; 
+        2) move_windows 2 '.class == "obsidian"' ;;
+        3) move_windows 3 '.class == "org.wezfurlong.wezterm" or .class == "Code" or .class == "Xcode"' ;;
+        5) move_windows 5 '.class == "org.gnome.Preview" or (.title | contains("PDF"))' ;;
+        7) move_windows 7 '.class == "Spotify"' ;;
+        8) move_windows 8 '.class | contains("Microsoft")' ;;
+        9) move_windows 9 '.class == "Slack" or .class == "discord" or .class == "org.telegram.desktop"' ;;
+        10) move_windows 10 '(.title | contains("Claude")) or (.title | contains("Perplexity"))' ;;
+        *) echo "⚠️ No specific apps assigned to Workspace $CURRENT_SPACE" ;;
+    esac
 fi
