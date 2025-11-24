@@ -175,7 +175,7 @@ alias top='htop'  # if htop is installed
 
 # Network
 alias myip='curl -s ifconfig.me'
-alias ports='netstat -tulanp'  # Linux
+alias ports='ss -tulanp' # Linux (ss replaces netstat)  # Linux
 if [ "$OS" = "macos" ]; then
     alias ports='lsof -i -P'
 fi

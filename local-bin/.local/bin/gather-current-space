@@ -1,86 +1,42 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-# This script detects the current workspace and gathers all
-# windows that "belong" to it, based on the unified config.
+# Gather all windows to the current space (Cross-Platform)
 
-# Load the OS detection library from its expected path
-source "$(dirname "$0")/lib-os-detect.sh"
+detect_os() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "linux"
+    else
+        echo "unknown"
+    fi
+}
 
-# Capture the output of detect_os
-OS_TYPE=$(detect_os)
+OS=$(detect_os)
 
-# --- macOS (Yabai) Implementation ---
-if [ "$OS_TYPE" = "macos" ]; then
+if [[ "$OS" == "macos" ]]; then
+    if ! command -v yabai &> /dev/null; then echo "Error: yabai missing"; exit 1; fi
+    
     CURRENT_SPACE=$(yabai -m query --spaces --space | jq '.index')
-    echo "Gathering windows for macOS Space $CURRENT_SPACE..."
+    echo "🍏 macOS: Gathering windows to Space $CURRENT_SPACE..."
+    
+    # Yabai Logic
+    yabai -m query --windows | jq -r ".[] | select(.space != $CURRENT_SPACE) | .id" | \
+    xargs -I{} yabai -m window {} --space "$CURRENT_SPACE"
 
-    case $CURRENT_SPACE in
-        1) # Browser
-            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser") | .id' | xargs -I {} yabai -m window {} --space 1 ;;
-        2) # Notes
-            yabai -m query --windows | jq -r '.[] | select(.app == "Obsidian") | .id' | xargs -I {} yabai -m window {} --space 2 ;;
-        3) # Terminal & Code
-            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode") | .id' | xargs -I {} yabai -m window {} --space 3 ;;
-        4) # Files
-            yabai -m query --windows | jq -r '.[] | select(.app == "Finder" or .app == "ForkLift") | .id' | xargs -I {} yabai -m window {} --space 4 ;;
-        5) # PDF
-            yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' | xargs -I {} yabai -m window {} --space 5 ;;
-        7) # Media
-            yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' | xargs -I {} yabai -m window {} --space 7 ;;
-        8) # Comms
-            yabai -m query --windows | jq -r '.[] | select(.app == "Slack" or .app == "Discord" or .app == "Mail" or .app == "Telegram") | .id' | xargs -I {} yabai -m window {} --space 8 ;;
-        9) # Office
-            yabai -m query --windows | jq -r '.[] | select(.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint") | .id' | xargs -I {} yabai -m window {} --space 9 ;;
-
-        10) # AI
-            yabai -m query --windows | jq -r '.[] | select(.app == "Claude" or .app == "Perplexity" or .app == "GeminiAPP" or .app == "PerplexityAPP") | .id' | xargs -I {} yabai -m window {} --space 10 ;;
-
-        *) # Catch-all
-            echo "No gather action defined for this space." ;;
-    esac
-
-# --- Linux (Hyprland) Implementation ---
-elif [ "$OS_TYPE" = "linux" ]; then
-    # Determine current workspace ID
-    CURRENT_SPACE=$(hyprctl activeworkspace -j | jq '.id')
-    echo "Gathering windows for Linux Workspace $CURRENT_SPACE..."
-
-    # Helper function to move windows by address using jq logic
-    # Usage: move_windows <destination_workspace> <jq_select_query>
-    move_windows() {
-        local workspace=$1
-        local query=$2
-
-        # get all clients, filter by query, output address, verify address exists, loop and move
-        hyprctl clients -j | jq -r ".[] | select($query) | .address" | while read -r addr; do
-            # 'movetoworkspacesilent' moves the window without switching focus to it immediately
-            hyprctl dispatch movetoworkspacesilent "$workspace,address:$addr"
-        done
-    }
-
-    case $CURRENT_SPACE in
-        1) # Browser
-            # Matches class names exactly or case-insensitive contains
-            move_windows 1 '.class == "Brave-browser" or .class == "Safari"' ;; 
-        2) # Notes
-            move_windows 2 '.class == "obsidian"' ;;
-        3) # Terminal & Code
-            move_windows 3 '.class == "org.wezfurlong.wezterm" or .class == "Code" or .class == "Xcode"' ;;
-        5) # PDF
-            move_windows 5 '.class == "org.gnome.Preview" or .title | contains("PDF")' ;;
-        7) # Media
-            move_windows 7 '.class == "Spotify"' ;;
-        8) # Office
-            move_windows 8 '.class | contains("Microsoft")' ;;
-        9) # Comms
-            move_windows 9 '.class == "Slack" or .class == "discord" or .class == "org.telegram.desktop"' ;;
-
-        10) # AI (Gemini, Claude, Perplexity)
-            # On Linux, Brave Apps usually have the class "Brave-browser" but the Title contains the App Name.
-            # Or they have a random hash class. Searching Title is safer.
-            move_windows 10 '(.title | contains("Claude")) or (.title | contains("Perplexity")) or (.title | contains("Gemini"))' ;;
-
-        *)
-            echo "No gather action defined for this space." ;;
-    esac
+elif [[ "$OS" == "linux" ]]; then
+    if ! command -v hyprctl &> /dev/null; then echo "Error: hyprctl missing"; exit 1; fi
+    
+    # Hyprland Logic
+    # Get current workspace ID
+    CURRENT_WS=$(hyprctl activeworkspace -j | jq '.id')
+    echo "🐧 Linux: Gathering windows to Workspace $CURRENT_WS..."
+    
+    # Get list of all window addresses on other workspaces
+    hyprctl clients -j | jq -r ".[] | select(.workspace.id != $CURRENT_WS) | .address" | \
+    while read -r addr; do
+        hyprctl dispatch movetoworkspacesilent "$CURRENT_WS,address:$addr"
+    done
 fi
+
+echo "✅ Done."
