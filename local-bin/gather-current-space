@@ -1,5 +1,5 @@
 #!/bin/bash
-# Gather all windows to current space (Requires yabai & jq)
+# Gather windows to current space (Stable Logic)
 if ! command -v yabai &> /dev/null; then echo "Error: yabai missing"; exit 1; fi
 CURRENT=$(yabai -m query --spaces --space | jq '.index')
 echo "Gathering windows to Space $CURRENT..."
