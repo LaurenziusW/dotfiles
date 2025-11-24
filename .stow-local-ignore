@@ -1,0 +1,10 @@
+\.git
+\.gitignore
+\.DS_Store
+\.stow-local-ignore
+README.md
+LICENSE
+install.sh
+migrate_legacy.sh
+scripts
+docs

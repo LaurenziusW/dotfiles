@@ -1,0 +1,919 @@
+diff --git a/.DS_Store b/.DS_Store
+index 574030e..36b3c2d 100644
+Binary files a/.DS_Store and b/.DS_Store differ
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..be22ed3
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,5 @@
++*.md
++.DS_Store
++*/.DS_Store
++.DS_Store
++**/.DS_Store
+diff --git a/local-bin/.local/bin/bunch-manager b/local-bin/.local/bin/bunch-manager
+new file mode 100755
+index 0000000..72d0c5b
+--- /dev/null
++++ b/local-bin/.local/bin/bunch-manager
+@@ -0,0 +1,116 @@
++#!/usr/bin/env bash
++
++# ═══════════════════════════════════════════════════════════
++# BUNCH MANAGER
++# Create and manage environment bunches
++# ═══════════════════════════════════════════════════════════
++
++BUNCHES_DIR="$(dirname "$0")"
++
++show_help() {
++    cat << HELP
++Bunch Manager - Environment Management System
++
++Usage:
++  bunch-manager.sh list                    List all available bunches
++  bunch-manager.sh create <name>           Create new bunch from template
++  bunch-manager.sh run <name>              Run a bunch
++  bunch-manager.sh edit <name>             Edit a bunch script
++  bunch-manager.sh help                    Show this help
++
++Examples:
++  bunch-manager.sh create deep-work
++  bunch-manager.sh run study-math
++  bunch-manager.sh list
++
++HELP
++}
++
++list_bunches() {
++    echo "Available Bunches:"
++    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
++    for script in "$BUNCHES_DIR"/*.sh; do
++        if [[ -f "$script" && -x "$script" ]]; then
++            name=$(basename "$script" .sh)
++            [[ "$name" == "lib-os-detect" || "$name" == "bunch-manager" ]] && continue
++            echo "  • $name"
++        fi
++    done
++}
++
++create_bunch() {
++    local name=$1
++    if [[ -z "$name" ]]; then
++        echo "Error: Bunch name required"
++        exit 1
++    fi
++    
++    local filepath="$BUNCHES_DIR/${name}.sh"
++    if [[ -f "$filepath" ]]; then
++        echo "Error: Bunch '$name' already exists"
++        exit 1
++    fi
++    
++    # Copy template
++    cp "$BUNCHES_DIR/templates/bunch-template.sh" "$filepath"
++    
++    # Replace placeholders
++    sed -i.bak "s/\[BUNCH_NAME\]/$name/g" "$filepath"
++    sed -i.bak "s/\[DESCRIPTION\]/Custom bunch for $name/g" "$filepath"
++    rm "${filepath}.bak" 2>/dev/null || true
++    
++    chmod +x "$filepath"
++    echo "✅ Created bunch: $filepath"
++    echo "Edit it with: \$EDITOR $filepath"
++}
++
++run_bunch() {
++    local name=$1
++    if [[ -z "$name" ]]; then
++        echo "Error: Bunch name required"
++        exit 1
++    fi
++    
++    local filepath="$BUNCHES_DIR/${name}.sh"
++    if [[ ! -f "$filepath" ]]; then
++        echo "Error: Bunch '$name' not found"
++        list_bunches
++        exit 1
++    fi
++    
++    "$filepath"
++}
++
++edit_bunch() {
++    local name=$1
++    if [[ -z "$name" ]]; then
++        echo "Error: Bunch name required"
++        exit 1
++    fi
++    
++    local filepath="$BUNCHES_DIR/${name}.sh"
++    if [[ ! -f "$filepath" ]]; then
++        echo "Error: Bunch '$name' not found"
++        exit 1
++    fi
++    
++    ${EDITOR:-vim} "$filepath"
++}
++
++case "${1:-help}" in
++    list)
++        list_bunches
++        ;;
++    create)
++        create_bunch "$2"
++        ;;
++    run)
++        run_bunch "$2"
++        ;;
++    edit)
++        edit_bunch "$2"
++        ;;
++    help|*)
++        show_help
++        ;;
++esac
+diff --git a/local-bin/.local/bin/gather-current-space b/local-bin/.local/bin/gather-current-space
+new file mode 100755
+index 0000000..d8e5359
+--- /dev/null
++++ b/local-bin/.local/bin/gather-current-space
+@@ -0,0 +1,86 @@
++#!/usr/bin/env bash
++
++# This script detects the current workspace and gathers all
++# windows that "belong" to it, based on the unified config.
++
++# Load the OS detection library from its expected path
++source "$(dirname "$0")/lib-os-detect.sh"
++
++# Capture the output of detect_os
++OS_TYPE=$(detect_os)
++
++# --- macOS (Yabai) Implementation ---
++if [ "$OS_TYPE" = "macos" ]; then
++    CURRENT_SPACE=$(yabai -m query --spaces --space | jq '.index')
++    echo "Gathering windows for macOS Space $CURRENT_SPACE..."
++
++    case $CURRENT_SPACE in
++        1) # Browser
++            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser") | .id' | xargs -I {} yabai -m window {} --space 1 ;;
++        2) # Notes
++            yabai -m query --windows | jq -r '.[] | select(.app == "Obsidian") | .id' | xargs -I {} yabai -m window {} --space 2 ;;
++        3) # Terminal & Code
++            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode") | .id' | xargs -I {} yabai -m window {} --space 3 ;;
++        4) # Files
++            yabai -m query --windows | jq -r '.[] | select(.app == "Finder" or .app == "ForkLift") | .id' | xargs -I {} yabai -m window {} --space 4 ;;
++        5) # PDF
++            yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' | xargs -I {} yabai -m window {} --space 5 ;;
++        7) # Media
++            yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' | xargs -I {} yabai -m window {} --space 7 ;;
++        8) # Comms
++            yabai -m query --windows | jq -r '.[] | select(.app == "Slack" or .app == "Discord" or .app == "Mail" or .app == "Telegram") | .id' | xargs -I {} yabai -m window {} --space 8 ;;
++        9) # Office
++            yabai -m query --windows | jq -r '.[] | select(.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint") | .id' | xargs -I {} yabai -m window {} --space 9 ;;
++
++        10) # AI
++            yabai -m query --windows | jq -r '.[] | select(.app == "Claude" or .app == "Perplexity" or .app == "GeminiAPP" or .app == "PerplexityAPP") | .id' | xargs -I {} yabai -m window {} --space 10 ;;
++
++        *) # Catch-all
++            echo "No gather action defined for this space." ;;
++    esac
++
++# --- Linux (Hyprland) Implementation ---
++elif [ "$OS_TYPE" = "linux" ]; then
++    # Determine current workspace ID
++    CURRENT_SPACE=$(hyprctl activeworkspace -j | jq '.id')
++    echo "Gathering windows for Linux Workspace $CURRENT_SPACE..."
++
++    # Helper function to move windows by address using jq logic
++    # Usage: move_windows <destination_workspace> <jq_select_query>
++    move_windows() {
++        local workspace=$1
++        local query=$2
++
++        # get all clients, filter by query, output address, verify address exists, loop and move
++        hyprctl clients -j | jq -r ".[] | select($query) | .address" | while read -r addr; do
++            # 'movetoworkspacesilent' moves the window without switching focus to it immediately
++            hyprctl dispatch movetoworkspacesilent "$workspace,address:$addr"
++        done
++    }
++
++    case $CURRENT_SPACE in
++        1) # Browser
++            # Matches class names exactly or case-insensitive contains
++            move_windows 1 '.class == "Brave-browser" or .class == "Safari"' ;; 
++        2) # Notes
++            move_windows 2 '.class == "obsidian"' ;;
++        3) # Terminal & Code
++            move_windows 3 '.class == "org.wezfurlong.wezterm" or .class == "Code" or .class == "Xcode"' ;;
++        5) # PDF
++            move_windows 5 '.class == "org.gnome.Preview" or .title | contains("PDF")' ;;
++        7) # Media
++            move_windows 7 '.class == "Spotify"' ;;
++        8) # Office
++            move_windows 8 '.class | contains("Microsoft")' ;;
++        9) # Comms
++            move_windows 9 '.class == "Slack" or .class == "discord" or .class == "org.telegram.desktop"' ;;
++
++        10) # AI (Gemini, Claude, Perplexity)
++            # On Linux, Brave Apps usually have the class "Brave-browser" but the Title contains the App Name.
++            # Or they have a random hash class. Searching Title is safer.
++            move_windows 10 '(.title | contains("Claude")) or (.title | contains("Perplexity")) or (.title | contains("Gemini"))' ;;
++
++        *)
++            echo "No gather action defined for this space." ;;
++    esac
++fi
+\ No newline at end of file
+diff --git a/local-bin/.local/bin/lib-os-detect b/local-bin/.local/bin/lib-os-detect
+new file mode 100755
+index 0000000..bc524be
+--- /dev/null
++++ b/local-bin/.local/bin/lib-os-detect
+@@ -0,0 +1,73 @@
++#!/usr/bin/env bash
++# OS Detection Library for Bunches
++
++detect_os() {
++    if [[ "$OSTYPE" == "darwin"* ]]; then
++        echo "macos"
++    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
++        echo "linux"
++    else
++        echo "unknown"
++    fi
++}
++
++# Export OS-specific commands
++setup_os_commands() {
++    local os=$(detect_os)
++    
++    if [[ "$os" == "macos" ]]; then
++        export OPEN_CMD="open -a"
++        export WM_FOCUS_SPACE="yabai -m space --focus"
++        export WM_SEND_WINDOW="yabai -m window --space"
++    elif [[ "$os" == "linux" ]]; then
++        export OPEN_CMD="gtk-launch"  # or "exo-open" on some distros
++        export WM_FOCUS_SPACE="hyprctl dispatch workspace"
++        export WM_SEND_WINDOW="hyprctl dispatch movetoworkspace"
++    fi
++}
++
++# App name translation between macOS and Linux
++get_app_command() {
++    local app_key=$1
++    local os=$(detect_os)
++    
++    case "$app_key" in
++        "browser")
++            [[ "$os" == "macos" ]] && echo "Safari" || echo "firefox"
++            ;;
++        "notes")
++            echo "Obsidian"  # Same on both platforms
++            ;;
++        "terminal")
++            echo "WezTerm"  # Same on both platforms
++            ;;
++        "code")
++            [[ "$os" == "macos" ]] && echo "Visual Studio Code" || echo "code"
++            ;;
++        "music")
++            [[ "$os" == "macos" ]] && echo "Spotify" || echo "spotify"
++            ;;
++        "office-word")
++            [[ "$os" == "macos" ]] && echo "Microsoft Word" || echo "libreoffice"
++            ;;
++        "pdf")
++            [[ "$os" == "macos" ]] && echo "Preview" || echo "evince"
++            ;;
++        *)
++            echo "$app_key"
++            ;;
++    esac
++}
++
++# Launch app with proper command
++launch_app() {
++    local app_key=$1
++    local app_name=$(get_app_command "$app_key")
++    local os=$(detect_os)
++    
++    if [[ "$os" == "macos" ]]; then
++        open -a "$app_name"
++    else
++        gtk-launch "$app_name" &>/dev/null || "$app_name" &
++    fi
++}
+diff --git a/nvim/.DS_Store b/nvim/.DS_Store
+index 9cf8869..77069e6 100644
+Binary files a/nvim/.DS_Store and b/nvim/.DS_Store differ
+diff --git a/nvim/.config/.DS_Store b/nvim/.config/.DS_Store
+index 7a1d766..d822d43 100644
+Binary files a/nvim/.config/.DS_Store and b/nvim/.config/.DS_Store differ
+diff --git a/skhd/.config/skhd/skhdrc b/skhd/.config/skhd/skhdrc
+deleted file mode 100755
+index 71fce56..0000000
+--- a/skhd/.config/skhd/skhdrc
++++ /dev/null
+@@ -1,139 +0,0 @@
+-# ═══════════════════════════════════════════════════════════
+-# UNIFIED KEYBOARD ENVIRONMENT - skhd Configuration
+-# PRIMARY Layer: Cmd (⌘) for Window Management
+-# ═══════════════════════════════════════════════════════════
+-
+-
+-# Smart Focus
+-cmd - escape : yabai -m window --focus mouse
+-
+-# disable keys
+-
+-alt - escape : /usr/bin/shortcuts run "ToggleKeyboard"
+-
+-# ───────────────────────────────────────────────────────────
+-# Window Focus Navigation (Vim-Style)
+-# ───────────────────────────────────────────────────────────
+-cmd - h : yabai -m window --focus west
+-cmd - j : yabai -m window --focus south
+-cmd - k : yabai -m window --focus north
+-cmd - l : yabai -m window --focus east
+-
+-# ───────────────────────────────────────────────────────────
+-# Window Movement (Move windows in direction)
+-# ───────────────────────────────────────────────────────────
+-cmd + shift - h : yabai -m window --warp west
+-cmd + shift - j : yabai -m window --warp south
+-cmd + shift - k : yabai -m window --warp north
+-cmd + shift - l : yabai -m window --warp east
+-
+-# ───────────────────────────────────────────────────────────
+-# Launch Terminal
+-# ───────────────────────────────────────────────────────────
+-cmd - return : open -a WezTerm
+-
+-# ───────────────────────────────────────────────────────────
+-# Window Resizing (Alt/Option Layer)
+-# ───────────────────────────────────────────────────────────
+-alt + shift - h : yabai -m window --resize left:-50:0
+-alt + shift - l : yabai -m window --resize right:50:0
+-alt + shift - k : yabai -m window --resize top:0:-50
+-alt + shift - j : yabai -m window --resize bottom:0:50
+-
+-# ───────────────────────────────────────────────────────────
+-# Window Controls
+-# ───────────────────────────────────────────────────────────
+-
+-# Toggle split direction
+-cmd + shift - 0x2A : yabai -m window --toggle split  # Cmd+Shift+\
+-
+-# Toggle float/tile
+-cmd + shift - space : yabai -m window --toggle float
+-
+-# Fullscreen toggle
+-cmd +shift - f : yabai -m window --toggle zoom-fullscreen
+-
+-# ───────────────────────────────────────────────────────────
+-# Advanced Window Layout Controls
+-# ───────────────────────────────────────────────────────────
+-
+-# Stack windows (create vertical stack)
+-cmd + ctrl - s : yabai -m window --insert stack
+-
+-# Rotate tree 90° clockwise
+-cmd + shift - r : yabai -m space --rotate 90
+-
+-# Mirror tree horizontally
+-cmd + shift - x : yabai -m space --mirror x-axis
+-
+-# Mirror tree vertically
+-cmd + shift - y : yabai -m space --mirror y-axis
+-
+-# Balance space (equalize all window sizes)
+-cmd + shift - b : yabai -m space --balance
+-
+-# Toggle layout between BSP and stack
+-cmd + ctrl - t : yabai -m space --layout $(yabai -m query --spaces --space | jq -r 'if .type == "bsp" then "stack" else "bsp" end')
+-
+-# ───────────────────────────────────────────────────────────
+-# Workspace (Space) Navigation - Cmd + Number
+-# ───────────────────────────────────────────────────────────
+-cmd - 1 : yabai -m space --focus 1
+-cmd - 2 : yabai -m space --focus 2
+-cmd - 3 : yabai -m space --focus 3
+-cmd - 4 : yabai -m space --focus 4
+-cmd - 5 : yabai -m space --focus 5
+-cmd - 6 : yabai -m space --focus 6
+-cmd - 7 : yabai -m space --focus 7
+-cmd - 8 : yabai -m space --focus 8
+-cmd - 9 : yabai -m space --focus 9
+-cmd - 0x1D :yabai -m space --focus 10
+-# Previous/Next space
+-cmd - 0x21 : yabai -m space --focus prev  # Cmd+[
+-cmd - 0x1E : yabai -m space --focus next  # Cmd+]
+-
+-# ───────────────────────────────────────────────────────────
+-# Move Window to Workspace - Cmd + Shift + Number
+-# (Moves window and follows it)
+-# ───────────────────────────────────────────────────────────
+-cmd + shift - 1 : yabai -m window --space 1 --focus
+-cmd + shift - 2 : yabai -m window --space 2 --focus
+-cmd + shift - 3 : yabai -m window --space 3 --focus
+-cmd + shift - 4 : yabai -m window --space 4 --focus
+-cmd + shift - 5 : yabai -m window --space 5 --focus
+-cmd + shift - 6 : yabai -m window --space 6 --focus
+-cmd + shift - 7 : yabai -m window --space 7 --focus
+-cmd + shift - 8 : yabai -m window --space 8 --focus
+-cmd + shift - 9 : yabai -m window --space 9 --focus
+-cmd + shift - 0x1D : yabai -m window --space 10 --focus
+-
+-# ───────────────────────────────────────────────────────────
+-# Gather (Cleanup) Current Workspace
+-# ───────────────────────────────────────────────────────────
+-# This is the new hotkey you requested
+-cmd - 0x32 : ~/OneDrive/workflow/scripts/gather-current-space.sh # Cmd + `
+-
+-
+-# ───────────────────────────────────────────────────────────
+-# Quick App Launchers - Cmd + Alt + Letter
+-# ───────────────────────────────────────────────────────────
+-
+-
+-
+-cmd + alt - r : open -b io.raindrop.macapp    # Raindrop
+-cmd + alt - b : open -b com.brave.Browser     # Browser
+-cmd + alt - o : open -a "Obsidian"            # Obsidian (notes)
+-cmd + alt - c : open -a "Visual Studio Code"  # Code editor
+-cmd + alt - m : open -a "Spotify"             # Music
+-cmd + alt - t : open -a "WezTerm"             # Terminal
+-cmd + alt - f : open -a "ForkLift"            # Forklift
+-
+-# ───────────────────────────────────────────────────────────
+-# Bunches - Environment Switching - Cmd + Ctrl + Number
+-# (Paths updated to new workflow directory)
+-# ───────────────────────────────────────────────────────────
+-cmd + ctrl - 1 : ~/OneDrive/workflow/bunches/study-math.sh
+-cmd + ctrl - 2 : ~/OneDrive/workflow/bunches/guitar-practice.sh
+-cmd + ctrl - 3 : ~/OneDrive/workflow/bunches/coding-project.sh
+-cmd + ctrl - 4 : ~/OneDrive/workflow/bunches/email-admin.sh
+-cmd + ctrl - 5 : ~/OneDrive/workflow/bunches/reading.sh
+diff --git a/workflow/bunches/oldBunchSHfiles/bunch-manager.sh b/workflow/bunches/oldBunchSHfiles/bunch-manager.sh
+new file mode 100644
+index 0000000..72d0c5b
+--- /dev/null
++++ b/workflow/bunches/oldBunchSHfiles/bunch-manager.sh
+@@ -0,0 +1,116 @@
++#!/usr/bin/env bash
++
++# ═══════════════════════════════════════════════════════════
++# BUNCH MANAGER
++# Create and manage environment bunches
++# ═══════════════════════════════════════════════════════════
++
++BUNCHES_DIR="$(dirname "$0")"
++
++show_help() {
++    cat << HELP
++Bunch Manager - Environment Management System
++
++Usage:
++  bunch-manager.sh list                    List all available bunches
++  bunch-manager.sh create <name>           Create new bunch from template
++  bunch-manager.sh run <name>              Run a bunch
++  bunch-manager.sh edit <name>             Edit a bunch script
++  bunch-manager.sh help                    Show this help
++
++Examples:
++  bunch-manager.sh create deep-work
++  bunch-manager.sh run study-math
++  bunch-manager.sh list
++
++HELP
++}
++
++list_bunches() {
++    echo "Available Bunches:"
++    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
++    for script in "$BUNCHES_DIR"/*.sh; do
++        if [[ -f "$script" && -x "$script" ]]; then
++            name=$(basename "$script" .sh)
++            [[ "$name" == "lib-os-detect" || "$name" == "bunch-manager" ]] && continue
++            echo "  • $name"
++        fi
++    done
++}
++
++create_bunch() {
++    local name=$1
++    if [[ -z "$name" ]]; then
++        echo "Error: Bunch name required"
++        exit 1
++    fi
++    
++    local filepath="$BUNCHES_DIR/${name}.sh"
++    if [[ -f "$filepath" ]]; then
++        echo "Error: Bunch '$name' already exists"
++        exit 1
++    fi
++    
++    # Copy template
++    cp "$BUNCHES_DIR/templates/bunch-template.sh" "$filepath"
++    
++    # Replace placeholders
++    sed -i.bak "s/\[BUNCH_NAME\]/$name/g" "$filepath"
++    sed -i.bak "s/\[DESCRIPTION\]/Custom bunch for $name/g" "$filepath"
++    rm "${filepath}.bak" 2>/dev/null || true
++    
++    chmod +x "$filepath"
++    echo "✅ Created bunch: $filepath"
++    echo "Edit it with: \$EDITOR $filepath"
++}
++
++run_bunch() {
++    local name=$1
++    if [[ -z "$name" ]]; then
++        echo "Error: Bunch name required"
++        exit 1
++    fi
++    
++    local filepath="$BUNCHES_DIR/${name}.sh"
++    if [[ ! -f "$filepath" ]]; then
++        echo "Error: Bunch '$name' not found"
++        list_bunches
++        exit 1
++    fi
++    
++    "$filepath"
++}
++
++edit_bunch() {
++    local name=$1
++    if [[ -z "$name" ]]; then
++        echo "Error: Bunch name required"
++        exit 1
++    fi
++    
++    local filepath="$BUNCHES_DIR/${name}.sh"
++    if [[ ! -f "$filepath" ]]; then
++        echo "Error: Bunch '$name' not found"
++        exit 1
++    fi
++    
++    ${EDITOR:-vim} "$filepath"
++}
++
++case "${1:-help}" in
++    list)
++        list_bunches
++        ;;
++    create)
++        create_bunch "$2"
++        ;;
++    run)
++        run_bunch "$2"
++        ;;
++    edit)
++        edit_bunch "$2"
++        ;;
++    help|*)
++        show_help
++        ;;
++esac
+diff --git a/workflow/bunches/oldBunchSHfiles/coding-project.sh b/workflow/bunches/oldBunchSHfiles/coding-project.sh
+new file mode 100644
+index 0000000..5e7c0a4
+--- /dev/null
++++ b/workflow/bunches/oldBunchSHfiles/coding-project.sh
+@@ -0,0 +1,27 @@
++#!/usr/bin/env bash
++source "$(dirname "$0")/lib-os-detect.sh"
++setup_os_commands
++
++echo "💻 Starting: Coding Project"
++
++# Terminal for git/builds
++$WM_FOCUS_SPACE 3
++launch_app "terminal"
++sleep 1
++
++# Code editor
++$WM_FOCUS_SPACE 4
++launch_app "code"
++sleep 2
++
++# Browser for docs
++$WM_FOCUS_SPACE 1
++launch_app "browser"
++
++# Return to terminal
++$WM_FOCUS_SPACE 3
++
++echo "✅ Coding environment ready!"
++# Optional: cd to project and start tmux session
++# cd ~/Projects/my-awesome-project
++# tmux new-session -d -s coding
+diff --git a/workflow/bunches/oldBunchSHfiles/email-admin.sh b/workflow/bunches/oldBunchSHfiles/email-admin.sh
+new file mode 100644
+index 0000000..59f094a
+--- /dev/null
++++ b/workflow/bunches/oldBunchSHfiles/email-admin.sh
+@@ -0,0 +1,27 @@
++#!/usr/bin/env bash
++source "$(dirname "$0")/lib-os-detect.sh"
++setup_os_commands
++
++echo "📧 Starting: Email & Admin"
++
++# Communication apps
++$WM_FOCUS_SPACE 5
++os=$(detect_os)
++if [[ "$os" == "macos" ]]; then
++    open -a "Mail"
++    sleep 1
++    open -a "Slack"
++else
++    gtk-launch thunderbird &
++    sleep 1
++    gtk-launch slack &
++fi
++
++# Browser for webmail/admin panels
++$WM_FOCUS_SPACE 1
++launch_app "browser"
++
++# Office apps if needed
++$WM_FOCUS_SPACE 7
++
++echo "✅ Admin environment ready!"
+diff --git a/workflow/bunches/oldBunchSHfiles/guitar-practice.sh b/workflow/bunches/oldBunchSHfiles/guitar-practice.sh
+new file mode 100644
+index 0000000..2f4550c
+--- /dev/null
++++ b/workflow/bunches/oldBunchSHfiles/guitar-practice.sh
+@@ -0,0 +1,21 @@
++#!/usr/bin/env bash
++source "$(dirname "$0")/lib-os-detect.sh"
++setup_os_commands
++
++echo "🎸 Starting: Guitar Practice"
++
++# Open music player
++$WM_FOCUS_SPACE 6
++launch_app "music"
++sleep 1
++
++# Open browser for tabs/tutorials
++$WM_FOCUS_SPACE 1
++launch_app "browser"
++sleep 1
++
++# Open notes for practice log
++$WM_FOCUS_SPACE 2
++launch_app "notes"
++
++echo "✅ Guitar practice environment ready!"
+diff --git a/workflow/bunches/oldBunchSHfiles/reading.sh b/workflow/bunches/oldBunchSHfiles/reading.sh
+new file mode 100644
+index 0000000..9ab112e
+--- /dev/null
++++ b/workflow/bunches/oldBunchSHfiles/reading.sh
+@@ -0,0 +1,19 @@
++#!/usr/bin/env bash
++source "$(dirname "$0")/lib-os-detect.sh"
++setup_os_commands
++
++echo "📖 Starting: Reading"
++
++# PDF reader
++$WM_FOCUS_SPACE 8
++launch_app "pdf"
++sleep 1
++
++# Notes for highlights/thoughts
++$WM_FOCUS_SPACE 2
++launch_app "notes"
++
++# Focus on reading space
++$WM_FOCUS_SPACE 8
++
++echo "✅ Reading environment ready!"
+diff --git a/workflow/bunches/oldBunchSHfiles/study-math.sh b/workflow/bunches/oldBunchSHfiles/study-math.sh
+new file mode 100644
+index 0000000..5de4b4c
+--- /dev/null
++++ b/workflow/bunches/oldBunchSHfiles/study-math.sh
+@@ -0,0 +1,30 @@
++#!/usr/bin/env bash
++source "$(dirname "$0")/lib-os-detect.sh"
++setup_os_commands
++
++echo "📚 Starting: Study Math"
++
++# Focus workspace 2 (Notes)
++$WM_FOCUS_SPACE 2
++sleep 0.5
++
++# Open Obsidian to math notes
++launch_app "notes"
++sleep 2
++
++# Open browser for research
++launch_app "browser"
++sleep 1
++
++# Open terminal for calculations (Julia, Python, etc.)
++$WM_FOCUS_SPACE 3
++launch_app "terminal"
++
++# Open PDF reader for textbooks
++$WM_FOCUS_SPACE 8
++launch_app "pdf"
++
++# Return to notes
++$WM_FOCUS_SPACE 2
++
++echo "✅ Math study environment ready!"
+diff --git a/workflow/bunches/templates/bunch-template.sh b/workflow/bunches/templates/bunch-template.sh
+new file mode 100644
+index 0000000..3040c73
+--- /dev/null
++++ b/workflow/bunches/templates/bunch-template.sh
+@@ -0,0 +1,38 @@
++#!/usr/bin/env bash
++
++# ═══════════════════════════════════════════════════════════
++# BUNCH: [BUNCH_NAME]
++# Description: [DESCRIPTION]
++# ═══════════════════════════════════════════════════════════
++
++# Load OS detection library
++source "$(dirname "$0")/lib-os-detect.sh"
++setup_os_commands
++
++# ───────────────────────────────────────────────────────────
++# Configuration
++# ───────────────────────────────────────────────────────────
++BUNCH_NAME="[BUNCH_NAME]"
++PRIMARY_SPACE=1  # Main workspace for this bunch
++
++# ───────────────────────────────────────────────────────────
++# Startup Sequence
++# ───────────────────────────────────────────────────────────
++echo "🚀 Starting bunch: $BUNCH_NAME"
++
++# Switch to primary workspace
++$WM_FOCUS_SPACE $PRIMARY_SPACE
++
++# Launch applications (add your apps here)
++# Example:
++# launch_app "browser"
++# sleep 1
++# launch_app "notes"
++# sleep 1
++# launch_app "terminal"
++
++echo "✅ Bunch '$BUNCH_NAME' ready!"
++
++# Optional: Run additional setup commands
++# cd ~/Projects/my-project
++# tmux new-session -d -s bunch-session
+diff --git a/yabai/.config/yabai/yabairc b/yabai/.config/yabai/yabairc
+deleted file mode 100755
+index 0f6f47a..0000000
+--- a/yabai/.config/yabai/yabairc
++++ /dev/null
+@@ -1,134 +0,0 @@
+-#!/usr/bin/env sh
+-sudo yabai --load-sa
+-# ═══════════════════════════════════════════════════════════
+-# UNIFIED KEYBOARD ENVIRONMENT - Yabai Configuration
+-# (Using your layout, with "follow focus" and corrected rule order)
+-# ═══════════════════════════════════════════════════════════
+-
+-# ───────────────────────────────────────────────────────────
+-# Layout Configuration
+-# ───────────────────────────────────────────────────────────
+-yabai -m config layout bsp
+-yabai -m config top_padding 4
+-yabai -m config bottom_padding 4
+-yabai -m config left_padding 4
+-yabai -m config right_padding 4
+-yabai -m config window_gap 4
+-
+-
+-
+-# ───────────────────────────────────────────────────────────
+-# Window Border Configuration (External Utility)
+-# ───────────────────────────────────────────────────────────
+-# Configure the 'borders' utility
+-borders width=3 \
+-        active_color=0xff88c0d0 \
+-        inactive_color=0xff3b4252 &
+-
+-# ───────────────────────────────────────────────────────────
+-# Mouse Configuration
+-# ───────────────────────────────────────────────────────────
+-yabai -m config mouse_follows_focus off
+-yabai -m config focus_follows_mouse off
+-yabai -m config mouse_modifier alt
+-yabai -m config mouse_action1 move
+-yabai -m config mouse_action2 resize
+-
+-# ───────────────────────────────────────────────────────────
+-# Window Behavior
+-# ───────────────────────────────────────────────────────────
+-yabai -m config split_ratio 0.50
+-yabai -m config auto_balance off
+-yabai -m config window_placement second_child
+-
+-# ───────────────────────────────────────────────────────────
+-# Exclusions - Apps That Should Float
+-# ───────────────────────────────────────────────────────────
+-yabai -m rule --add app="^System Settings$" manage=off
+-yabai -m rule --add app="^Calculator$" manage=off
+-yabai -m rule --add app="^App Store$" manage=off
+-
+-# ═══════════════════════════════════════════════════════════
+-# WORKSPACE (SPACE) APP ASSIGNMENTS
+-# ═══════════════════════════════════════════════════════════
+-
+-# ───────────────────────────────────────────────────────────
+-# Space 1: Browser & Web
+-# ───────────────────────────────────────────────────────────
+-yabai -m rule --add app="^Safari$" space=^1
+-yabai -m rule --add app="^Brave Browser$" space=^1
+-yabai -m rule --add app="^Raindrop.io$" space=^1
+-
+-# ───────────────────────────────────────────────────────────
+-# Space 2: Notes & Writing
+-# ───────────────────────────────────────────────────────────
+-yabai -m rule --add app="^Obsidian$" space=^2
+-
+-# ───────────────────────────────────────────────────────────
+-# Space 3: Terminal & Code Editors
+-# ───────────────────────────────────────────────────────────
+-yabai -m rule --add app="^WezTerm$" space=^3
+-yabai -m rule --add app="^Code$" space=^3
+-yabai -m rule --add app="^Xcode$" space=^3
+-
+-# ───────────────────────────────────────────────────────────
+-# Space 4: ForkLift % Finder
+-# ───────────────────────────────────────────────────────────
+-yabai -m rule --add app="^Finder$" space=^4
+-yabai -m rule --add app="^ForkLift$" space=^4
+-
+-
+-
+-
+-# ───────────────────────────────────────────────────────────
+-# Space 5: PDF & Reading
+-# ───────────────────────────────────────────────────────────
+-yabai -m rule --add app="^Preview$" space=^5
+-yabai -m rule --add app="^PDF Expert$" space=^5
+-
+-# ───────────────────────────────────────────────────────────
+-# Space 6: other
+-# ───────────────────────────────────────────────────────────
+-
+-
+-
+-# ───────────────────────────────────────────────────────────
+-# Space 7: Media & Music
+-# ───────────────────────────────────────────────────────────
+-yabai -m rule --add app="^Spotify$" space=^7
+-
+-# ───────────────────────────────────────────────────────────
+-# Space 8: Communication
+-# ───────────────────────────────────────────────────────────
+-yabai -m rule --add app="^Slack$" space=^8
+-yabai -m rule --add app="^Discord$" space=^8
+-yabai -m rule --add app="^Mail$" space=^8
+-yabai -m rule --add app="^Telegram$" space=^8
+-
+-# ───────────────────────────────────────────────────────────
+-# Space 9: Office & Documents
+-# ───────────────────────────────────────────────────────────
+-yabai -m rule --add app="^Microsoft Word$" space=^9
+-yabai -m rule --add app="^Microsoft Excel$" space=^9
+-yabai -m rule --add app="^Microsoft PowerPoint$" space=^9
+-
+-
+-# ───────────────────────────────────────────────────────────
+-# Space 10: AI
+-# ───────────────────────────────────────────────────────────
+-yabai -m rule --add app="^Claude$" space=^10
+-yabai -m rule --add app="^Perplexity$" space=^10
+-yabai -m rule --add app="^GeminiAPP$" space=^10
+-yabai -m rule --add app="^PerplexityAPP$" space=^10
+-# ───────────────────────────────────────────────────────────
+-# Space 6: Everything else (Catch-all)
+-# ───────────────────────────────────────────────────────────
+-# This rule MUST be last. It catches all apps that
+-# did not match any rule above. '^' for focus.
+-
+-yabai -m rule --add app!="^(GeminiAPP|Perplexity|PerplexityAPP|Claude|Safari|Brave Browser|Obsidian|WezTerm|Code|Xcode|Preview|PDF Expert|Raindrop.io|Spotify|Microsoft Word|Microsoft Excel|Microsoft PowerPoint|Slack|Discord|Mail|WhatsApp|Telegram|Finder|ForkLift)$" space=^6
+-yabai -m rule --add app="WhatsApp" role="AXWindow" space=^8
+-
+-
+-
+-echo "yabai: Configuration loaded with workspace assignments"
