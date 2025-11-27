@@ -91,6 +91,11 @@ cmd - 0x1D :yabai -m space --focus 10
 # Previous/Next space
 cmd - 0x21 : yabai -m space --focus prev  # Cmd+[
 cmd - 0x1E : yabai -m space --focus next  # Cmd+]
+# Switch to last used workspace
+cmd - 0x30 : yabai -m space --focus recent
+
+
+
 
 # ───────────────────────────────────────────────────────────
 # Move Window to Workspace - Cmd + Shift + Number

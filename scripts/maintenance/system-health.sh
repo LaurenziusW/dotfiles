@@ -1,32 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ═══════════════════════════════════════════════════════════
-# SYSTEM HEALTH CHECK
-# Validates symlinks, executables, and service status
-# ═══════════════════════════════════════════════════════════
-
 readonly DOTFILES_DIR="${DOTFILES_ROOT:-$HOME/dotfiles}"
 readonly OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 
-# ───────────────────────────────────────────────────────────
-# Validation Functions
-# ───────────────────────────────────────────────────────────
-
 check_exec() {
-    command -v "$1" &>/dev/null && echo "✓ $1" || echo "✗ $1 (missing)"
+    command -v "$1" &>/dev/null && echo "✓ $1" || echo "✗ $1"
 }
 
 check_link() {
     local path=$1
     local name=$(basename "$path")
     
-    if [[ -L "$path" && $(readlink "$path") == "$DOTFILES_DIR"* ]]; then
-        echo "✓ $name → dotfiles"
+    if [[ -L "$path" ]]; then
+        local target=$(readlink "$path")
+        if [[ "$target" == "$DOTFILES_DIR"* ]] || [[ "$target" == *"dotfiles/"* ]]; then
+            echo "✓ $name"
+        else
+            echo "⚠ $name → $target"
+        fi
     elif [[ -e "$path" ]]; then
-        echo "⚠ $name (physical file, not linked)"
+        echo "✓ $name (physical)"
     else
-        echo "✗ $name (missing)"
+        echo "✗ $name"
     fi
 }
 
@@ -34,31 +30,19 @@ check_service() {
     local service=$1
     case "$OS" in
         darwin)
-            if brew services list | grep -q "^$service.*started"; then
-                echo "✓ $service (running)"
-            else
-                echo "✗ $service (stopped)"
-            fi
+            pgrep -x "$service" &>/dev/null && echo "✓ $service" || echo "✗ $service"
             ;;
         linux)
-            if systemctl --user is-active --quiet "$service" 2>/dev/null; then
-                echo "✓ $service (active)"
-            else
-                echo "⚠ $service (inactive/not found)"
-            fi
+            systemctl --user is-active --quiet "$service" 2>/dev/null && echo "✓ $service" || echo "✗ $service"
             ;;
     esac
 }
 
-# ───────────────────────────────────────────────────────────
-# Health Checks
-# ───────────────────────────────────────────────────────────
-
-echo "System Health Check"
+echo "System Health"
 echo "OS: $OS | Dotfiles: $DOTFILES_DIR"
 echo ""
 
-echo "▸ Core Executables"
+echo "Executables"
 check_exec nvim
 check_exec tmux
 check_exec zsh
@@ -67,7 +51,7 @@ check_exec gather-current-space
 check_exec bunch-manager
 
 echo ""
-echo "▸ Window Manager Stack"
+echo "Window Manager"
 if [[ "$OS" == "darwin" ]]; then
     check_exec yabai
     check_exec skhd
@@ -79,7 +63,7 @@ elif [[ "$OS" == "linux" ]]; then
 fi
 
 echo ""
-echo "▸ Critical Symlinks"
+echo "Symlinks"
 check_link "$HOME/.zshrc"
 check_link "$HOME/.wezterm.lua"
 check_link "$HOME/.tmux.conf"
@@ -93,9 +77,3 @@ elif [[ "$OS" == "linux" ]]; then
 fi
 
 echo ""
-echo "▸ Local Binaries in PATH"
-check_exec gather-current-space
-check_exec bunch-manager
-
-echo ""
-echo "Health check complete"
