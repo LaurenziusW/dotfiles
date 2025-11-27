@@ -6,6 +6,13 @@ set -euo pipefail
 # Identifies configuration drift before install
 # ═══════════════════════════════════════════════════════════
 
+# 1. Defined Colors
+readonly RESET="\033[0m"
+readonly GRAY="\033[90m"
+readonly GREEN="\033[32m"
+readonly YELLOW="\033[33m"
+readonly RED="\033[31m"
+
 readonly DOTFILES_DIR="${DOTFILES_ROOT:-$HOME/dotfiles}"
 readonly BACKUP_DIR="$HOME/dotfiles-backup-$(date +%Y%m%d_%H%M%S)"
 
@@ -37,15 +44,34 @@ esac
 # Drift Detection
 # ───────────────────────────────────────────────────────────
 
+# Helper to resolve symlinks to absolute paths (handles relative links)
+resolve_path() {
+    if command -v realpath >/dev/null 2>&1; then
+        realpath "$1"
+    else
+        # Python fallback for macOS if coreutils/realpath is missing
+        python3 -c "import os, sys; print(os.path.realpath(sys.argv[1]))" "$1"
+    fi
+}
+
 detect_state() {
     local path=$1
     
     if [[ ! -e "$path" && ! -L "$path" ]]; then
         echo "CLEAN"
-    elif [[ -L "$path" && $(readlink "$path") == "$DOTFILES_DIR"* ]]; then
-        echo "LINKED"
-    elif [[ -L "$path" ]]; then
-        echo "FOREIGN"
+        return
+    fi
+
+    if [[ -L "$path" ]]; then
+        # Resolve the link to an absolute path before comparing
+        local target
+        target=$(resolve_path "$path")
+        
+        if [[ "$target" == "$DOTFILES_DIR"* ]]; then
+            echo "LINKED"
+        else
+            echo "FOREIGN"
+        fi
     elif [[ -d "$path" ]]; then
         echo "DIRECTORY"
     elif [[ -f "$path" ]]; then
@@ -53,6 +79,7 @@ detect_state() {
     fi
 }
 
+# Header
 printf "%-20s | %-12s | %s\n" "PACKAGE" "STATUS" "PATH"
 echo "───────────────────────────────────────────────────────────"
 
@@ -63,10 +90,10 @@ for name in "${!TARGETS[@]}"; do
     state=$(detect_state "$path")
     
     case "$state" in
-        CLEAN)   icon="○"; color="\033[90m" ;;
-        LINKED)  icon="✓"; color="\033[32m" ;;
-        FOREIGN) icon="⚠"; color="\033[33m"; has_conflict=1 ;;
-        *)       icon="✗"; color="\033[31m"; has_conflict=1 ;;
+        CLEAN)   icon="○"; color="$GRAY" ;;
+        LINKED)  icon="✓"; color="$GREEN" ;;
+        FOREIGN) icon="⚠"; color="$YELLOW"; has_conflict=1 ;;
+        *)       icon="✗"; color="$RED";    has_conflict=1 ;;
     esac
     
     printf "${color}%-20s${RESET} | %-12s | %s\n" "$name" "$state" "$path"
@@ -83,7 +110,7 @@ if [[ $has_conflict -eq 0 ]]; then
     exit 0
 fi
 
-echo "Conflicts detected. Backup and wipe?"
+printf "${YELLOW}Conflicts detected. Backup and wipe?${RESET}\n"
 read -rp "Continue? [y/N]: " confirm
 
 [[ ! "$confirm" =~ ^[Yy]$ ]] && { echo "Aborted"; exit 1; }
@@ -97,9 +124,12 @@ for name in "${!TARGETS[@]}"; do
     if [[ "$state" != "CLEAN" && "$state" != "LINKED" ]]; then
         rel_path="${path#$HOME/}"
         dest="$BACKUP_DIR/$rel_path"
+        
+        # Ensure backup subdirectory exists
         mkdir -p "$(dirname "$dest")"
+        
         mv "$path" "$dest"
-        echo "→ Backed up: $path"
+        printf "→ Backed up: %s\n" "$path"
     fi
 done
 
