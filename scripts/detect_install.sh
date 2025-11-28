@@ -1,71 +1,156 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Configuration
-BACKUP_DIR="$HOME/dotfiles_pre_install_backup_$(date +%Y%m%d_%H%M%S)"
-DOTFILES_DIR="$HOME/dotfiles"
+# ═══════════════════════════════════════════════════════════
+# PRE-INSTALL DETECTOR
+# Detects configuration conflicts before installation
+# ═══════════════════════════════════════════════════════════
 
-# Define the critical paths we want to manage
-# Format: "Name:Path"
-TARGETS=(
-    "Zsh Configuration:$HOME/.zshrc"
-    "WezTerm Config:$HOME/.wezterm.lua"
-    "Tmux Config:$HOME/.tmux.conf"
-    "Neovim Config:$HOME/.config/nvim"
-    "Local Binaries:$HOME/.local/bin/gather-current-space"
-    "Bunch Manager:$HOME/.local/bin/bunch-manager"
-    "Workflow Bunches:$HOME/bunches"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly DOTFILES_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+readonly BACKUP_DIR="$HOME/dotfiles_pre_install_backup_$(date +%Y%m%d_%H%M%S)"
+
+# Colors
+readonly RESET="\033[0m"
+readonly GRAY="\033[90m"
+readonly GREEN="\033[32m"
+readonly YELLOW="\033[33m"
+readonly RED="\033[31m"
+
+# Detect OS
+detect_os() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    else
+        echo "linux"
+    fi
+}
+
+OS_TYPE=$(detect_os)
+
+# ───────────────────────────────────────────────────────────
+# Target Definitions
+# Maps component names to their target locations
+# ───────────────────────────────────────────────────────────
+
+declare -A TARGETS=(
+    ["Zsh Configuration"]="$HOME/.zshrc"
+    ["WezTerm Config"]="$HOME/.wezterm.lua"
+    ["Tmux Config"]="$HOME/.tmux.conf"
+    ["Neovim Config"]="$HOME/.config/nvim"
+    ["Local Binaries"]="$HOME/.local/bin/gather-current-space"
+    ["Bunch Manager"]="$HOME/.local/bin/bunch-manager"
+    ["Workflow Bunches"]="$HOME/bunches"
 )
 
-# Add OS-specific targets
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    TARGETS+=("Yabai Config:$HOME/.config/yabai")
-    TARGETS+=("Skhd Config:$HOME/.config/skhd")
-elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    TARGETS+=("Hyprland Config:$HOME/.config/hypr")
+# Platform-specific targets
+if [[ "$OS_TYPE" == "macos" ]]; then
+    TARGETS["Yabai Config"]="$HOME/.config/yabai"
+    TARGETS["Skhd Config"]="$HOME/.config/skhd"
+    TARGETS["Karabiner"]="$HOME/.config/karabiner"
+else
+    TARGETS["Hyprland Config"]="$HOME/.config/hypr"
+    TARGETS["Keyd Config"]="$HOME/.config/keyd"
 fi
+
+# ───────────────────────────────────────────────────────────
+# Helper Functions
+# ───────────────────────────────────────────────────────────
+
+# Resolve symlinks to absolute paths
+resolve_path() {
+    if command -v realpath >/dev/null 2>&1; then
+        realpath "$1" 2>/dev/null || echo "$1"
+    else
+        # Fallback for systems without realpath
+        python3 -c "import os, sys; print(os.path.realpath(sys.argv[1]))" "$1" 2>/dev/null || echo "$1"
+    fi
+}
+
+# Detect the state of a path
+detect_state() {
+    local path=$1
+    
+    # Doesn't exist - clean
+    if [[ ! -e "$path" && ! -L "$path" ]]; then
+        echo "CLEAN"
+        return
+    fi
+
+    # Is a symlink
+    if [[ -L "$path" ]]; then
+        local target=$(resolve_path "$path")
+        
+        # Check if it points to our dotfiles
+        if [[ "$target" == "$DOTFILES_ROOT"* ]]; then
+            echo "LINKED"
+        else
+            echo "FOREIGN"
+        fi
+        return
+    fi
+    
+    # Is a directory or file (not linked)
+    if [[ -d "$path" ]]; then
+        echo "DIRECTORY"
+    elif [[ -f "$path" ]]; then
+        echo "FILE"
+    fi
+}
+
+# ───────────────────────────────────────────────────────────
+# Detection
+# ───────────────────────────────────────────────────────────
 
 echo "🔍 Detecting existing configurations..."
 echo "═══════════════════════════════════════════════════════════"
 printf "%-20s | %-15s | %s\n" "COMPONENT" "STATUS" "LOCATION"
 echo "───────────────────────────────────────────────────────────"
 
-CONFLICT_FOUND=false
+has_conflict=0
 
-for item in "${TARGETS[@]}"; do
-    NAME="${item%%:*}"
-    PATH_TARGET="${item#*:}"
+for name in "${!TARGETS[@]}"; do
+    path="${TARGETS[$name]}"
+    state=$(detect_state "$path")
     
-    if [ ! -e "$PATH_TARGET" ] && [ ! -L "$PATH_TARGET" ]; then
-        STATUS="⚪ Clean"
-        COLOR="\033[0;90m" # Gray
-    elif [ -L "$PATH_TARGET" ]; then
-        LINK_DEST=$(readlink "$PATH_TARGET")
-        if [[ "$LINK_DEST" == *"$DOTFILES_DIR"* ]]; then
-            STATUS="✅ Linked"
-            COLOR="\033[0;32m" # Green
-        else
-            STATUS="⚠️  Foreign Link"
-            COLOR="\033[0;33m" # Yellow
-            CONFLICT_FOUND=true
-        fi
-    elif [ -d "$PATH_TARGET" ]; then
-        STATUS="❌ Directory"
-        COLOR="\033[0;31m" # Red
-        CONFLICT_FOUND=true
-    elif [ -f "$PATH_TARGET" ]; then
-        STATUS="❌ File"
-        COLOR="\033[0;31m" # Red
-        CONFLICT_FOUND=true
-    fi
+    case "$state" in
+        CLEAN)
+            icon="⚪"
+            status="Clean"
+            ;;
+        LINKED)
+            icon="✅"
+            status="✓ Stowed"
+            ;;
+        FOREIGN)
+            icon="⚠️ "
+            status="Foreign Link"
+            has_conflict=1
+            ;;
+        DIRECTORY)
+            icon="⚠️ "
+            status="Directory"
+            has_conflict=1
+            ;;
+        FILE)
+            icon="⚠️ "
+            status="File"
+            has_conflict=1
+            ;;
+    esac
     
-    # Reset color
-    NC="\033[0m"
-    printf "${COLOR}%-20s${NC} | ${COLOR}%-15s${NC} | %s\n" "$NAME" "$STATUS" "$PATH_TARGET"
+    printf "%-20s | $icon %-13s | %s\n" "$name" "$status" "$path"
 done
+
 echo "═══════════════════════════════════════════════════════════"
 
-if [ "$CONFLICT_FOUND" = false ]; then
-    echo "✨ Your system is clean! You can run ./install.sh safely."
+# ───────────────────────────────────────────────────────────
+# Conflict Resolution
+# ───────────────────────────────────────────────────────────
+
+if [[ $has_conflict -eq 0 ]]; then
+    echo "✅ No conflicts detected!"
+    echo "You can safely run: ./scripts/install.sh"
     exit 0
 fi
 
@@ -74,36 +159,40 @@ echo "⚠️  CONFLICTS DETECTED!"
 echo "Existing files or folders are blocking the dotfiles installation."
 echo "You can 'wipe' these files (they will be moved to a backup folder)."
 echo ""
-read -p "Do you want to WIPE existing configs and backup to $BACKUP_DIR? (y/N) " -n 1 -r
-echo ""
 
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo ""
-    echo "📦 Creating backup directory: $BACKUP_DIR"
-    mkdir -p "$BACKUP_DIR"
-    
-    for item in "${TARGETS[@]}"; do
-        PATH_TARGET="${item#*:}"
-        
-        # Check if it exists and is NOT correctly linked
-        if [ -e "$PATH_TARGET" ] || [ -L "$PATH_TARGET" ]; then
-            # Check if it's already correct, skip if so
-            if [ -L "$PATH_TARGET" ] && [[ "$(readlink "$PATH_TARGET")" == *"$DOTFILES_DIR"* ]]; then
-                continue
-            fi
-            
-            # Prepare destination path in backup to preserve hierarchy
-            REL_PATH="${PATH_TARGET#$HOME/}"
-            BACKUP_DEST="$BACKUP_DIR/$REL_PATH"
-            mkdir -p "$(dirname "$BACKUP_DEST")"
-            
-            echo "🔥 Wiping: $PATH_TARGET -> $BACKUP_DEST"
-            mv "$PATH_TARGET" "$BACKUP_DEST"
-        fi
-    done
-    
-    echo ""
-    echo "✅ Wipe complete. Your system is ready for ./install.sh"
-else
-    echo "❌ Operation cancelled. No files were changed."
+read -rp "Do you want to WIPE existing configs and backup to $BACKUP_DIR? (y/N) " confirm
+
+if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    echo "Aborted. Run './scripts/install.sh' to install without wiping."
+    echo "Note: install.sh will also handle conflicts by backing them up."
+    exit 1
 fi
+
+# Create backup directory
+echo "📦 Creating backup directory: $BACKUP_DIR"
+mkdir -p "$BACKUP_DIR"
+
+# Wipe conflicts
+for name in "${!TARGETS[@]}"; do
+    path="${TARGETS[$name]}"
+    state=$(detect_state "$path")
+    
+    # Skip if clean or already linked to our dotfiles
+    if [[ "$state" == "CLEAN" || "$state" == "LINKED" ]]; then
+        continue
+    fi
+    
+    # Create relative path for backup
+    rel_path="${path#$HOME/}"
+    backup_path="$BACKUP_DIR/$rel_path"
+    
+    # Ensure backup parent directory exists
+    mkdir -p "$(dirname "$backup_path")"
+    
+    # Move to backup
+    mv "$path" "$backup_path"
+    echo "🔥 Wiping: $path -> $backup_path"
+done
+
+echo ""
+echo "✅ Wipe complete. Your system is ready for ./install.sh"
