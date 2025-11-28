@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Gather - Organize windows to correct workspaces
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+source "$UKE_ROOT/lib/core.sh"
+source "$UKE_ROOT/lib/wm.sh"
+
+require_cmd yq jq
+
+REGISTRY="$UKE_CONFIG/registry.yaml"
+
+# Build app -> workspace mapping
+declare -A APP_WS
+
+build_mapping() {
+    for ws in $(yq -r '.workspaces | keys[]' "$REGISTRY"); do
+        local apps
+        if is_macos; then
+            apps=$(yq -r ".workspaces.$ws.apps // [] | .[] as \$a | .apps[\$a].macos // empty" "$REGISTRY" 2>/dev/null)
+        else
+            apps=$(yq -r ".workspaces.$ws.apps // [] | .[] as \$a | .apps[\$a].linux // empty" "$REGISTRY" 2>/dev/null)
+        fi
+        for app in $apps; do
+            [[ -n "$app" ]] && APP_WS["$app"]="$ws"
+        done
+    done
+}
+
+gather_macos() {
+    local ws="${1:-$(wm_current_workspace)}"
+    log_info "Gathering windows for workspace $ws..."
+    
+    build_mapping
+    
+    # Get all windows
+    local windows
+    windows=$(yabai -m query --windows 2>/dev/null)
+    
+    echo "$windows" | jq -c '.[]' | while read -r win; do
+        local app_name bundle space
+        app_name=$(echo "$win" | jq -r '.app')
+        space=$(echo "$win" | jq -r '.space')
+        
+        # Find target workspace for this app
+        for pattern in "${!APP_WS[@]}"; do
+            if [[ "$app_name" == *"$pattern"* ]]; then
+                local target="${APP_WS[$pattern]}"
+                if [[ "$space" != "$target" ]]; then
+                    local wid
+                    wid=$(echo "$win" | jq -r '.id')
+                    log_debug "Moving $app_name to workspace $target"
+                    yabai -m window "$wid" --space "$target" 2>/dev/null || true
+                fi
+                break
+            fi
+        done
+    done
+    
+    ok "Windows gathered"
+}
+
+gather_linux() {
+    local ws="${1:-$(wm_current_workspace)}"
+    log_info "Gathering windows for workspace $ws..."
+    
+    build_mapping
+    
+    local windows
+    windows=$(hyprctl clients -j 2>/dev/null)
+    
+    echo "$windows" | jq -c '.[]' | while read -r win; do
+        local class current
+        class=$(echo "$win" | jq -r '.class')
+        current=$(echo "$win" | jq -r '.workspace.id')
+        
+        for pattern in "${!APP_WS[@]}"; do
+            if [[ "$class" == *"$pattern"* ]]; then
+                local target="${APP_WS[$pattern]}"
+                if [[ "$current" != "$target" ]]; then
+                    local addr
+                    addr=$(echo "$win" | jq -r '.address')
+                    log_debug "Moving $class to workspace $target"
+                    hyprctl dispatch movetoworkspacesilent "$target,address:$addr" 2>/dev/null || true
+                fi
+                break
+            fi
+        done
+    done
+    
+    ok "Windows gathered"
+}
+
+# Main
+is_macos && gather_macos "$@" || gather_linux "$@"

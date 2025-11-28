@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Manual backup utility for UKE configs
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+source "$UKE_ROOT/lib/core.sh"
+
+BACKUP_ROOT="$HOME/.uke-backups"
+
+create_backup() {
+    local timestamp=$(date +%Y%m%d-%H%M%S)
+    local backup_dir="$BACKUP_ROOT/$timestamp"
+    
+    log_info "Creating backup: $backup_dir"
+    mkdir -p "$backup_dir"
+    
+    # Backup registry
+    cp "$UKE_CONFIG/registry.yaml" "$backup_dir/" && ok "Backed up registry"
+    
+    # Backup generated configs
+    if is_macos; then
+        [[ -f "$UKE_GEN/skhd/skhdrc" ]] && cp "$UKE_GEN/skhd/skhdrc" "$backup_dir/"
+        [[ -f "$UKE_GEN/yabai/yabairc" ]] && cp "$UKE_GEN/yabai/yabairc" "$backup_dir/"
+    else
+        [[ -f "$UKE_GEN/hyprland/hyprland.conf" ]] && cp "$UKE_GEN/hyprland/hyprland.conf" "$backup_dir/"
+    fi
+    
+    # Create manifest
+    cat > "$backup_dir/MANIFEST.txt" << EOF
+UKE Backup - $timestamp
+Platform: $(uname -s)
+Version: $UKE_VERSION
+Files:
+$(ls -1 "$backup_dir")
+EOF
+    
+    ok "Backup complete: $backup_dir"
+    return 0
+}
+
+list_backups() {
+    if [[ ! -d "$BACKUP_ROOT" ]]; then
+        log_info "No backups found"
+        return 0
+    fi
+    
+    echo "Available backups:"
+    for backup in "$BACKUP_ROOT"/*; do
+        [[ -d "$backup" ]] || continue
+        local name=$(basename "$backup")
+        echo "  $name"
+        [[ -f "$backup/MANIFEST.txt" ]] && sed 's/^/    /' "$backup/MANIFEST.txt"
+    done
+}
+
+restore_backup() {
+    local name="$1"
+    local backup_dir="$BACKUP_ROOT/$name"
+    
+    [[ -d "$backup_dir" ]] || log_fatal "Backup not found: $name"
+    
+    log_warn "This will overwrite your current registry!"
+    read -p "Continue? (y/N) " -n 1 -r
+    echo
+    [[ $REPLY =~ ^[Yy]$ ]] || { log_info "Aborted"; return 1; }
+    
+    [[ -f "$backup_dir/registry.yaml" ]] && {
+        cp "$backup_dir/registry.yaml" "$UKE_CONFIG/"
+        ok "Restored registry"
+    }
+    
+    log_info "Run 'uke gen && uke reload' to apply"
+    return 0
+}
+
+case "${1:-}" in
+    create|"") create_backup ;;
+    list)      list_backups ;;
+    restore)   shift; restore_backup "$@" ;;
+    *)         log_fatal "Usage: uke-backup {create|list|restore <name>}" ;;
+esac

@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════
+# UKE v6 - Installation Detector & Cleaner
+# Finds existing symlinks, stow packages, and orphaned configs
+# ═══════════════════════════════════════════════════════════
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Targets to check
+STOW_TARGETS=(
+    "$HOME/.wezterm.lua"
+    "$HOME/.tmux.conf"
+    "$HOME/.zshrc"
+    "$HOME/.config/nvim"
+)
+
+GEN_TARGETS=(
+    "$HOME/.config/skhd/skhdrc"
+    "$HOME/.config/yabai/yabairc"
+    "$HOME/.config/hypr/hyprland.conf"
+)
+
+KEYLAYER_TARGETS=(
+    "$HOME/.config/karabiner/assets/complex_modifications"
+    "/etc/keyd/default.conf"
+)
+
+BIN_TARGETS=(
+    "$HOME/.local/bin/uke"
+    "$HOME/.local/bin/uke-bunch"
+    "$HOME/.local/bin/uke-gather"
+    "$HOME/.local/bin/uke-doctor"
+    "$HOME/.local/bin/uke-backup"
+    "$HOME/.local/bin/uke-debug"
+    "$HOME/.local/bin/gather-current-space"
+    "$HOME/.local/bin/bunch-manager"
+    "$HOME/.local/bin/lib-os-detect"
+)
+
+FOUND_ISSUES=0
+
+check_path() {
+    local path="$1"
+    local category="$2"
+    
+    if [[ -L "$path" ]]; then
+        local target=$(readlink -f "$path" 2>/dev/null || readlink "$path")
+        echo -e "${YELLOW}SYMLINK${NC} [$category] $path -> $target"
+        ((FOUND_ISSUES++)) || true
+    elif [[ -e "$path" ]]; then
+        echo -e "${RED}EXISTS${NC}  [$category] $path (regular file/dir)"
+        ((FOUND_ISSUES++)) || true
+    fi
+}
+
+detect() {
+    echo -e "${BLUE}═══ UKE Installation Detector ═══${NC}"
+    echo ""
+    
+    echo -e "${BLUE}[Stow Packages]${NC}"
+    for t in "${STOW_TARGETS[@]}"; do check_path "$t" "stow"; done
+    
+    echo ""
+    echo -e "${BLUE}[Generated WM Configs]${NC}"
+    for t in "${GEN_TARGETS[@]}"; do check_path "$t" "gen"; done
+    
+    echo ""
+    echo -e "${BLUE}[Keyboard Layer]${NC}"
+    for t in "${KEYLAYER_TARGETS[@]}"; do check_path "$t" "keys"; done
+    
+    echo ""
+    echo -e "${BLUE}[Binaries]${NC}"
+    for t in "${BIN_TARGETS[@]}"; do check_path "$t" "bin"; done
+    
+    echo ""
+    if [[ $FOUND_ISSUES -eq 0 ]]; then
+        echo -e "${GREEN}✓ No existing installation detected. Clean slate.${NC}"
+    else
+        echo -e "${YELLOW}Found $FOUND_ISSUES existing paths.${NC}"
+        echo "Run '$0 clean' to remove them."
+    fi
+}
+
+clean() {
+    echo -e "${RED}═══ UKE Installation Cleaner ═══${NC}"
+    echo ""
+    
+    local ALL_TARGETS=("${STOW_TARGETS[@]}" "${GEN_TARGETS[@]}" "${BIN_TARGETS[@]}")
+    local removed=0
+    
+    for path in "${ALL_TARGETS[@]}"; do
+        if [[ -L "$path" ]]; then
+            echo -e "${YELLOW}Removing symlink:${NC} $path"
+            rm "$path"
+            ((removed++)) || true
+        elif [[ -e "$path" ]]; then
+            local backup="${path}.bak.$(date +%Y%m%d%H%M%S)"
+            echo -e "${YELLOW}Backing up:${NC} $path -> $backup"
+            mv "$path" "$backup"
+            ((removed++)) || true
+        fi
+    done
+    
+    # Unstow from common dotfiles locations
+    for dotdir in "$HOME/dotfiles" "$HOME/.dotfiles" "$HOME/uke"; do
+        if [[ -d "$dotdir" ]]; then
+            echo -e "${BLUE}Attempting unstow from $dotdir${NC}"
+            cd "$dotdir"
+            for pkg in wezterm tmux zsh nvim karabiner keyd local-bin; do
+                stow -D "$pkg" 2>/dev/null || true
+            done
+        fi
+    done
+    
+    echo ""
+    echo -e "${GREEN}✓ Cleaned $removed paths.${NC}"
+}
+
+case "${1:-detect}" in
+    detect|status|check)
+        detect
+        ;;
+    clean|remove|uninstall)
+        read -p "This will remove/backup existing configs. Continue? [y/N] " -n 1 -r
+        echo
+        [[ $REPLY =~ ^[Yy]$ ]] && clean || echo "Aborted."
+        ;;
+    -h|--help|help)
+        echo "Usage: $0 [detect|clean]"
+        echo "  detect  - Find existing UKE installations (default)"
+        echo "  clean   - Remove symlinks, backup regular files, unstow packages"
+        ;;
+    *)
+        echo "Unknown command: $1"
+        exit 1
+        ;;
+esac

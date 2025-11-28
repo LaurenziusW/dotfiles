@@ -1,0 +1,147 @@
+# ==============================================================================
+# UKE Registry v5.0 - Single Source of Truth
+# ==============================================================================
+# Edit this file, then run: uke gen && uke reload
+# ==============================================================================
+
+version: "5.0"
+
+# ==============================================================================
+# MODIFIERS
+# ==============================================================================
+modifiers:
+  primary:       { macos: "cmd",           linux: "ALT" }
+  primary_shift: { macos: "cmd + shift",   linux: "ALT SHIFT" }
+  tertiary:      { macos: "cmd + alt",     linux: "SUPER" }
+  bunch:         { macos: "cmd + ctrl",    linux: "SUPER CTRL" }
+  resize:        { macos: "alt + shift",   linux: "ALT SHIFT" }
+
+# ==============================================================================
+# APPS - Platform-specific identifiers
+# ==============================================================================
+apps:
+  safari:     { macos: "com.apple.Safari" }
+  brave:      { macos: "com.brave.Browser",              linux: "Brave-browser" }
+  arc:        { macos: "company.thebrowser.Browser" }
+  raindrop:   { macos: "io.raindrop.macapp",             linux: "Raindrop" }
+  obsidian:   { macos: "md.obsidian",                    linux: "obsidian" }
+  wezterm:    { macos: "com.github.wez.wezterm",         linux: "org.wezfurlong.wezterm" }
+  vscode:     { macos: "com.microsoft.VSCode",           linux: "Code" }
+  xcode:      { macos: "com.apple.dt.Xcode" }
+  finder:     { macos: "com.apple.finder",               linux: "org.gnome.Nautilus" }
+  forklift:   { macos: "com.binarynights.ForkLift" }
+  preview:    { macos: "com.apple.Preview",              linux: "org.gnome.Evince" }
+  pdf-expert: { macos: "com.readdle.PDFExpert-Mac" }
+  spotify:    { macos: "com.spotify.client",             linux: "Spotify" }
+  slack:      { macos: "com.tinyspeck.slackmacgap",      linux: "Slack" }
+  discord:    { macos: "com.hnc.Discord",                linux: "discord" }
+  mail:       { macos: "com.apple.mail",                 linux: "thunderbird" }
+  telegram:   { macos: "ru.keepcoder.Telegram",          linux: "org.telegram.desktop" }
+  whatsapp:   { macos: "net.whatsapp.WhatsApp" }
+  word:       { macos: "com.microsoft.Word",             linux: "libreoffice-writer" }
+  excel:      { macos: "com.microsoft.Excel",            linux: "libreoffice-calc" }
+  powerpoint: { macos: "com.microsoft.Powerpoint",       linux: "libreoffice-impress" }
+  claude:     { macos: "com.anthropic.claudefordesktop", linux: "Claude" }
+  perplexity: { macos: "ai.perplexity.mac" }
+  gemini:     { macos: "com.google.GeminiApp" }
+
+# ==============================================================================
+# WORKSPACES
+# ==============================================================================
+workspaces:
+  1:  { name: "browser",       apps: [safari, brave, arc, raindrop] }
+  2:  { name: "notes",         apps: [obsidian] }
+  3:  { name: "code",          apps: [wezterm, vscode, xcode] }
+  4:  { name: "files",         apps: [finder, forklift] }
+  5:  { name: "documents",     apps: [preview, pdf-expert] }
+  6:  { name: "misc",          catch_all: true }
+  7:  { name: "media",         apps: [spotify] }
+  8:  { name: "communication", apps: [slack, discord, mail, telegram, whatsapp] }
+  9:  { name: "office",        apps: [word, excel, powerpoint] }
+  10: { name: "ai",            apps: [claude, perplexity, gemini] }
+
+# ==============================================================================
+# KEYBINDINGS
+# ==============================================================================
+keys:
+  # --- Focus (primary) ---
+  - { key: h, mod: primary, macos: "yabai -m window --focus west",  linux: "movefocus l" }
+  - { key: j, mod: primary, macos: "yabai -m window --focus south", linux: "movefocus d" }
+  - { key: k, mod: primary, macos: "yabai -m window --focus north", linux: "movefocus u" }
+  - { key: l, mod: primary, macos: "yabai -m window --focus east",  linux: "movefocus r" }
+
+  # --- Move (primary_shift) ---
+  - { key: h, mod: primary_shift, macos: "yabai -m window --warp west",  linux: "movewindow l" }
+  - { key: j, mod: primary_shift, macos: "yabai -m window --warp south", linux: "movewindow d" }
+  - { key: k, mod: primary_shift, macos: "yabai -m window --warp north", linux: "movewindow u" }
+  - { key: l, mod: primary_shift, macos: "yabai -m window --warp east",  linux: "movewindow r" }
+
+  # --- Resize (resize) ---
+  - { key: h, mod: resize, macos: "yabai -m window --resize left:-50:0",   linux: "resizeactive -50 0" }
+  - { key: j, mod: resize, macos: "yabai -m window --resize bottom:0:50",  linux: "resizeactive 0 50" }
+  - { key: k, mod: resize, macos: "yabai -m window --resize top:0:-50",    linux: "resizeactive 0 -50" }
+  - { key: l, mod: resize, macos: "yabai -m window --resize right:50:0",   linux: "resizeactive 50 0" }
+
+  # --- Workspaces (primary) ---
+  - { key: "1", mod: primary, macos: "yabai -m space --focus 1",  linux: "workspace 1" }
+  - { key: "2", mod: primary, macos: "yabai -m space --focus 2",  linux: "workspace 2" }
+  - { key: "3", mod: primary, macos: "yabai -m space --focus 3",  linux: "workspace 3" }
+  - { key: "4", mod: primary, macos: "yabai -m space --focus 4",  linux: "workspace 4" }
+  - { key: "5", mod: primary, macos: "yabai -m space --focus 5",  linux: "workspace 5" }
+  - { key: "6", mod: primary, macos: "yabai -m space --focus 6",  linux: "workspace 6" }
+  - { key: "7", mod: primary, macos: "yabai -m space --focus 7",  linux: "workspace 7" }
+  - { key: "8", mod: primary, macos: "yabai -m space --focus 8",  linux: "workspace 8" }
+  - { key: "9", mod: primary, macos: "yabai -m space --focus 9",  linux: "workspace 9" }
+  - { key: "0", mod: primary, macos: "yabai -m space --focus 10", linux: "workspace 10" }
+  - { key: "[", mod: primary, macos: "yabai -m space --focus prev", linux: "workspace m-1" }
+  - { key: "]", mod: primary, macos: "yabai -m space --focus next", linux: "workspace m+1" }
+  - { key: tab, mod: primary, macos: "yabai -m space --focus recent", linux: "workspace previous" }
+
+  # --- Move to Workspace (primary_shift) ---
+  - { key: "1", mod: primary_shift, macos: "yabai -m window --space 1 --focus",  linux: "movetoworkspace 1" }
+  - { key: "2", mod: primary_shift, macos: "yabai -m window --space 2 --focus",  linux: "movetoworkspace 2" }
+  - { key: "3", mod: primary_shift, macos: "yabai -m window --space 3 --focus",  linux: "movetoworkspace 3" }
+  - { key: "4", mod: primary_shift, macos: "yabai -m window --space 4 --focus",  linux: "movetoworkspace 4" }
+  - { key: "5", mod: primary_shift, macos: "yabai -m window --space 5 --focus",  linux: "movetoworkspace 5" }
+  - { key: "6", mod: primary_shift, macos: "yabai -m window --space 6 --focus",  linux: "movetoworkspace 6" }
+  - { key: "7", mod: primary_shift, macos: "yabai -m window --space 7 --focus",  linux: "movetoworkspace 7" }
+  - { key: "8", mod: primary_shift, macos: "yabai -m window --space 8 --focus",  linux: "movetoworkspace 8" }
+  - { key: "9", mod: primary_shift, macos: "yabai -m window --space 9 --focus",  linux: "movetoworkspace 9" }
+  - { key: "0", mod: primary_shift, macos: "yabai -m window --space 10 --focus", linux: "movetoworkspace 10" }
+
+  # --- Window Controls ---
+  - { key: f, mod: primary_shift, macos: "yabai -m window --toggle zoom-fullscreen", linux: "fullscreen 0" }
+  - { key: space, mod: primary_shift, macos: "yabai -m window --toggle float", linux: "togglefloating" }
+  - { key: s, mod: primary, macos: "yabai -m window --toggle split", linux: "togglesplit" }
+  - { key: r, mod: primary_shift, macos: "yabai -m space --rotate 90", linux: "layoutmsg orientationcycle" }
+  - { key: b, mod: primary_shift, macos: "yabai -m space --balance", linux: "layoutmsg orientationcycle" }
+
+  # --- Launchers (tertiary) ---
+  - { key: return, mod: primary, macos: "open -b com.github.wez.wezterm", linux: "exec wezterm" }
+  - { key: b, mod: tertiary, macos: "open -b com.brave.Browser", linux: "exec brave" }
+  - { key: o, mod: tertiary, macos: "open -b md.obsidian", linux: "exec obsidian" }
+  - { key: c, mod: tertiary, macos: "open -b com.microsoft.VSCode", linux: "exec code" }
+  - { key: m, mod: tertiary, macos: "open -b com.spotify.client", linux: "exec spotify" }
+  - { key: f, mod: tertiary, macos: "open -b com.binarynights.ForkLift", linux: "exec nautilus" }
+  - { key: space, mod: tertiary, linux: "exec wofi --show drun" }
+
+  # --- Utilities ---
+  - { key: grave, mod: primary, macos: "$HOME/.local/bin/uke-gather", linux: "$HOME/.local/bin/uke-gather" }
+  - { key: q, mod: tertiary, linux: "killactive" }
+
+  # --- Bunches ---
+  - { key: "1", mod: bunch, both: "$HOME/.local/bin/uke-bunch study" }
+  - { key: "2", mod: bunch, both: "$HOME/.local/bin/uke-bunch guitar" }
+  - { key: "3", mod: bunch, both: "$HOME/.local/bin/uke-bunch coding" }
+  - { key: "4", mod: bunch, both: "$HOME/.local/bin/uke-bunch email" }
+  - { key: "5", mod: bunch, both: "$HOME/.local/bin/uke-bunch reading" }
+
+# ==============================================================================
+# BUNCHES
+# ==============================================================================
+bunches:
+  study:   { apps: [obsidian, brave, wezterm, preview], focus: 2 }
+  guitar:  { apps: [spotify, brave], focus: 7 }
+  coding:  { apps: [wezterm, vscode, brave], focus: 3 }
+  email:   { apps: [mail, slack, brave], focus: 8 }
+  reading: { apps: [preview, obsidian], focus: 5 }

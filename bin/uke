@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE - Unified Keyboard Environment CLI
+# ==============================================================================
+set -euo pipefail
+
+# Resolve UKE_ROOT
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
+source "$UKE_ROOT/lib/core.sh"
+source "$UKE_ROOT/lib/wm.sh"
+
+# ------------------------------------------------------------------------------
+# Commands
+# ------------------------------------------------------------------------------
+cmd_gen() {
+    bash "$UKE_LIB/gen.sh" "${1:-all}"
+}
+
+cmd_reload() {
+    wm_reload
+}
+
+cmd_status() {
+    echo "UKE v$UKE_VERSION"
+    echo "Platform: $UKE_OS"
+    echo "Root: $UKE_ROOT"
+    echo ""
+    wm_running && ok "Window manager running" || fail "Window manager not running"
+    echo "Current workspace: $(wm_current_workspace)"
+}
+
+cmd_validate() {
+    log_info "Validating configuration..."
+    require_file "$UKE_CONFIG/registry.yaml"
+    
+    if command -v yq &>/dev/null; then
+        yq '.' "$UKE_CONFIG/registry.yaml" > /dev/null && ok "Registry YAML valid" || fail "Registry YAML invalid"
+    else
+        log_warn "yq not found, skipping YAML validation"
+    fi
+    
+    if is_macos; then
+        [[ -f "$UKE_GEN/skhd/skhdrc" ]] && ok "skhd config exists" || fail "skhd config missing"
+        [[ -f "$UKE_GEN/yabai/yabairc" ]] && ok "yabai config exists" || fail "yabai config missing"
+    else
+        [[ -f "$UKE_GEN/hyprland/hyprland.conf" ]] && ok "hyprland config exists" || fail "hyprland config missing"
+    fi
+}
+
+cmd_edit() {
+    local target="${1:-registry}"
+    local file
+    
+    case "$target" in
+        registry|reg) file="$UKE_CONFIG/registry.yaml" ;;
+        skhd)         file="$UKE_GEN/skhd/skhdrc" ;;
+        yabai)        file="$UKE_GEN/yabai/yabairc" ;;
+        hyprland)     file="$UKE_GEN/hyprland/hyprland.conf" ;;
+        *)            log_fatal "Unknown target: $target" ;;
+    esac
+    
+    ${EDITOR:-nvim} "$file"
+}
+
+cmd_log() {
+    case "${1:-tail}" in
+        tail)  tail -n "${2:-50}" "$UKE_LOG_FILE" 2>/dev/null || echo "No logs" ;;
+        clear) : > "$UKE_LOG_FILE" && ok "Log cleared" ;;
+        path)  echo "$UKE_LOG_FILE" ;;
+        *)     log_fatal "Unknown: $1" ;;
+    esac
+}
+
+cmd_install() {
+    bash "$UKE_SCRIPTS/install.sh" "$@"
+}
+
+cmd_help() {
+    cat << EOF
+UKE v$UKE_VERSION - Unified Keyboard Environment
+
+Usage: uke <command> [args]
+
+Commands:
+  gen [target]     Generate configs (skhd|yabai|hyprland|all)
+  reload           Reload window manager
+  status           Show status
+  validate         Validate configuration
+  edit [target]    Edit config (registry|skhd|yabai|hyprland)
+  log [cmd]        Manage logs (tail|clear|path)
+  install [opts]   Run installer
+  help             Show this help
+
+Environment:
+  UKE_DEBUG=1      Enable debug output
+  UKE_DRY_RUN=1    Don't execute commands
+
+Examples:
+  uke gen                    # Generate all configs
+  uke edit                   # Edit registry.yaml
+  uke gen && uke reload      # Apply changes
+EOF
+}
+
+# ------------------------------------------------------------------------------
+# Main
+# ------------------------------------------------------------------------------
+case "${1:-help}" in
+    gen|generate)  shift; cmd_gen "$@" ;;
+    reload)        cmd_reload ;;
+    status)        cmd_status ;;
+    validate)      cmd_validate ;;
+    edit)          shift; cmd_edit "$@" ;;
+    log)           shift; cmd_log "$@" ;;
+    install)       shift; cmd_install "$@" ;;
+    help|--help|-h) cmd_help ;;
+    version|--version|-v) echo "UKE v$UKE_VERSION" ;;
+    *) log_error "Unknown command: $1"; cmd_help; exit 1 ;;
+esac

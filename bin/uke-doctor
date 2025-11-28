@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Health check for UKE system
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+source "$UKE_ROOT/lib/core.sh"
+
+check_deps() {
+    local status=0
+    for cmd in stow yq jq git; do
+        command -v $cmd &>/dev/null || { log_error "$cmd not found"; status=1; }
+    done
+    
+    if is_macos; then
+        for cmd in yabai skhd; do
+            command -v $cmd &>/dev/null || { log_error "$cmd not found"; status=1; }
+        done
+    else
+        command -v hyprctl &>/dev/null || { log_error "hyprland not found"; status=1; }
+    fi
+    return $status
+}
+
+check_configs() {
+    local status=0
+    [[ -f "$UKE_CONFIG/registry.yaml" ]] || { log_error "registry.yaml missing"; status=1; }
+    
+    if is_macos; then
+        [[ -f "$UKE_GEN/skhd/skhdrc" ]] || { log_warn "skhd config not generated"; status=1; }
+        [[ -f "$UKE_GEN/yabai/yabairc" ]] || { log_warn "yabai config not generated"; status=1; }
+    else
+        [[ -f "$UKE_GEN/hyprland/hyprland.conf" ]] || { log_warn "hyprland config not generated"; status=1; }
+    fi
+    return $status
+}
+
+check_links() {
+    local status=0
+    for bin in uke uke-bunch uke-gather; do
+        [[ -x "$HOME/.local/bin/$bin" ]] || { log_warn "$bin not linked"; status=1; }
+    done
+    return $status
+}
+
+check_stow() {
+    local status=0
+    local packages=(wezterm tmux zsh nvim)
+    is_macos && packages+=(karabiner) || packages+=(keyd)
+    
+    for pkg in "${packages[@]}"; do
+        local stow_dir="$UKE_STOW/$pkg"
+        [[ -d "$stow_dir" ]] || { log_warn "$pkg stow package missing"; status=1; continue; }
+        
+        local linked=0
+        while IFS= read -r -d '' file; do
+            local target="${file#$stow_dir}"
+            [[ -L "$HOME$target" ]] && ((linked++))
+        done < <(find "$stow_dir" -type f -print0 2>/dev/null)
+        
+        [[ $linked -eq 0 ]] && log_warn "$pkg: no files linked"
+    done
+    return $status
+}
+
+main() {
+    log_info "Running UKE health check..."
+    echo ""
+    
+    local overall=0
+    
+    echo "Dependencies:"
+    check_deps && ok "All dependencies present" || { fail "Missing dependencies"; overall=1; }
+    echo ""
+    
+    echo "Configurations:"
+    check_configs && ok "Configs valid" || { fail "Config issues found"; overall=1; }
+    echo ""
+    
+    echo "Binaries:"
+    check_links && ok "Binaries linked" || { fail "Binary link issues"; overall=1; }
+    echo ""
+    
+    echo "Stow Packages:"
+    check_stow || { fail "Stow issues found"; overall=1; }
+    echo ""
+    
+    if [[ $overall -eq 0 ]]; then
+        ok "All checks passed"
+    else
+        fail "Some checks failed - see above"
+    fi
+    
+    return $overall
+}
+
+main "$@"

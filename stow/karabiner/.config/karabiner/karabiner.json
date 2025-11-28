@@ -1,0 +1,38 @@
+{
+  "profiles": [{
+    "name": "UKE",
+    "selected": true,
+    "complex_modifications": {
+      "rules": [{
+        "description": "Caps Lock → Escape (tap) / Hyper (hold)",
+        "manipulators": [{
+          "type": "basic",
+          "from": { "key_code": "caps_lock" },
+          "to": [{ "set_variable": { "name": "caps_pressed", "value": 1 }}],
+          "to_if_alone": [{ "key_code": "escape" }],
+          "to_after_key_up": [{ "set_variable": { "name": "caps_pressed", "value": 0 }}]
+        }]
+      }, {
+        "description": "Caps + HJKL → Arrows",
+        "manipulators": [
+          { "type": "basic", "from": { "key_code": "h" }, "to": [{ "key_code": "left_arrow" }], "conditions": [{ "type": "variable_if", "name": "caps_pressed", "value": 1 }]},
+          { "type": "basic", "from": { "key_code": "j" }, "to": [{ "key_code": "down_arrow" }], "conditions": [{ "type": "variable_if", "name": "caps_pressed", "value": 1 }]},
+          { "type": "basic", "from": { "key_code": "k" }, "to": [{ "key_code": "up_arrow" }], "conditions": [{ "type": "variable_if", "name": "caps_pressed", "value": 1 }]},
+          { "type": "basic", "from": { "key_code": "l" }, "to": [{ "key_code": "right_arrow" }], "conditions": [{ "type": "variable_if", "name": "caps_pressed", "value": 1 }]}
+        ]
+      }, {
+        "description": "Caps + WB → Word nav",
+        "manipulators": [
+          { "type": "basic", "from": { "key_code": "w" }, "to": [{ "key_code": "right_arrow", "modifiers": ["left_option"] }], "conditions": [{ "type": "variable_if", "name": "caps_pressed", "value": 1 }]},
+          { "type": "basic", "from": { "key_code": "b" }, "to": [{ "key_code": "left_arrow", "modifiers": ["left_option"] }], "conditions": [{ "type": "variable_if", "name": "caps_pressed", "value": 1 }]}
+        ]
+      }, {
+        "description": "Caps + UD → Page",
+        "manipulators": [
+          { "type": "basic", "from": { "key_code": "u" }, "to": [{ "key_code": "page_up" }], "conditions": [{ "type": "variable_if", "name": "caps_pressed", "value": 1 }]},
+          { "type": "basic", "from": { "key_code": "d" }, "to": [{ "key_code": "page_down" }], "conditions": [{ "type": "variable_if", "name": "caps_pressed", "value": 1 }]}
+        ]
+      }]
+    }
+  }]
+}
