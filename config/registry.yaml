@@ -63,6 +63,7 @@ workspaces:
 # ==============================================================================
 # KEYBINDINGS
 # ==============================================================================
+
 keys:
   # --- Focus (primary) ---
   - { key: h, mod: primary, macos: "yabai -m window --focus west",  linux: "movefocus l" }
@@ -93,8 +94,10 @@ keys:
   - { key: "8", mod: primary, macos: "yabai -m space --focus 8",  linux: "workspace 8" }
   - { key: "9", mod: primary, macos: "yabai -m space --focus 9",  linux: "workspace 9" }
   - { key: "0", mod: primary, macos: "yabai -m space --focus 10", linux: "workspace 10" }
-  - { key: "[", mod: primary, macos: "yabai -m space --focus prev", linux: "workspace m-1" }
-  - { key: "]", mod: primary, macos: "yabai -m space --focus next", linux: "workspace m+1" }
+  
+  # CHANGED: [ ] → , . for ISO QWERTZ
+  - { key: "comma",  mod: primary, macos: "yabai -m space --focus prev", linux: "workspace m-1" }
+  - { key: "period", mod: primary, macos: "yabai -m space --focus next", linux: "workspace m+1" }
   - { key: tab, mod: primary, macos: "yabai -m space --focus recent", linux: "workspace previous" }
 
   # --- Move to Workspace (primary_shift) ---
@@ -145,3 +148,4 @@ bunches:
   coding:  { apps: [wezterm, vscode, brave], focus: 3 }
   email:   { apps: [mail, slack, brave], focus: 8 }
   reading: { apps: [preview, obsidian], focus: 5 }
+

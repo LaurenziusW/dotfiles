@@ -2,9 +2,13 @@
 \.gitignore
 \.DS_Store
 \.stow-local-ignore
-README.md
+README\.md
 LICENSE
-install.sh
-migrate_legacy.sh
 scripts
 docs
+config
+lib
+bin
+gen
+bunches
+templates

@@ -3,10 +3,8 @@
 # UKE Installer
 # ==============================================================================
 set -euo pipefail
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UKE_ROOT="${SCRIPT_DIR%/scripts}"
-
 source "$UKE_ROOT/lib/core.sh"
 
 # ------------------------------------------------------------------------------
@@ -49,7 +47,7 @@ backup_existing() {
     for item in .config/skhd .config/yabai .config/hypr .wezterm.lua .tmux.conf .zshrc .config/nvim .config/karabiner; do
         if [[ -e "$HOME/$item" && ! -L "$HOME/$item" ]]; then
             mkdir -p "$backup_dir"
-            cp -r "$HOME/$item" "$backup_dir/" 2>/dev/null && ((backed_up++))
+            cp -r "$HOME/$item" "$backup_dir/" 2>/dev/null && backed_up=$((backed_up + 1))
         fi
     done
     
@@ -80,6 +78,8 @@ stow_packages() {
     for pkg in "${packages[@]}"; do
         if [[ -d "$pkg" ]]; then
             stow -R "$pkg" -t "$HOME" 2>/dev/null && ok "Stowed: $pkg" || log_warn "Failed: $pkg"
+        else
+            log_warn "Package not found: $pkg"
         fi
     done
 }
@@ -110,12 +110,12 @@ link_gen() {
     
     if is_macos; then
         mkdir -p "$HOME/.config/skhd" "$HOME/.config/yabai"
-        ln -sf "$UKE_GEN/skhd/skhdrc" "$HOME/.config/skhd/skhdrc" 2>/dev/null || true
-        ln -sf "$UKE_GEN/yabai/yabairc" "$HOME/.config/yabai/yabairc" 2>/dev/null || true
+        [[ -f "$UKE_GEN/skhd/skhdrc" ]] && ln -sf "$UKE_GEN/skhd/skhdrc" "$HOME/.config/skhd/skhdrc"
+        [[ -f "$UKE_GEN/yabai/yabairc" ]] && ln -sf "$UKE_GEN/yabai/yabairc" "$HOME/.config/yabai/yabairc"
         ok "Linked skhd and yabai configs"
     else
         mkdir -p "$HOME/.config/hypr"
-        ln -sf "$UKE_GEN/hyprland/hyprland.conf" "$HOME/.config/hypr/hyprland.conf" 2>/dev/null || true
+        [[ -f "$UKE_GEN/hyprland/hyprland.conf" ]] && ln -sf "$UKE_GEN/hyprland/hyprland.conf" "$HOME/.config/hypr/hyprland.conf"
         ok "Linked hyprland config"
     fi
 }
@@ -125,7 +125,11 @@ link_gen() {
 # ------------------------------------------------------------------------------
 generate_configs() {
     log_info "Generating configs from registry..."
-    bash "$UKE_LIB/gen.sh" all
+    if [[ -f "$UKE_LIB/gen.sh" ]]; then
+        bash "$UKE_LIB/gen.sh" all
+    else
+        log_warn "gen.sh not found, skipping generation"
+    fi
 }
 
 # ------------------------------------------------------------------------------
@@ -141,6 +145,15 @@ main() {
         --bins)  link_bins; exit 0 ;;
         --stow)  stow_packages; exit 0 ;;
         --gen)   generate_configs; exit 0 ;;
+        --help|-h)
+            echo "Usage: $0 [option]"
+            echo "  (no args)  Full install"
+            echo "  --check    Check dependencies only"
+            echo "  --stow     Stow packages only"
+            echo "  --bins     Link binaries only"
+            echo "  --gen      Generate configs only"
+            exit 0
+            ;;
     esac
     
     check_deps
