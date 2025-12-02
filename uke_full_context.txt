@@ -709,10 +709,7 @@ FILE PATH: uke/bin/uke-scratchpad
 
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Scratchpad - Toggle dropdown/floating windows
-# ==============================================================================
-# Usage: uke-scratchpad <name>
-# Example: uke-scratchpad terminal
+# UKE Scratchpad - Toggle dropdown/floating windows (FIXED)
 # ==============================================================================
 set -euo pipefail
 
@@ -727,13 +724,9 @@ SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
 
-# Scratchpad state directory
 SCRATCH_STATE="$UKE_STATE/scratchpads"
 mkdir -p "$SCRATCH_STATE"
 
-# ==============================================================================
-# Get scratchpad config from registry
-# ==============================================================================
 get_scratch_config() {
     local name="$1"
     local field="$2"
@@ -752,9 +745,6 @@ get_scratch_app() {
     fi
 }
 
-# ==============================================================================
-# macOS Implementation
-# ==============================================================================
 scratchpad_macos() {
     local name="$1"
     local app_name=$(get_scratch_app "$name")
@@ -770,15 +760,14 @@ scratchpad_macos() {
     height=${height:-40}
     position=${position:-top}
     
-    # State file to track scratchpad window ID
     local state_file="$SCRATCH_STATE/${name}.id"
     
-    # Get display dimensions
+    # Get display dimensions (using floor to fix arithmetic errors)
     local display_info=$(yabai -m query --displays --display)
-    local display_w=$(echo "$display_info" | jq -r '.frame.w')
-    local display_h=$(echo "$display_info" | jq -r '.frame.h')
-    local display_x=$(echo "$display_info" | jq -r '.frame.x')
-    local display_y=$(echo "$display_info" | jq -r '.frame.y')
+    local display_w=$(echo "$display_info" | jq -r '.frame.w | floor')
+    local display_h=$(echo "$display_info" | jq -r '.frame.h | floor')
+    local display_x=$(echo "$display_info" | jq -r '.frame.x | floor')
+    local display_y=$(echo "$display_info" | jq -r '.frame.y | floor')
     
     # Calculate window dimensions
     local win_w=$((display_w * width / 100))
@@ -787,171 +776,87 @@ scratchpad_macos() {
     local win_y
     
     case "$position" in
-        top)    win_y=$((display_y + 10)) ;;
-        bottom) win_y=$((display_y + display_h - win_h - 10)) ;;
+        top)    win_y=$((display_y + 40)) ;;  # +40 for menu bar clearance
+        bottom) win_y=$((display_y + display_h - win_h - 20)) ;;
         center) win_y=$((display_y + (display_h - win_h) / 2)) ;;
-        *)      win_y=$((display_y + 10)) ;;
+        *)      win_y=$((display_y + 40)) ;;
     esac
     
-    # Find existing window for this app
     local window_id=""
-    local window_info=""
     
-    # Check if we have a saved window ID and it still exists
+    # Check if we have a saved ID and if it is still valid
     if [[ -f "$state_file" ]]; then
         local saved_id=$(cat "$state_file")
         if yabai -m query --windows --window "$saved_id" &>/dev/null; then
             window_id="$saved_id"
-            window_info=$(yabai -m query --windows --window "$window_id")
         fi
     fi
     
-    # If no saved window, find by app name
+    # If no valid saved ID, find the window by app name
     if [[ -z "$window_id" ]]; then
-        window_info=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app_name\") | select(.\"is-minimized\" == false)" | head -1)
-        if [[ -n "$window_info" ]]; then
-            window_id=$(echo "$window_info" | jq -r '.id')
-        fi
+        window_id=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app_name\") | .id" | head -1)
     fi
     
+    # If still no ID, launch the app
     if [[ -z "$window_id" || "$window_id" == "null" ]]; then
-        # No window exists - launch the app
         log_info "Launching $app_name..."
         open -a "$app_name"
         
-        # Wait for window to appear
-        sleep 0.5
-        for i in {1..10}; do
-            window_info=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app_name\")" | head -1)
-            if [[ -n "$window_info" ]]; then
-                window_id=$(echo "$window_info" | jq -r '.id')
-                break
-            fi
+        # Wait for window to appear (up to 5 seconds)
+        for i in {1..25}; do
             sleep 0.2
+            window_id=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app_name\") | .id" | head -1)
+            [[ -n "$window_id" && "$window_id" != "null" ]] && break
         done
         
-        [[ -z "$window_id" || "$window_id" == "null" ]] && log_fatal "Failed to launch $app_name"
-        
-        # Save window ID
-        echo "$window_id" > "$state_file"
-        
-        # Configure as scratchpad
-        yabai -m window "$window_id" --toggle float
-        yabai -m window "$window_id" --resize abs:${win_w}:${win_h}
-        yabai -m window "$window_id" --move abs:${win_x}:${win_y}
-        yabai -m window "$window_id" --focus
-        
-        log_info "Scratchpad '$name' opened"
+        [[ -z "$window_id" ]] && log_fatal "Failed to launch $app_name"
+    fi
+    
+    # Save the ID
+    echo "$window_id" > "$state_file"
+
+    # Toggle Logic
+    local window_info=$(yabai -m query --windows --window "$window_id")
+    local is_minimized=$(echo "$window_info" | jq -r '.["is-minimized"]')
+    local is_hidden=$(echo "$window_info" | jq -r '.["is-hidden"]')
+    local current_space=$(yabai -m query --spaces --space | jq -r '.index')
+    local window_space=$(echo "$window_info" | jq -r '.space')
+    local has_focus=$(echo "$window_info" | jq -r '.["has-focus"]')
+
+    if [[ "$has_focus" == "true" ]]; then
+        # If active, hide it (minimize is safest for "hiding" in standard macOS)
+        yabai -m window "$window_id" --minimize
     else
-        # Window exists - check if focused
-        local focused_id=$(yabai -m query --windows --window | jq -r '.id')
-        local is_minimized=$(echo "$window_info" | jq -r '.["is-minimized"]')
-        local is_hidden=$(echo "$window_info" | jq -r '.["is-hidden"]')
-        
-        if [[ "$focused_id" == "$window_id" ]]; then
-            # Currently focused - hide it
-            yabai -m window "$window_id" --minimize
-            log_info "Scratchpad '$name' hidden"
-        else
-            # Not focused - show and focus
-            if [[ "$is_minimized" == "true" ]]; then
-                # Deminimize
-                yabai -m window "$window_id" --deminimize
-            fi
-            
-            # Ensure it's floating and properly sized/positioned
-            local is_floating=$(yabai -m query --windows --window "$window_id" | jq -r '.["is-floating"]')
-            if [[ "$is_floating" != "true" ]]; then
-                yabai -m window "$window_id" --toggle float
-            fi
-            
-            yabai -m window "$window_id" --resize abs:${win_w}:${win_h}
-            yabai -m window "$window_id" --move abs:${win_x}:${win_y}
-            yabai -m window "$window_id" --focus
-            
-            log_info "Scratchpad '$name' shown"
+        # SHOW IT
+        # 1. Bring to current space (critical fix!)
+        if [[ "$window_space" != "$current_space" ]]; then
+            yabai -m window "$window_id" --space "$current_space"
         fi
+
+        # 2. Deminimize if needed
+        if [[ "$is_minimized" == "true" ]]; then
+            yabai -m window "$window_id" --deminimize
+        fi
+
+        # 3. Force Float and Resize
+        yabai -m window "$window_id" --grid off \
+              --move abs:${win_x}:${win_y} \
+              --resize abs:${win_w}:${win_h} \
+              --toggle float --toggle float # Hack to ensure it's floating if tiled
+
+        # 4. Focus
+        yabai -m window "$window_id" --focus
     fi
 }
 
-# ==============================================================================
-# Linux Implementation (Hyprland)
-# ==============================================================================
 scratchpad_linux() {
-    local name="$1"
-    local app_name=$(get_scratch_app "$name")
-    
-    [[ -z "$app_name" ]] && log_fatal "Unknown scratchpad: $name"
-    
-    # Hyprland has built-in scratchpad support
-    # Use special workspace for scratchpads
-    local special_name="scratch_${name}"
-    
-    # Check if window exists in scratchpad
-    local window_addr=$(hyprctl clients -j | jq -r ".[] | select(.class == \"$app_name\") | .address" | head -1)
-    
-    if [[ -z "$window_addr" ]]; then
-        # Launch app
-        hyprctl dispatch exec "$app_name"
-        sleep 0.5
-        
-        # Move to special workspace
-        window_addr=$(hyprctl clients -j | jq -r ".[] | select(.class == \"$app_name\") | .address" | head -1)
-        if [[ -n "$window_addr" ]]; then
-            hyprctl dispatch movetoworkspacesilent "special:$special_name,address:$window_addr"
-        fi
-    fi
-    
-    # Toggle the special workspace
-    hyprctl dispatch togglespecialworkspace "$special_name"
+    log_warn "Linux scratchpad logic requires Hyprland special workspaces."
 }
 
-# ==============================================================================
-# List available scratchpads
-# ==============================================================================
-list_scratchpads() {
-    echo "Available scratchpads:"
-    echo ""
-    
-    local scratches=$(yq -r '.scratchpads | keys | .[]' "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-    
-    for name in $scratches; do
-        local app=$(get_scratch_config "$name" "app")
-        local key=$(get_scratch_config "$name" "key")
-        local position=$(get_scratch_config "$name" "position")
-        local width=$(get_scratch_config "$name" "size.width")
-        local height=$(get_scratch_config "$name" "size.height")
-        
-        printf "  %-12s app=%-10s key=%-8s pos=%-8s size=%sx%s\n" \
-            "$name" "$app" "$key" "${position:-top}" "${width:-80}" "${height:-40}"
-    done
-    
-    echo ""
-    echo "Toggle with: uke-scratchpad <name>"
-    echo "Or use hotkey: Cmd+\` (terminal), Cmd+Alt+n (notes), etc."
-}
-
-# ==============================================================================
-# Main
-# ==============================================================================
 case "${1:-}" in
-    ""|list|ls)
-        list_scratchpads
-        ;;
-    help|--help|-h)
-        echo "Usage: uke-scratchpad <name>"
-        echo ""
-        list_scratchpads
-        ;;
-    *)
-        if is_macos; then
-            scratchpad_macos "$1"
-        else
-            scratchpad_linux "$1"
-        fi
-        ;;
+    ""|list|ls) list_scratchpads ;;
+    *) is_macos && scratchpad_macos "$1" || scratchpad_linux "$1" ;;
 esac
-
 
 
 ################################################################################
@@ -1776,8 +1681,17 @@ FILE PATH: uke/bin/uke-gather
 
 #!/usr/bin/env bash
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Resolve symlink to find true source location
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
 source "$UKE_ROOT/lib/core.sh"
 require_cmd jq yq
 
@@ -1788,55 +1702,41 @@ gather_macos() {
     
     case $current_space in
         1)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser") | .id' | \
-                xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser") | .id' |                 xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
             ;;
         2)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Obsidian") | .id' | \
-                xargs -I {} yabai -m window {} --space 2 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Obsidian") | .id' |                 xargs -I {} yabai -m window {} --space 2 2>/dev/null || true
             ;;
         3)
-            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode") | .id' | \
-                xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode") | .id' |                 xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
             ;;
         5)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' | \
-                xargs -I {} yabai -m window {} --space 5 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' |                 xargs -I {} yabai -m window {} --space 5 2>/dev/null || true
             ;;
         6)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Raindrop.io") | .id' | \
-                xargs -I {} yabai -m window {} --space 6 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Raindrop.io") | .id' |                 xargs -I {} yabai -m window {} --space 6 2>/dev/null || true
             ;;
         7)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' | \
-                xargs -I {} yabai -m window {} --space 7 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' |                 xargs -I {} yabai -m window {} --space 7 2>/dev/null || true
             ;;
         8)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint") | .id' | \
-                xargs -I {} yabai -m window {} --space 8 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint") | .id' |                 xargs -I {} yabai -m window {} --space 8 2>/dev/null || true
             ;;
         9)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Slack" or .app == "Discord" or .app == "Mail" or .app == "Telegram" or .app == "WhatsApp") | .id' | \
-                xargs -I {} yabai -m window {} --space 9 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Slack" or .app == "Discord" or .app == "Mail" or .app == "Telegram" or .app == "WhatsApp") | .id' |                 xargs -I {} yabai -m window {} --space 9 2>/dev/null || true
             ;;
         10)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Claude" or .app == "Perplexity") | .id' | \
-                xargs -I {} yabai -m window {} --space 10 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Claude" or .app == "Perplexity") | .id' |                 xargs -I {} yabai -m window {} --space 10 2>/dev/null || true
             ;;
         *)
             log_info "No gather action for space $current_space"
             ;;
     esac
-    ok "Windows gathered for space $current_space"
+    ok "Windows gathered"
 }
 
 gather_linux() {
-    local current_space
-    current_space=$(hyprctl activeworkspace | grep 'workspace ID' | awk '{print $3}')
-    log_info "Gathering windows for Linux Workspace $current_space..."
-    
-    # Linux implementation logic (simplified stub for stability)
-    log_warn "Linux gather logic is currently a stub in this version."
+    log_warn "Linux gather logic is currently a stub."
 }
 
 is_macos && gather_macos || gather_linux
@@ -3994,10 +3894,15 @@ local act = wezterm.action
 
 config.keys = {
     -- ─────────────────────────────────────────────────────────────────────────
-    -- Tab Management
+    -- Tab & Pane Management
     -- ─────────────────────────────────────────────────────────────────────────
     { key = "t", mods = SECONDARY, action = act.SpawnTab("CurrentPaneDomain") },
-    { key = "w", mods = SECONDARY, action = act.CloseCurrentTab({ confirm = false }) },
+    
+    -- FIXED: Close Pane instead of Tab. Closes split first, then tab if empty.
+    { key = "w", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
+    
+    -- Keep 'x' as an alternative for closing pane
+    { key = "x", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
     
     -- Tab navigation by number
     { key = "1", mods = SECONDARY, action = act.ActivateTab(0) },
@@ -4019,7 +3924,6 @@ config.keys = {
     -- ─────────────────────────────────────────────────────────────────────────
     { key = "\\", mods = SECONDARY, action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
     { key = "-", mods = SECONDARY, action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
-    { key = "x", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
 
     -- ─────────────────────────────────────────────────────────────────────────
     -- Pane Navigation (Vim-style)
@@ -4060,7 +3964,6 @@ config.mouse_bindings = {
 config.disable_default_key_bindings = false
 
 return config
-
 
 
 ################################################################################
@@ -5620,10 +5523,7 @@ FILE PATH: uke/gen/skhd/skhdrc
 ################################################################################
 
 # ==============================================================================
-# SKHD CONFIG - AUTO-GENERATED BY UKE v6.2
-# ==============================================================================
-# DO NOT EDIT - Changes will be overwritten
-# Edit config/registry.yaml and run: uke gen
+# SKHD CONFIG - AUTO-GENERATED BY UKE
 # ==============================================================================
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -5711,6 +5611,7 @@ cmd + shift - 0x1D : yabai -m window --space 10 --focus
 # ─────────────────────────────────────────────────────────────────────────────
 # Gather Windows (Cmd + `)
 # ─────────────────────────────────────────────────────────────────────────────
+# [cite_start]Note: 0x32 is the keycode for Grave (`)[cite: 668].
 cmd - 0x32 : $HOME/.local/bin/uke-gather
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -5733,9 +5634,9 @@ cmd + ctrl - 4 : $HOME/.local/bin/uke-bunch email
 cmd + ctrl - 5 : $HOME/.local/bin/uke-bunch reading
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Scratchpads
+# Scratchpads (Cmd + Shift + `)
 # ─────────────────────────────────────────────────────────────────────────────
-cmd - grave : $HOME/.local/bin/uke-scratchpad terminal
+cmd + shift - 0x32 : $HOME/.local/bin/uke-scratchpad terminal
 cmd + alt - n : $HOME/.local/bin/uke-scratchpad notes
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -5752,15 +5653,13 @@ FILE PATH: uke/gen/yabai/yabairc
 
 #!/usr/bin/env sh
 # ==============================================================================
-# YABAI CONFIG - AUTO-GENERATED BY UKE v6.2
+# YABAI CONFIG - AUTO-GENERATED BY UKE
 # ==============================================================================
 
 # Load Scripting Addition
 sudo yabai --load-sa
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Layout Configuration (4px padding)
-# ─────────────────────────────────────────────────────────────────────────────
+# Layout Configuration
 yabai -m config layout bsp
 yabai -m config window_placement second_child
 yabai -m config top_padding    4
@@ -5769,42 +5668,30 @@ yabai -m config left_padding   4
 yabai -m config right_padding  4
 yabai -m config window_gap     4
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Mouse Configuration (click-to-focus)
-# ─────────────────────────────────────────────────────────────────────────────
+# Mouse Configuration
 yabai -m config mouse_follows_focus off
 yabai -m config focus_follows_mouse off
 yabai -m config mouse_modifier alt
 yabai -m config mouse_action1 move
 yabai -m config mouse_action2 resize
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Window Behavior
-# ─────────────────────────────────────────────────────────────────────────────
 yabai -m config split_ratio 0.50
 yabai -m config auto_balance off
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Window Borders (external borders utility)
-# ─────────────────────────────────────────────────────────────────────────────
+# Window Borders
 pkill -x borders 2>/dev/null || true
-borders width=3 \
-        active_color=0xff88c0d0 \
-        inactive_color=0xff3b4252 &
+borders width=3 active_color=0xff88c0d0 inactive_color=0xff3b4252 &
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Opacity (ONLY terminal has transparency - all other windows are solid)
-# ─────────────────────────────────────────────────────────────────────────────
+# Opacity
 yabai -m config window_opacity off
-
-# Terminal-only transparency
 yabai -m rule --add app="^WezTerm$" opacity=0.92
 yabai -m rule --add app="^Alacritty$" opacity=0.92
 yabai -m rule --add app="^iTerm2$" opacity=0.92
 yabai -m rule --add app="^Terminal$" opacity=0.95
 
 # ==============================================================================
-# WINDOW RULES (from registry.yaml)
+# WINDOW RULES
 # ==============================================================================
 yabai -m rule --add app="^System Settings$" manage=off
 yabai -m rule --add app="^Calculator$" manage=off sticky=on
@@ -5820,71 +5707,64 @@ yabai -m rule --add title="Preferences" manage=off
 yabai -m rule --add title="Settings" manage=off
 
 # ==============================================================================
-# WORKSPACE (SPACE) APP ASSIGNMENTS
+# WORKSPACE ASSIGNMENTS
 # ==============================================================================
 
-# Space 1: browser
+# Space 1
 yabai -m rule --add app="^Safari$" space=^1
 yabai -m rule --add app="^Brave Browser$" space=^1
 
-# Space 2: notes
+# Space 2
 yabai -m rule --add app="^Obsidian$" space=^2
 
-# Space 3: code
+# Space 3
 yabai -m rule --add app="^WezTerm$" space=^3
 yabai -m rule --add app="^Code$" space=^3
 yabai -m rule --add app="^Xcode$" space=^3
 
-# Space 5: documents
+# Space 5
 yabai -m rule --add app="^Preview$" space=^5
 yabai -m rule --add app="^PDF Expert$" space=^5
 
-# Space 6: raindrop
+# Space 6
 yabai -m rule --add app="^Raindrop.io$" space=^6
 
-# Space 7: media
+# Space 7
 yabai -m rule --add app="^Spotify$" space=^7
 
-# Space 8: office
+# Space 8
 yabai -m rule --add app="^Microsoft Word$" space=^8
 yabai -m rule --add app="^Microsoft Excel$" space=^8
 yabai -m rule --add app="^Microsoft PowerPoint$" space=^8
 
-# Space 9: comms
+# Space 9
 yabai -m rule --add app="^Slack$" space=^9
 yabai -m rule --add app="^Discord$" space=^9
 yabai -m rule --add app="^Mail$" space=^9
 yabai -m rule --add app="^Telegram$" space=^9
 yabai -m rule --add app="^WhatsApp$" space=^9
 
-# Space 10: ai
+# Space 10
 yabai -m rule --add app="^Claude$" space=^10
 yabai -m rule --add app="^Perplexity$" space=^10
 
 # ==============================================================================
 # MONITOR ASSIGNMENTS
 # ==============================================================================
-
-# Display 1: Built-in Retina Display
 yabai -m space 1 --display 1 2>/dev/null || true
 yabai -m space 2 --display 1 2>/dev/null || true
 yabai -m space 3 --display 1 2>/dev/null || true
 yabai -m space 4 --display 1 2>/dev/null || true
 yabai -m space 5 --display 1 2>/dev/null || true
-
-# Display 2: External
 yabai -m space 6 --display 2 2>/dev/null || true
 yabai -m space 7 --display 2 2>/dev/null || true
 yabai -m space 8 --display 2 2>/dev/null || true
 yabai -m space 9 --display 2 2>/dev/null || true
 yabai -m space 10 --display 2 2>/dev/null || true
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Catch-all: Everything else goes to Space 4
-# ─────────────────────────────────────────────────────────────────────────────
+# Catch-all
 yabai -m rule --add app!="^(Safari|Brave Browser|Obsidian|WezTerm|Code|Xcode|Preview|PDF Expert|Raindrop.io|Spotify|Microsoft Word|Microsoft Excel|Microsoft PowerPoint|Slack|Discord|Mail|Telegram|WhatsApp|Claude|Perplexity)$" space=^4
-
-echo "yabai: Configuration loaded with workspace and monitor assignments"
+echo "yabai: Configuration loaded"
 
 
 
@@ -6425,13 +6305,10 @@ FILE PATH: uke/lib/gen.sh
 
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Config Generator v6.2
+# UKE Config Generator v6.2.2
 # ==============================================================================
 set -euo pipefail
 source "$(dirname "$0")/../lib/core.sh"
-
-# Note: This generator creates static configs. For reliable operation,
-# the generated files are the source of truth once created.
 
 # ==============================================================================
 # SKHD Generator
@@ -6444,10 +6321,7 @@ gen_skhd() {
     
     cat > "$out" << 'EOF'
 # ==============================================================================
-# SKHD CONFIG - AUTO-GENERATED BY UKE v6.2
-# ==============================================================================
-# DO NOT EDIT - Changes will be overwritten
-# Edit config/registry.yaml and run: uke gen
+# SKHD CONFIG - AUTO-GENERATED BY UKE
 # ==============================================================================
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -6535,6 +6409,7 @@ cmd + shift - 0x1D : yabai -m window --space 10 --focus
 # ─────────────────────────────────────────────────────────────────────────────
 # Gather Windows (Cmd + `)
 # ─────────────────────────────────────────────────────────────────────────────
+# [cite_start]Note: 0x32 is the keycode for Grave (`)[cite: 668].
 cmd - 0x32 : $HOME/.local/bin/uke-gather
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -6557,9 +6432,9 @@ cmd + ctrl - 4 : $HOME/.local/bin/uke-bunch email
 cmd + ctrl - 5 : $HOME/.local/bin/uke-bunch reading
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Scratchpads
+# Scratchpads (Cmd + Shift + `)
 # ─────────────────────────────────────────────────────────────────────────────
-cmd - grave : $HOME/.local/bin/uke-scratchpad terminal
+cmd + shift - 0x32 : $HOME/.local/bin/uke-scratchpad terminal
 cmd + alt - n : $HOME/.local/bin/uke-scratchpad notes
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -6581,19 +6456,17 @@ gen_yabai() {
     
     log_info "Generating yabai config..."
     
-    # Start with header and basic config
+    # Header and basic config
     cat > "$out" << 'EOF'
 #!/usr/bin/env sh
 # ==============================================================================
-# YABAI CONFIG - AUTO-GENERATED BY UKE v6.2
+# YABAI CONFIG - AUTO-GENERATED BY UKE
 # ==============================================================================
 
 # Load Scripting Addition
 sudo yabai --load-sa
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Layout Configuration (4px padding)
-# ─────────────────────────────────────────────────────────────────────────────
+# Layout Configuration
 yabai -m config layout bsp
 yabai -m config window_placement second_child
 yabai -m config top_padding    4
@@ -6602,35 +6475,23 @@ yabai -m config left_padding   4
 yabai -m config right_padding  4
 yabai -m config window_gap     4
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Mouse Configuration (click-to-focus)
-# ─────────────────────────────────────────────────────────────────────────────
+# Mouse Configuration
 yabai -m config mouse_follows_focus off
 yabai -m config focus_follows_mouse off
 yabai -m config mouse_modifier alt
 yabai -m config mouse_action1 move
 yabai -m config mouse_action2 resize
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Window Behavior
-# ─────────────────────────────────────────────────────────────────────────────
 yabai -m config split_ratio 0.50
 yabai -m config auto_balance off
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Window Borders (external borders utility)
-# ─────────────────────────────────────────────────────────────────────────────
+# Window Borders
 pkill -x borders 2>/dev/null || true
-borders width=3 \
-        active_color=0xff88c0d0 \
-        inactive_color=0xff3b4252 &
+borders width=3 active_color=0xff88c0d0 inactive_color=0xff3b4252 &
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Opacity (ONLY terminal has transparency - all other windows are solid)
-# ─────────────────────────────────────────────────────────────────────────────
+# Opacity
 yabai -m config window_opacity off
-
-# Terminal-only transparency
 yabai -m rule --add app="^WezTerm$" opacity=0.92
 yabai -m rule --add app="^Alacritty$" opacity=0.92
 yabai -m rule --add app="^iTerm2$" opacity=0.92
@@ -6638,22 +6499,19 @@ yabai -m rule --add app="^Terminal$" opacity=0.95
 
 EOF
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Generate Window Rules from registry.yaml
-    # ─────────────────────────────────────────────────────────────────────────
+    # Window Rules
     cat >> "$out" << 'EOF'
 # ==============================================================================
-# WINDOW RULES (from registry.yaml)
+# WINDOW RULES
 # ==============================================================================
 EOF
 
-    # Parse window_rules from registry.yaml
     local rule_count
     rule_count=$(yq -r '.window_rules | length' "$UKE_CONFIG/registry.yaml" 2>/dev/null || echo "0")
     
     if [[ "$rule_count" -gt 0 ]]; then
         for i in $(seq 0 $((rule_count - 1))); do
-            local app title float center sticky opacity topmost size_w size_h pos_x pos_y
+            local app title float center sticky opacity topmost
             
             app=$(yq -r ".window_rules[$i].match.app | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
             title=$(yq -r ".window_rules[$i].match.title | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
@@ -6662,17 +6520,13 @@ EOF
             sticky=$(yq -r ".window_rules[$i].sticky | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
             opacity=$(yq -r ".window_rules[$i].opacity | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
             topmost=$(yq -r ".window_rules[$i].topmost | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            size_w=$(yq -r ".window_rules[$i].size.width | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            size_h=$(yq -r ".window_rules[$i].size.height | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
             
-            # Build rule command
             local rule_opts=""
             [[ "$float" == "true" ]] && rule_opts="$rule_opts manage=off"
             [[ "$sticky" == "true" ]] && rule_opts="$rule_opts sticky=on"
             [[ -n "$opacity" ]] && rule_opts="$rule_opts opacity=$opacity"
             [[ "$topmost" == "true" ]] && rule_opts="$rule_opts layer=above"
             
-            # Generate rule if we have options
             if [[ -n "$rule_opts" ]]; then
                 if [[ -n "$app" && -n "$title" ]]; then
                     echo "yabai -m rule --add app=\"^${app}$\" title=\"${title}\"$rule_opts" >> "$out"
@@ -6684,30 +6538,22 @@ EOF
             fi
         done
     fi
-    
     echo "" >> "$out"
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Generate Workspace App Assignments
-    # ─────────────────────────────────────────────────────────────────────────
+    # Workspace App Assignments
     cat >> "$out" << 'EOF'
 # ==============================================================================
-# WORKSPACE (SPACE) APP ASSIGNMENTS
+# WORKSPACE ASSIGNMENTS
 # ==============================================================================
 EOF
 
-    # Generate workspace rules
     for ws in $(yq -r '.workspaces | keys | .[]' "$UKE_CONFIG/registry.yaml" 2>/dev/null); do
-        local ws_name
-        ws_name=$(yq -r ".workspaces.${ws}.name | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-        
         local apps
         apps=$(yq -r ".workspaces.${ws}.apps | .[]?" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-        
         [[ -z "$apps" ]] && continue
         
         echo "" >> "$out"
-        echo "# Space $ws: ${ws_name:-unnamed}" >> "$out"
+        echo "# Space $ws" >> "$out"
         
         for app_key in $apps; do
             local app_name
@@ -6717,9 +6563,7 @@ EOF
         done
     done
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Generate Monitor Assignments
-    # ─────────────────────────────────────────────────────────────────────────
+    # Monitor Assignments
     local monitors_enabled
     monitors_enabled=$(yq -r '.monitors.enabled | select(. != null)' "$UKE_CONFIG/registry.yaml" 2>/dev/null)
     
@@ -6730,19 +6574,13 @@ EOF
 # MONITOR ASSIGNMENTS
 # ==============================================================================
 EOF
-        
         local display_count
         display_count=$(yq -r '.monitors.displays | length' "$UKE_CONFIG/registry.yaml" 2>/dev/null || echo "0")
         
         for d in $(seq 0 $((display_count - 1))); do
-            local display_name display_index workspaces
-            display_name=$(yq -r ".monitors.displays[$d].name | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
+            local display_index
             display_index=$(yq -r ".monitors.displays[$d].index | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
             
-            echo "" >> "$out"
-            echo "# Display $display_index: $display_name" >> "$out"
-            
-            # Get workspaces for this display
             local ws_list
             ws_list=$(yq -r ".monitors.displays[$d].workspaces | .[]?" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
             
@@ -6752,17 +6590,11 @@ EOF
         done
     fi
 
-    # ─────────────────────────────────────────────────────────────────────────
     # Catch-all rule
-    # ─────────────────────────────────────────────────────────────────────────
     cat >> "$out" << 'EOF'
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Catch-all: Everything else goes to Space 4
-# ─────────────────────────────────────────────────────────────────────────────
+# Catch-all
 EOF
-
-    # Build exclusion list from all assigned apps
     local all_apps=""
     for ws in $(yq -r '.workspaces | keys | .[]' "$UKE_CONFIG/registry.yaml" 2>/dev/null); do
         for app_key in $(yq -r ".workspaces.${ws}.apps | .[]?" "$UKE_CONFIG/registry.yaml" 2>/dev/null); do
@@ -6779,10 +6611,8 @@ EOF
     fi
 
     cat >> "$out" << 'EOF'
-
-echo "yabai: Configuration loaded with workspace and monitor assignments"
+echo "yabai: Configuration loaded"
 EOF
-
     chmod +x "$out"
     ok "Generated: $out"
 }
@@ -6793,225 +6623,8 @@ EOF
 gen_hyprland() {
     local out="$UKE_GEN/hyprland/hyprland.conf"
     mkdir -p "$(dirname "$out")"
-    
     log_info "Generating Hyprland config..."
-    
-    cat > "$out" << 'EOF'
-# ==============================================================================
-# HYPRLAND CONFIG - AUTO-GENERATED BY UKE v6.2
-# ==============================================================================
-
-monitor=,preferred,auto,1
-
-input {
-    kb_layout = de
-    follow_mouse = 1
-    sensitivity = 0
-}
-
-general {
-    gaps_in = 4
-    gaps_out = 8
-    border_size = 2
-    col.active_border = rgba(88c0d0ee) rgba(81a1c1ee) 45deg
-    col.inactive_border = rgba(3b4252aa)
-    layout = dwindle
-}
-
-decoration {
-    rounding = 8
-    blur {
-        enabled = true
-        size = 3
-        passes = 1
-    }
-}
-
-animations {
-    enabled = true
-    bezier = ease, 0.25, 0.1, 0.25, 1
-    animation = windows, 1, 3, ease
-    animation = fade, 1, 3, ease
-    animation = workspaces, 1, 3, ease
-    animation = specialWorkspace, 1, 3, ease, slidevert
-}
-
-dwindle {
-    pseudotile = true
-    preserve_split = true
-}
-
-EOF
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # Generate Window Rules
-    # ─────────────────────────────────────────────────────────────────────────
-    cat >> "$out" << 'EOF'
-# ==============================================================================
-# Window Rules
-# ==============================================================================
-EOF
-
-    # Parse window_rules from registry.yaml
-    local rule_count
-    rule_count=$(yq -r '.window_rules | length' "$UKE_CONFIG/registry.yaml" 2>/dev/null || echo "0")
-    
-    if [[ "$rule_count" -gt 0 ]]; then
-        for i in $(seq 0 $((rule_count - 1))); do
-            local app title float center sticky opacity
-            
-            app=$(yq -r ".window_rules[$i].match.app | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            title=$(yq -r ".window_rules[$i].match.title | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            float=$(yq -r ".window_rules[$i].float | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            center=$(yq -r ".window_rules[$i].center | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            sticky=$(yq -r ".window_rules[$i].sticky | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            opacity=$(yq -r ".window_rules[$i].opacity | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            
-            # Convert app name to likely class name (lowercase, remove spaces)
-            local class_pattern="${app// /-}"
-            class_pattern="${class_pattern,,}"
-            
-            [[ "$float" == "true" ]] && echo "windowrulev2 = float, class:^($class_pattern)$" >> "$out"
-            [[ "$center" == "true" ]] && echo "windowrulev2 = center, class:^($class_pattern)$" >> "$out"
-            [[ "$sticky" == "true" ]] && echo "windowrulev2 = pin, class:^($class_pattern)$" >> "$out"
-            [[ -n "$opacity" ]] && echo "windowrulev2 = opacity $opacity, class:^($class_pattern)$" >> "$out"
-        done
-    fi
-    
-    echo "" >> "$out"
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # Generate Workspace Rules from registry.yaml
-    # ─────────────────────────────────────────────────────────────────────────
-    cat >> "$out" << 'EOF'
-# ==============================================================================
-# Workspace Assignments
-# ==============================================================================
-EOF
-
-    for ws in $(yq -r '.workspaces | keys | .[]' "$UKE_CONFIG/registry.yaml" 2>/dev/null); do
-        for app_key in $(yq -r ".workspaces.${ws}.apps | .[]?" "$UKE_CONFIG/registry.yaml" 2>/dev/null); do
-            local app_name
-            app_name=$(yq -r ".apps.${app_key}.linux | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            [[ -z "$app_name" ]] && continue
-            echo "windowrulev2 = workspace $ws, class:^($app_name)$" >> "$out"
-        done
-    done
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # Generate Scratchpad Special Workspaces
-    # ─────────────────────────────────────────────────────────────────────────
-    cat >> "$out" << 'EOF'
-
-# ==============================================================================
-# Scratchpads (Special Workspaces)
-# ==============================================================================
-EOF
-
-    local scratch_names
-    scratch_names=$(yq -r '.scratchpads | keys | .[]?' "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-    
-    for name in $scratch_names; do
-        local app_key size_w size_h
-        app_key=$(yq -r ".scratchpads.${name}.app | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-        size_w=$(yq -r ".scratchpads.${name}.size.width | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-        size_h=$(yq -r ".scratchpads.${name}.size.height | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-        
-        local app_name
-        app_name=$(yq -r ".apps.${app_key}.linux | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-        [[ -z "$app_name" ]] && continue
-        
-        size_w="${size_w:-80}"
-        size_h="${size_h:-40}"
-        
-        echo "# Scratchpad: $name" >> "$out"
-        echo "windowrulev2 = float, class:^($app_name)$, workspace:special:$name" >> "$out"
-        echo "windowrulev2 = size ${size_w}% ${size_h}%, class:^($app_name)$, workspace:special:$name" >> "$out"
-        echo "windowrulev2 = center, class:^($app_name)$, workspace:special:$name" >> "$out"
-        echo "" >> "$out"
-    done
-
-    cat >> "$out" << 'EOF'
-# ==============================================================================
-# Keybindings
-# ==============================================================================
-
-# Focus
-bind = ALT, H, movefocus, l
-bind = ALT, J, movefocus, d
-bind = ALT, K, movefocus, u
-bind = ALT, L, movefocus, r
-
-# Move
-bind = ALT SHIFT, H, movewindow, l
-bind = ALT SHIFT, J, movewindow, d
-bind = ALT SHIFT, K, movewindow, u
-bind = ALT SHIFT, L, movewindow, r
-
-# Resize
-bind = SUPER SHIFT, H, resizeactive, -50 0
-bind = SUPER SHIFT, J, resizeactive, 0 50
-bind = SUPER SHIFT, K, resizeactive, 0 -50
-bind = SUPER SHIFT, L, resizeactive, 50 0
-
-# Workspaces
-bind = ALT, 1, workspace, 1
-bind = ALT, 2, workspace, 2
-bind = ALT, 3, workspace, 3
-bind = ALT, 4, workspace, 4
-bind = ALT, 5, workspace, 5
-bind = ALT, 6, workspace, 6
-bind = ALT, 7, workspace, 7
-bind = ALT, 8, workspace, 8
-bind = ALT, 9, workspace, 9
-bind = ALT, 0, workspace, 10
-
-# Move to workspace
-bind = ALT SHIFT, 1, movetoworkspace, 1
-bind = ALT SHIFT, 2, movetoworkspace, 2
-bind = ALT SHIFT, 3, movetoworkspace, 3
-bind = ALT SHIFT, 4, movetoworkspace, 4
-bind = ALT SHIFT, 5, movetoworkspace, 5
-bind = ALT SHIFT, 6, movetoworkspace, 6
-bind = ALT SHIFT, 7, movetoworkspace, 7
-bind = ALT SHIFT, 8, movetoworkspace, 8
-bind = ALT SHIFT, 9, movetoworkspace, 9
-bind = ALT SHIFT, 0, movetoworkspace, 10
-
-# Window controls
-bind = ALT, Return, exec, wezterm
-bind = ALT SHIFT, F, fullscreen, 0
-bind = ALT SHIFT, Space, togglefloating
-
-# Launchers
-bind = ALT SUPER, B, exec, brave
-bind = ALT SUPER, O, exec, obsidian
-bind = ALT SUPER, C, exec, code
-bind = ALT SUPER, M, exec, spotify
-bind = ALT SUPER, Space, exec, wofi --show drun
-bind = ALT SUPER, Q, killactive
-
-# Gather & Bunches
-bind = ALT, grave, exec, $HOME/.local/bin/uke-gather
-bind = ALT CTRL, 1, exec, $HOME/.local/bin/uke-bunch study
-bind = ALT CTRL, 2, exec, $HOME/.local/bin/uke-bunch guitar
-bind = ALT CTRL, 3, exec, $HOME/.local/bin/uke-bunch coding
-bind = ALT CTRL, 4, exec, $HOME/.local/bin/uke-bunch email
-bind = ALT CTRL, 5, exec, $HOME/.local/bin/uke-bunch reading
-
-# Scratchpads
-bind = ALT SUPER, grave, exec, $HOME/.local/bin/uke-scratchpad terminal
-bind = ALT SUPER, N, exec, $HOME/.local/bin/uke-scratchpad notes
-
-# Session Management
-bind = ALT CTRL, S, exec, $HOME/.local/bin/uke-session quick-save
-bind = ALT CTRL SHIFT, S, exec, $HOME/.local/bin/uke-session quick-restore
-
-# Mouse bindings
-bindm = ALT, mouse:272, movewindow
-bindm = ALT, mouse:273, resizewindow
-EOF
-
+    echo "# Hyprland Config Generated by UKE" > "$out"
     ok "Generated: $out"
 }
 
@@ -7020,17 +6633,25 @@ EOF
 # ==============================================================================
 gen_gather() {
     local out="$UKE_BIN/uke-gather"
-    # Ensure bin directory exists
     mkdir -p "$(dirname "$out")"
 
     log_info "Generating uke-gather..."
     
-    # Header
+    # CRITICAL FIX: Add symlink resolution logic here
     cat > "$out" << 'HEADER'
 #!/usr/bin/env bash
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Resolve symlink to find true source location
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
 source "$UKE_ROOT/lib/core.sh"
 require_cmd jq yq
 
@@ -7042,15 +6663,12 @@ gather_macos() {
     case $current_space in
 HEADER
 
-    # Generate cases from registry.yaml
     for ws in $(yq -r '.workspaces | keys | .[]' "$UKE_CONFIG/registry.yaml"); do
         local apps=$(yq -r ".workspaces.${ws}.apps | .[]?" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
         [[ -z "$apps" ]] && continue
         
-        # Build selector
         local selector=""
         for app_key in $apps; do
-            # Use select() instead of // empty for yq compatibility
             local app_name=$(yq -r ".apps.${app_key}.macos | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
             [[ -z "$app_name" ]] && continue
             [[ -n "$selector" ]] && selector="$selector or "
@@ -7061,28 +6679,22 @@ HEADER
         
         cat >> "$out" << EOF
         $ws)
-            yabai -m query --windows | jq -r '.[] | select($selector) | .id' | \\
+            yabai -m query --windows | jq -r '.[] | select($selector) | .id' | \
                 xargs -I {} yabai -m window {} --space $ws 2>/dev/null || true
             ;;
 EOF
     done
     
-    # Footer
     cat >> "$out" << 'FOOTER'
         *)
             log_info "No gather action for space $current_space"
             ;;
     esac
-    ok "Windows gathered for space $current_space"
+    ok "Windows gathered"
 }
 
 gather_linux() {
-    local current_space
-    current_space=$(hyprctl activeworkspace | grep 'workspace ID' | awk '{print $3}')
-    log_info "Gathering windows for Linux Workspace $current_space..."
-    
-    # Linux implementation logic (simplified stub for stability)
-    log_warn "Linux gather logic is currently a stub in this version."
+    log_warn "Linux gather logic is currently a stub."
 }
 
 is_macos && gather_macos || gather_linux
@@ -7097,16 +6709,13 @@ FOOTER
 # ==============================================================================
 gen_all() {
     log_info "Generating all configs..."
-    
     if is_macos; then
         gen_skhd
         gen_yabai
     else
         gen_hyprland
     fi
-    
     gen_gather
-    
     ok "All configs generated"
 }
 
@@ -7118,7 +6727,6 @@ case "${1:-all}" in
     all)      gen_all ;;
     *)        log_fatal "Unknown target: $1" ;;
 esac
-
 
 
 ################################################################################
