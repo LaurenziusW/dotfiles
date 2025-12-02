@@ -50,6 +50,8 @@ uke/
 │   ├── uke                # Main CLI
 │   ├── uke-gather         # Window organization
 │   ├── uke-bunch          # Environment presets
+│   ├── uke-scratchpad     # Dropdown/toggle windows
+│   ├── uke-session        # Save/restore layouts
 │   ├── uke-doctor         # Health check
 │   ├── uke-backup         # Backup utility
 │   ├── uke-debug          # Diagnostics

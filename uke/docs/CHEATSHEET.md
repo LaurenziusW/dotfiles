@@ -1,4 +1,4 @@
-# UKE v6.1 - Complete Cheatsheet
+# UKE v6.2 - Complete Cheatsheet
 
 **Unified Keyboard Environment - One muscle memory for macOS & Linux**
 
@@ -189,6 +189,45 @@ BUNCH + 4             Email (Mail, Slack, Brave → WS 9)
 BUNCH + 5             Reading (Preview, Obsidian → WS 5)
 ```
 
+
+---
+
+## Scratchpads (Dropdown Windows)
+
+Toggle floating windows that appear/hide with a hotkey:
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Terminal scratchpad | `Cmd + \`` | `Alt + \`` |
+| Notes scratchpad | `Cmd+Alt + n` | `Alt+Super + n` |
+
+Configure in `registry.yaml`:
+```yaml
+scratchpads:
+  terminal:
+    app: wezterm
+    key: "grave"
+    size: { width: 80, height: 40 }
+    position: "top"    # top, bottom, center
+```
+
+---
+
+## Session Management
+
+Save and restore window layouts:
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Quick save | `Cmd+Ctrl + s` | `Alt+Ctrl + s` |
+| Quick restore | `Cmd+Ctrl+Shift + s` | `Alt+Ctrl+Shift + s` |
+
+```bash
+uke-session save deep-work      # Save current layout
+uke-session restore deep-work   # Restore layout
+uke-session list                # List all sessions
+uke-session delete <n>       # Delete a session
+```
 ---
 
 ## UKE CLI Commands
@@ -204,9 +243,8 @@ uke log tail          View recent logs
 uke-bunch list        List available bunches
 uke-bunch <name>      Run a bunch
 uke-gather            Organize windows to workspaces
-uke-doctor            Health check
-uke-backup            Backup configs
-uke-debug dump        Full diagnostics
+uke-scratchpad <n> Toggle dropdown windows
+uke-session <cmd>     Save/restore layouts
 uke-logs <component>  Live log viewer (uke|yabai|skhd|hyprland|all)
 ```
 
@@ -224,6 +262,8 @@ uke-logs <component>  Live log viewer (uke|yabai|skhd|hyprland|all)
 | Launch terminal | `Cmd + Return` | `Alt + Return` |
 | Fullscreen | `Cmd+Shift + f` | `Alt+Shift + f` |
 | Gather windows | `Cmd + \`` | `Alt + \`` |
+| Terminal scratchpad | `Cmd + \`` | `Alt + \`` |
+| Quick save session | `Cmd+Ctrl + s` | `Alt+Ctrl + s` |
 | WezTerm pane nav | `Alt + hjkl` | `Super + hjkl` |
 | WezTerm split | `Alt + \ / -` | `Super + \ / -` |
 | Shell interrupt | `Ctrl + c` | `Ctrl + c` |

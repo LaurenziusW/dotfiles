@@ -1,4 +1,4 @@
-# UKE - Unified Keyboard Environment v6.1
+# UKE - Unified Keyboard Environment v6.2
 
 **One keyboard workflow for macOS and Linux.**
 
@@ -23,6 +23,10 @@ uke-doctor
 - **Single source of truth**: Edit `config/registry.yaml`, generate platform configs
 - **10 workspaces**: Organized by purpose (Browser, Notes, Code, etc.)
 - **Bunches**: Environment presets (study, coding, guitar, email, reading)
+- **Scratchpads**: Dropdown/toggle windows (terminal, notes) with hotkeys
+- **Sessions**: Save and restore complete window layouts
+- **Window Rules**: Fine-grained control over floating, sticky, opacity
+- **Multi-Monitor**: Assign workspaces to specific displays
 - **Gather**: Organize scattered windows to their designated workspaces
 - **Conflict-free**: Layered modifier system prevents keybinding conflicts
 
@@ -42,6 +46,9 @@ uke gen              # Generate platform configs
 uke reload           # Restart window manager
 uke-gather           # Organize windows (Cmd+`)
 uke-bunch study      # Launch study environment (Cmd+Ctrl+1)
+uke-scratchpad terminal # Toggle dropdown terminal (Cmd+`)
+uke-session save work  # Save current layout
+uke-session restore work # Restore layout
 uke-doctor           # Health check
 uke-logs yabai       # Live log viewer
 ```
@@ -54,7 +61,9 @@ uke-logs yabai       # Live log viewer
 | Move window | Cmd+Shift + hjkl | Alt+Shift + hjkl |
 | Switch workspace | Cmd + 1-9 | Alt + 1-9 |
 | Launch terminal | Cmd + Return | Alt + Return |
-| Gather windows | Cmd + \` | Alt + \` |
+| Scratchpad terminal | Cmd + \` | Alt + \` |
+| Scratchpad notes | Cmd+Alt + n | Alt+Super + n |
+| Quick save session | Cmd+Ctrl + s | Alt+Ctrl + s |
 | WezTerm panes | Alt + hjkl | Super + hjkl |
 
 See `docs/CHEATSHEET.md` for complete reference.

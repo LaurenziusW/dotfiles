@@ -12,7 +12,7 @@ echo "║     UKE Detection Report             ║"
 echo "╚══════════════════════════════════════╝"
 
 echo -e "\n[1] Binary Symlinks (~/.local/bin)"
-for bin in uke uke-gather uke-bunch uke-doctor uke-backup uke-debug uke-logs; do
+for bin in uke uke-gather uke-bunch uke-doctor uke-backup uke-debug uke-logs uke-scratch uke-session; do
     if [[ -L "$HOME/.local/bin/$bin" ]]; then
         target=$(readlink "$HOME/.local/bin/$bin")
         echo "  ✓ $bin → $target"
@@ -68,7 +68,16 @@ pgrep -x yabai &>/dev/null && echo "  ✓ yabai running" || echo "  - yabai not 
 pgrep -x skhd &>/dev/null && echo "  ✓ skhd running" || echo "  - skhd not running"
 [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && echo "  ✓ hyprland running"
 
-echo -e "\n[6] Log Files"
+echo -e "\n[6] Monitors"
+if command -v yabai &>/dev/null && pgrep -x yabai &>/dev/null; then
+    yabai -m query --displays 2>/dev/null | jq -r '.[] | "  ✓ Display \(.index): \(.frame.w)x\(.frame.h) at (\(.frame.x),\(.frame.y))"' 2>/dev/null || echo "  - Could not query displays"
+elif [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    hyprctl monitors -j 2>/dev/null | jq -r '.[] | "  ✓ \(.name): \(.width)x\(.height)"' 2>/dev/null || echo "  - Could not query monitors"
+else
+    echo "  - Window manager not running"
+fi
+
+echo -e "\n[7] Log Files"
 [[ -f "$HOME/.local/state/uke/uke.log" ]] && echo "  ✓ UKE log exists" || echo "  - No UKE log"
 ls /tmp/yabai_*.err.log &>/dev/null && echo "  ✓ Yabai logs exist" || echo "  - No yabai logs"
 ls /tmp/skhd_*.err.log &>/dev/null && echo "  ✓ skhd logs exist" || echo "  - No skhd logs"

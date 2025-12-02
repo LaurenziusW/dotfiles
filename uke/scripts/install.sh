@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Installer v6.1
+# UKE Installer v6.2
 # ==============================================================================
 set -euo pipefail
 
@@ -160,7 +160,7 @@ start_services() {
 main() {
     echo ""
     echo "${BOLD}╔══════════════════════════════════════╗${RESET}"
-    echo "${BOLD}║     UKE v6.1 Installer               ║${RESET}"
+    echo "${BOLD}║     UKE v6.2 Installer               ║${RESET}"
     echo "${BOLD}╚══════════════════════════════════════╝${RESET}"
     echo ""
     echo "Platform: $OS"

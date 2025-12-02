@@ -1,11 +1,11 @@
 # ==============================================================================
-# UKE Registry v6.1
+# UKE Registry v6.2
 # ==============================================================================
 # Single source of truth for the Unified Keyboard Environment
 # Edit this file, then run: uke gen && uke reload
 # ==============================================================================
 
-version: "6.1.0"
+version: "6.2.0"
 
 # ==============================================================================
 # Modifiers
@@ -76,6 +76,152 @@ workspaces:
   10: { name: "ai",        apps: [claude, perplexity] }
 
 # ==============================================================================
+# Scratchpads
+# ==============================================================================
+# Dropdown/toggle windows that appear on demand (Cmd+` style)
+# Key bindings use PRIMARY modifier by default
+scratchpads:
+  terminal:
+    app: wezterm
+    key: "grave"           # backtick key (`)
+    size: { width: 80, height: 40 }  # percentage of screen
+    position: "top"        # top, bottom, center
+    
+  notes:
+    app: obsidian
+    key: "n"
+    size: { width: 60, height: 70 }
+    position: "center"
+    modifier: "cmd + alt"  # override default modifier
+    
+  # spotify:
+  #   app: spotify
+  #   key: "m"
+  #   size: { width: 50, height: 60 }
+  #   position: "center"
+
+# ==============================================================================
+# Window Rules
+# ==============================================================================
+# Fine-grained control over window behavior
+window_rules:
+  # System apps that should always float
+  - match: { app: "System Settings" }
+    float: true
+    center: true
+    
+  - match: { app: "Calculator" }
+    float: true
+    size: { width: 300, height: 400 }
+    sticky: true           # follows across workspaces
+    
+  - match: { app: "Finder" }
+    float: true
+    size: { width: 900, height: 600 }
+    center: true
+    
+  - match: { app: "App Store" }
+    float: true
+    
+  - match: { app: "Karabiner-Elements" }
+    float: true
+    
+  - match: { app: "Karabiner-EventViewer" }
+    float: true
+
+  # Video calls - always visible
+  - match: { app: "zoom.us" }
+    float: true
+    sticky: true
+    opacity: 1.0
+    
+  - match: { app: "FaceTime" }
+    float: true
+    sticky: true
+
+  # Picture-in-picture style
+  - match: { title: "Picture in Picture" }
+    float: true
+    sticky: true
+    topmost: true
+    size: { width: 400, height: 225 }
+    position: { x: "right", y: "bottom" }
+
+  # Development tools
+  - match: { app: "Code", title: "Settings" }
+    float: true
+    center: true
+
+  # Dialogs and popups (by title pattern)
+  - match: { title: "Preferences" }
+    float: true
+    center: true
+    
+  - match: { title: "Settings" }
+    float: true
+    center: true
+
+# ==============================================================================
+# Monitors
+# ==============================================================================
+# Multi-monitor workspace assignment
+# Use 'uke-detect monitors' to see available displays
+monitors:
+  enabled: true
+  
+  # Assignment strategy: "static" or "dynamic"
+  # static: workspaces stay on assigned monitor
+  # dynamic: workspaces follow focus
+  strategy: "static"
+  
+  displays:
+    # Built-in display (laptop screen)
+    - name: "Built-in Retina Display"
+      index: 1                    # yabai display index
+      workspaces: [1, 2, 3, 4, 5]
+      
+    # External monitor
+    - name: "External"
+      index: 2
+      workspaces: [6, 7, 8, 9, 10]
+      
+  # Fallback: if monitor not connected, where do its workspaces go?
+  fallback_display: 1
+
+# ==============================================================================
+# Sessions
+# ==============================================================================
+# Saved window layouts that can be restored
+sessions:
+  # Session storage location
+  storage: "~/.local/state/uke/sessions"
+  
+  # Auto-save current session periodically
+  autosave:
+    enabled: false
+    interval: 300          # seconds
+    name: "autosave"
+    
+  # Predefined session templates (optional)
+  templates:
+    deep-work:
+      description: "Focused coding with no distractions"
+      workspaces: [2, 3]   # Only these workspaces are restored
+      apps:
+        - { app: wezterm, workspace: 3, layout: "main" }
+        - { app: code, workspace: 3, layout: "secondary" }
+        - { app: obsidian, workspace: 2 }
+        
+    research:
+      description: "Research and note-taking"
+      workspaces: [1, 2, 5, 10]
+      apps:
+        - { app: brave, workspace: 1 }
+        - { app: obsidian, workspace: 2 }
+        - { app: preview, workspace: 5 }
+        - { app: claude, workspace: 10 }
+
+# ==============================================================================
 # Bunches
 # ==============================================================================
 # Environment presets (Cmd+Ctrl+1-5 on macOS, Alt+Ctrl+1-5 on Linux)
@@ -124,7 +270,7 @@ window_manager:
     inactive_border: "rgba(3b4252aa)"
 
 # ==============================================================================
-# Float Rules
+# Float Rules (Legacy - prefer window_rules above)
 # ==============================================================================
 # Apps that should always float (not be tiled)
 float_rules:

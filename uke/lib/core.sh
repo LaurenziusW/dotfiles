@@ -21,7 +21,7 @@ _resolve_uke_root() {
 }
 
 export UKE_ROOT="${UKE_ROOT:-$(_resolve_uke_root)}"
-export UKE_VERSION="6.1.0"
+export UKE_VERSION="6.2.0"
 
 # ------------------------------------------------------------------------------
 # Directories

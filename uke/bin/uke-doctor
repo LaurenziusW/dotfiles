@@ -70,7 +70,7 @@ check_links() {
     echo ""
     echo "Checking symlinks..."
     
-    for bin in uke uke-bunch uke-gather uke-logs; do
+    for bin in uke uke-bunch uke-gather uke-logs uke-scratchpad uke-session; do
         if [[ -x "$HOME/.local/bin/$bin" ]]; then
             ok "$bin linked"
         else

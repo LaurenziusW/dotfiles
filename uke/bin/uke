@@ -91,6 +91,8 @@ Examples:
 Companion commands:
   uke-gather                 # Organize windows to workspaces
   uke-bunch <n>           # Run environment preset
+  uke-scratchpad <n>      # Toggle scratchpad window
+  uke-session <cmd>          # Save/restore window layouts
   uke-doctor                 # Health check
   uke-backup                 # Backup configs
   uke-debug                  # Diagnostics

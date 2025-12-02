@@ -63,10 +63,15 @@ local act = wezterm.action
 
 config.keys = {
     -- ─────────────────────────────────────────────────────────────────────────
-    -- Tab Management
+    -- Tab & Pane Management
     -- ─────────────────────────────────────────────────────────────────────────
     { key = "t", mods = SECONDARY, action = act.SpawnTab("CurrentPaneDomain") },
-    { key = "w", mods = SECONDARY, action = act.CloseCurrentTab({ confirm = false }) },
+    
+    -- FIXED: Close Pane instead of Tab. Closes split first, then tab if empty.
+    { key = "w", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
+    
+    -- Keep 'x' as an alternative for closing pane
+    { key = "x", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
     
     -- Tab navigation by number
     { key = "1", mods = SECONDARY, action = act.ActivateTab(0) },
@@ -88,7 +93,6 @@ config.keys = {
     -- ─────────────────────────────────────────────────────────────────────────
     { key = "\\", mods = SECONDARY, action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
     { key = "-", mods = SECONDARY, action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
-    { key = "x", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
 
     -- ─────────────────────────────────────────────────────────────────────────
     -- Pane Navigation (Vim-style)
