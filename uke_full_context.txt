@@ -3,6 +3,7 @@
 DIRECTORY STRUCTURE
 ================================================================================
 uke
+├── .DS_Store
 ├── .gitignore
 ├── .stow-local-ignore
 ├── bin
@@ -26,6 +27,7 @@ uke
 ├── config
 │   └── registry.yaml
 ├── docs
+│   ├── ARCH-INSTALL.md
 │   ├── ARCHITECTURE.md
 │   ├── CHEATSHEET.md
 │   ├── MIGRATION.md
@@ -34,6 +36,7 @@ uke
 │   └── TROUBLESHOOTING.md
 ├── gen
 │   ├── hyprland
+│   │   └── hyprland.conf
 │   ├── skhd
 │   │   └── skhdrc
 │   └── yabai
@@ -45,9 +48,14 @@ uke
 ├── README.md
 ├── scripts
 │   ├── install.sh
+│   ├── keyd-setup.sh
 │   ├── uke-detect.sh
 │   └── uke-wipe.sh
 ├── stow
+│   ├── keyd
+│   │   └── .config
+│   │       └── keyd
+│   │           └── default.conf
 │   ├── nvim
 │   │   └── .config
 │   │       └── nvim
@@ -80,7 +88,7 @@ uke
 └── templates
     └── bunch-template.sh
 
-26 directories, 51 files
+29 directories, 56 files
 
 
 
@@ -218,7 +226,7 @@ FILE PATH: uke/bunches/lib-os-detect.sh
 
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE OS Detection Library
+# UKE OS Detection Library v6.3
 # ==============================================================================
 # Provides cross-platform helpers for bunches and scripts
 # Source this in any bunch script: source "$(dirname "$0")/lib-os-detect.sh"
@@ -236,6 +244,28 @@ detect_os() {
 }
 
 OS_TYPE=$(detect_os)
+
+# ------------------------------------------------------------------------------
+# Distro Detection (Linux only)
+# ------------------------------------------------------------------------------
+detect_distro() {
+    if [[ "$OS_TYPE" != "linux" ]]; then
+        echo ""
+        return
+    fi
+    
+    if [[ -f /etc/arch-release ]]; then
+        echo "arch"
+    elif [[ -f /etc/debian_version ]]; then
+        echo "debian"
+    elif [[ -f /etc/fedora-release ]]; then
+        echo "fedora"
+    else
+        echo "unknown"
+    fi
+}
+
+DISTRO=$(detect_distro)
 
 # ------------------------------------------------------------------------------
 # Window Manager Commands (set based on OS)
@@ -265,30 +295,58 @@ get_app_command() {
             [ "$OS_TYPE" = "macos" ] && echo "Brave Browser" || echo "brave" ;;
         safari)
             [ "$OS_TYPE" = "macos" ] && echo "Safari" || echo "" ;;
+        firefox)
+            echo "firefox" ;;
+        chromium)
+            [ "$OS_TYPE" = "macos" ] && echo "Chromium" || echo "chromium" ;;
         notes|obsidian)
-            echo "Obsidian" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Obsidian" || echo "obsidian" ;;
         terminal|wezterm)
-            echo "WezTerm" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "WezTerm" || echo "wezterm" ;;
+        alacritty)
+            [ "$OS_TYPE" = "macos" ] && echo "Alacritty" || echo "alacritty" ;;
+        kitty)
+            echo "kitty" ;;
         code|vscode)
-            echo "Code" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Code" || echo "code" ;;
+        codium|vscodium)
+            [ "$OS_TYPE" = "macos" ] && echo "VSCodium" || echo "codium" ;;
         music|spotify)
-            echo "Spotify" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Spotify" || echo "spotify" ;;
         pdf|preview)
             [ "$OS_TYPE" = "macos" ] && echo "Preview" || echo "evince" ;;
+        zathura)
+            echo "zathura" ;;
+        okular)
+            echo "okular" ;;
         slack)
-            echo "Slack" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Slack" || echo "slack" ;;
         discord)
-            echo "Discord" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Discord" || echo "discord" ;;
         mail)
             [ "$OS_TYPE" = "macos" ] && echo "Mail" || echo "thunderbird" ;;
+        telegram)
+            [ "$OS_TYPE" = "macos" ] && echo "Telegram" || echo "telegram-desktop" ;;
+        signal)
+            [ "$OS_TYPE" = "macos" ] && echo "Signal" || echo "signal-desktop" ;;
         raindrop)
-            echo "Raindrop.io" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Raindrop.io" || echo "raindrop" ;;
         word)
-            [ "$OS_TYPE" = "macos" ] && echo "Microsoft Word" || echo "libreoffice-writer" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Microsoft Word" || echo "libreoffice --writer" ;;
         excel)
-            [ "$OS_TYPE" = "macos" ] && echo "Microsoft Excel" || echo "libreoffice-calc" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Microsoft Excel" || echo "libreoffice --calc" ;;
         powerpoint)
-            [ "$OS_TYPE" = "macos" ] && echo "Microsoft PowerPoint" || echo "libreoffice-impress" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Microsoft PowerPoint" || echo "libreoffice --impress" ;;
+        libreoffice)
+            echo "libreoffice" ;;
+        files|finder)
+            [ "$OS_TYPE" = "macos" ] && echo "Finder" || echo "thunar" ;;
+        nautilus)
+            echo "nautilus" ;;
+        thunar)
+            echo "thunar" ;;
+        dolphin)
+            echo "dolphin" ;;
         *)
             echo "$app_key" ;;
     esac
@@ -312,7 +370,11 @@ launch_app() {
     else
         # Linux: try to find and run the command
         local cmd="${app_name,,}"  # lowercase
-        if command -v "$cmd" &>/dev/null; then
+        
+        # Handle commands with arguments (like libreoffice --writer)
+        if [[ "$app_name" == *" "* ]]; then
+            $app_name &>/dev/null &
+        elif command -v "$cmd" &>/dev/null; then
             "$cmd" &>/dev/null &
         elif command -v "$app_name" &>/dev/null; then
             "$app_name" &>/dev/null &
@@ -332,7 +394,7 @@ get_current_workspace() {
     if [ "$OS_TYPE" = "macos" ]; then
         yabai -m query --spaces --space | jq -r '.index'
     else
-        hyprctl activeworkspace | grep 'workspace ID' | awk '{print $3}'
+        hyprctl activeworkspace -j | jq -r '.id'
     fi
 }
 
@@ -345,7 +407,54 @@ gather_app_to_space() {
         yabai -m query --windows | jq -r ".[] | select(.app == \"$app_name\") | .id" | \
             xargs -I {} yabai -m window {} --space "$target_space" 2>/dev/null
     else
-        hyprctl dispatch movetoworkspace "$target_space,class:$app_name" 2>/dev/null
+        # On Linux, use class name matching
+        hyprctl clients -j | jq -r ".[] | select(.class | test(\"$app_name\"; \"i\")) | .address" | \
+            while read -r addr; do
+                hyprctl dispatch movetoworkspacesilent "$target_space,address:$addr" 2>/dev/null
+            done
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Notification Helper
+# ------------------------------------------------------------------------------
+notify() {
+    local title="$1"
+    local message="${2:-}"
+    
+    if [ "$OS_TYPE" = "macos" ]; then
+        osascript -e "display notification \"$message\" with title \"$title\"" 2>/dev/null || true
+    else
+        if command -v notify-send &>/dev/null; then
+            notify-send "$title" "$message" 2>/dev/null || true
+        fi
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Clipboard Helper
+# ------------------------------------------------------------------------------
+clipboard_copy() {
+    if [ "$OS_TYPE" = "macos" ]; then
+        pbcopy
+    else
+        if command -v wl-copy &>/dev/null; then
+            wl-copy
+        elif command -v xclip &>/dev/null; then
+            xclip -selection clipboard
+        fi
+    fi
+}
+
+clipboard_paste() {
+    if [ "$OS_TYPE" = "macos" ]; then
+        pbpaste
+    else
+        if command -v wl-paste &>/dev/null; then
+            wl-paste
+        elif command -v xclip &>/dev/null; then
+            xclip -selection clipboard -o
+        fi
     fi
 }
 
@@ -1415,7 +1524,7 @@ FILE PATH: uke/bin/uke-doctor
 
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Doctor - Health check
+# UKE Doctor - Health Check (Arch Linux Ready)
 # ==============================================================================
 set -euo pipefail
 
@@ -1423,10 +1532,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
 
+# ==============================================================================
+# Dependency Check
+# ==============================================================================
 check_deps() {
     local status=0
     echo "Checking dependencies..."
     
+    # Universal dependencies
     for cmd in stow jq git; do
         if command -v $cmd &>/dev/null; then
             ok "$cmd installed"
@@ -1437,6 +1550,7 @@ check_deps() {
     done
     
     if is_macos; then
+        # macOS-specific
         for cmd in yabai skhd; do
             if command -v $cmd &>/dev/null; then
                 ok "$cmd installed"
@@ -1451,18 +1565,49 @@ check_deps() {
         else
             log_warn "borders not found (optional, for window borders)"
         fi
+        
+        if command -v yq &>/dev/null; then
+            ok "yq installed"
+        else
+            log_warn "yq not found (needed for config generation from registry.yaml)"
+        fi
     else
+        # Linux-specific
         if command -v hyprctl &>/dev/null; then
             ok "hyprland installed"
         else
             fail "hyprland not found"
             status=1
         fi
+        
+        if command -v keyd &>/dev/null; then
+            ok "keyd installed"
+        else
+            log_warn "keyd not found (needed for Caps Lock remapping)"
+        fi
+        
+        # Optional Hyprland ecosystem tools
+        local optional_linux=(waybar dunst wofi grim slurp wl-copy)
+        local missing_optional=()
+        
+        for cmd in "${optional_linux[@]}"; do
+            if ! command -v $cmd &>/dev/null; then
+                missing_optional+=("$cmd")
+            fi
+        done
+        
+        if [[ ${#missing_optional[@]} -gt 0 ]]; then
+            log_warn "Optional tools not found: ${missing_optional[*]}"
+            echo "      Install with: sudo pacman -S ${missing_optional[*]}"
+        fi
     fi
     
     return $status
 }
 
+# ==============================================================================
+# Config Check
+# ==============================================================================
 check_configs() {
     local status=0
     echo ""
@@ -1475,16 +1620,35 @@ check_configs() {
         [[ -f "$UKE_GEN/yabai/yabairc" ]] && ok "yabai config generated" || { fail "yabai config missing - run 'uke gen'"; status=1; }
     else
         [[ -f "$UKE_GEN/hyprland/hyprland.conf" ]] && ok "hyprland config generated" || { fail "hyprland config missing - run 'uke gen'"; status=1; }
+        
+        # Check keyd config
+        if [[ -f "$UKE_STOW/keyd/.config/keyd/default.conf" ]]; then
+            ok "keyd config exists in stow"
+            
+            if [[ -L /etc/keyd/default.conf ]]; then
+                ok "keyd config linked to /etc/keyd/"
+            elif [[ -f /etc/keyd/default.conf ]]; then
+                log_warn "/etc/keyd/default.conf exists but is not a symlink"
+            else
+                log_warn "keyd config not linked - run 'scripts/keyd-setup.sh'"
+            fi
+        else
+            log_warn "keyd config not found in stow/keyd/"
+        fi
     fi
     
     return $status
 }
 
+# ==============================================================================
+# Symlink Check
+# ==============================================================================
 check_links() {
     local status=0
     echo ""
     echo "Checking symlinks..."
     
+    # Check binaries
     for bin in uke uke-bunch uke-gather uke-logs uke-scratchpad uke-session; do
         if [[ -x "$HOME/.local/bin/$bin" ]]; then
             ok "$bin linked"
@@ -1494,9 +1658,60 @@ check_links() {
         fi
     done
     
+    # Check config symlinks
+    echo ""
+    echo "Checking config symlinks..."
+    
+    if is_macos; then
+        if [[ -L "$HOME/.config/skhd/skhdrc" ]]; then
+            ok "skhdrc linked"
+        else
+            fail "skhdrc not linked"
+            status=1
+        fi
+        
+        if [[ -L "$HOME/.config/yabai/yabairc" ]]; then
+            ok "yabairc linked"
+        else
+            fail "yabairc not linked"
+            status=1
+        fi
+    else
+        if [[ -L "$HOME/.config/hypr/hyprland.conf" ]]; then
+            ok "hyprland.conf linked"
+        else
+            fail "hyprland.conf not linked"
+            status=1
+        fi
+    fi
+    
+    # Check stowed dotfiles
+    echo ""
+    echo "Checking stowed dotfiles..."
+    
+    local dotfiles=(".wezterm.lua" ".tmux.conf" ".zshrc")
+    for dot in "${dotfiles[@]}"; do
+        if [[ -L "$HOME/$dot" ]]; then
+            ok "$dot stowed"
+        elif [[ -f "$HOME/$dot" ]]; then
+            log_warn "$dot exists but not a symlink"
+        else
+            log_warn "$dot not found"
+        fi
+    done
+    
+    if [[ -L "$HOME/.config/nvim" ]] || [[ -d "$HOME/.config/nvim" ]]; then
+        ok "nvim config exists"
+    else
+        log_warn "nvim config not found"
+    fi
+    
     return $status
 }
 
+# ==============================================================================
+# Service Check
+# ==============================================================================
 check_services() {
     echo ""
     echo "Checking services..."
@@ -1517,11 +1732,65 @@ check_services() {
         if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
             ok "hyprland running"
         else
-            fail "hyprland not running"
+            log_warn "hyprland not running (or not in Hyprland session)"
+        fi
+        
+        # Check keyd service
+        if command -v keyd &>/dev/null; then
+            if systemctl is-active keyd &>/dev/null; then
+                ok "keyd service active"
+            else
+                log_warn "keyd service not running - run 'sudo systemctl enable --now keyd'"
+            fi
+        fi
+        
+        # Check optional services
+        if pgrep -x waybar &>/dev/null; then
+            ok "waybar running"
+        else
+            log_warn "waybar not running (optional)"
+        fi
+        
+        if pgrep -x dunst &>/dev/null; then
+            ok "dunst running"
+        else
+            log_warn "dunst not running (optional)"
         fi
     fi
 }
 
+# ==============================================================================
+# Arch-specific Checks
+# ==============================================================================
+check_arch() {
+    if [[ ! -f /etc/arch-release ]]; then
+        return 0
+    fi
+    
+    echo ""
+    echo "Arch Linux specific checks..."
+    
+    # Check if user is in input group (needed for keyd)
+    if groups | grep -q '\binput\b'; then
+        ok "User in 'input' group"
+    else
+        log_warn "User not in 'input' group (may be needed for keyd)"
+        echo "      Add with: sudo usermod -aG input \$USER"
+    fi
+    
+    # Check if Hyprland is in path
+    if [[ -n "${XDG_SESSION_TYPE:-}" ]]; then
+        echo "  Session type: $XDG_SESSION_TYPE"
+    fi
+    
+    if [[ -n "${XDG_CURRENT_DESKTOP:-}" ]]; then
+        echo "  Desktop: $XDG_CURRENT_DESKTOP"
+    fi
+}
+
+# ==============================================================================
+# Main
+# ==============================================================================
 main() {
     echo "╔══════════════════════════════════════╗"
     echo "║     UKE Doctor - Health Check        ║"
@@ -1529,6 +1798,7 @@ main() {
     echo ""
     echo "Platform: $UKE_OS"
     echo "UKE Root: $UKE_ROOT"
+    echo "UKE Version: $UKE_VERSION"
     echo ""
     
     local overall=0
@@ -1537,6 +1807,7 @@ main() {
     check_configs || overall=1
     check_links || overall=1
     check_services
+    check_arch
     
     echo ""
     if [[ $overall -eq 0 ]]; then
@@ -1545,6 +1816,11 @@ main() {
     else
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         fail "Some checks failed - see above"
+        echo ""
+        echo "Quick fixes:"
+        echo "  uke gen           # Regenerate configs"
+        echo "  uke install       # Re-run installer"
+        echo "  uke reload        # Reload window manager"
     fi
     
     return $overall
@@ -1693,7 +1969,7 @@ SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 
 source "$UKE_ROOT/lib/core.sh"
-require_cmd jq yq
+require_cmd jq
 
 gather_macos() {
     local current_space
@@ -1702,31 +1978,40 @@ gather_macos() {
     
     case $current_space in
         1)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser") | .id' |                 xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser") | .id' | \
+                xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
             ;;
         2)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Obsidian") | .id' |                 xargs -I {} yabai -m window {} --space 2 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Obsidian") | .id' | \
+                xargs -I {} yabai -m window {} --space 2 2>/dev/null || true
             ;;
         3)
-            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode") | .id' |                 xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode") | .id' | \
+                xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
             ;;
         5)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' |                 xargs -I {} yabai -m window {} --space 5 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' | \
+                xargs -I {} yabai -m window {} --space 5 2>/dev/null || true
             ;;
         6)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Raindrop.io") | .id' |                 xargs -I {} yabai -m window {} --space 6 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Raindrop.io") | .id' | \
+                xargs -I {} yabai -m window {} --space 6 2>/dev/null || true
             ;;
         7)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' |                 xargs -I {} yabai -m window {} --space 7 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' | \
+                xargs -I {} yabai -m window {} --space 7 2>/dev/null || true
             ;;
         8)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint") | .id' |                 xargs -I {} yabai -m window {} --space 8 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint") | .id' | \
+                xargs -I {} yabai -m window {} --space 8 2>/dev/null || true
             ;;
         9)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Slack" or .app == "Discord" or .app == "Mail" or .app == "Telegram" or .app == "WhatsApp") | .id' |                 xargs -I {} yabai -m window {} --space 9 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Slack" or .app == "Discord" or .app == "Mail") | .id' | \
+                xargs -I {} yabai -m window {} --space 9 2>/dev/null || true
             ;;
         10)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Claude" or .app == "Perplexity") | .id' |                 xargs -I {} yabai -m window {} --space 10 2>/dev/null || true
+            yabai -m query --windows | jq -r '.[] | select(.app == "Claude" or .app == "Perplexity") | .id' | \
+                xargs -I {} yabai -m window {} --space 10 2>/dev/null || true
             ;;
         *)
             log_info "No gather action for space $current_space"
@@ -1736,7 +2021,52 @@ gather_macos() {
 }
 
 gather_linux() {
-    log_warn "Linux gather logic is currently a stub."
+    local current_ws
+    current_ws=$(hyprctl activeworkspace -j | jq -r '.id')
+    log_info "Gathering windows for workspace $current_ws..."
+    
+    case $current_ws in
+        1)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("brave|firefox|chromium"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "1,address:$addr" 2>/dev/null; done
+            ;;
+        2)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("obsidian"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "2,address:$addr" 2>/dev/null; done
+            ;;
+        3)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("wezterm|code|alacritty|kitty"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "3,address:$addr" 2>/dev/null; done
+            ;;
+        5)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("evince|zathura|okular"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "5,address:$addr" 2>/dev/null; done
+            ;;
+        6)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("raindrop"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "6,address:$addr" 2>/dev/null; done
+            ;;
+        7)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("spotify"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "7,address:$addr" 2>/dev/null; done
+            ;;
+        8)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("libreoffice|soffice"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "8,address:$addr" 2>/dev/null; done
+            ;;
+        9)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("slack|discord|thunderbird|telegram"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "9,address:$addr" 2>/dev/null; done
+            ;;
+        10)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("claude"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "10,address:$addr" 2>/dev/null; done
+            ;;
+        *)
+            log_info "No gather action for workspace $current_ws"
+            ;;
+    esac
+    ok "Windows gathered"
 }
 
 is_macos && gather_macos || gather_linux
@@ -3826,6 +4156,94 @@ kickstart.nvim	kickstart.txt	/*kickstart.nvim*
 
 
 ################################################################################
+FILE PATH: uke/stow/keyd/.config/keyd/default.conf
+################################################################################
+
+# ==============================================================================
+# KEYD CONFIG - Unified Keyboard Environment
+# ==============================================================================
+# ISO Hyper Key: Caps Lock as navigation layer
+# Equivalent to Karabiner-Elements config on macOS
+# ==============================================================================
+# 
+# INSTALLATION:
+#   This file should be symlinked to /etc/keyd/default.conf (requires sudo)
+#   See: scripts/keyd-setup.sh
+#
+# USAGE:
+#   Caps Lock alone → Escape
+#   Caps Lock + hjkl → Arrow keys
+#   Caps Lock + yuio → Home/PageUp/PageDown/End
+#   Caps Lock + wasd → Shift+Arrow (selection)
+#   Caps Lock + qe   → Option+Shift+Arrow (word selection)
+#   Caps Lock + fg   → Option+Arrow (word jump)
+#   Caps Lock + nm   → Option+Arrow (word jump, alternate)
+#   Caps Lock + Backspace → Delete Forward
+#   Caps Lock + '    → Toggle actual Caps Lock
+# ==============================================================================
+
+[ids]
+*
+
+[main]
+
+# Caps Lock becomes a layer toggle, Escape when tapped alone
+capslock = overload(hyper, esc)
+
+[hyper]
+
+# ------------------------------------------------------------------------------
+# Vim-style Navigation (hjkl → Arrows)
+# ------------------------------------------------------------------------------
+h = left
+j = down
+k = up
+l = right
+
+# ------------------------------------------------------------------------------
+# Extended Navigation
+# ------------------------------------------------------------------------------
+y = home
+u = pagedown
+i = pageup
+o = end
+
+# ------------------------------------------------------------------------------
+# Delete Forward (Caps + Backspace)
+# ------------------------------------------------------------------------------
+backspace = delete
+
+# ------------------------------------------------------------------------------
+# Actual Caps Lock Toggle (Caps + ')
+# ------------------------------------------------------------------------------
+' = capslock
+
+# ------------------------------------------------------------------------------
+# Word Navigation (Caps + f/g or n/m)
+# Uses Ctrl+Arrow on Linux (equivalent to Option+Arrow on macOS)
+# ------------------------------------------------------------------------------
+f = C-left
+g = C-right
+n = C-left
+m = C-right
+
+# ------------------------------------------------------------------------------
+# Selection (Caps + wasd → Shift+Arrow)
+# ------------------------------------------------------------------------------
+w = S-up
+a = S-left
+s = S-down
+d = S-right
+
+# ------------------------------------------------------------------------------
+# Word Selection (Caps + q/e → Ctrl+Shift+Arrow)
+# ------------------------------------------------------------------------------
+q = C-S-left
+e = C-S-right
+
+
+
+################################################################################
 FILE PATH: uke/stow/wezterm/.wezterm.lua
 ################################################################################
 
@@ -5058,7 +5476,7 @@ This is a trade-off between functionality and security. Consider your threat mod
 FILE PATH: uke/docs/CHEATSHEET.md
 ################################################################################
 
-# UKE v6.2 - Complete Cheatsheet
+# UKE v6.3 - Complete Cheatsheet
 
 **Unified Keyboard Environment - One muscle memory for macOS & Linux**
 
@@ -5081,263 +5499,260 @@ FILE PATH: uke/docs/CHEATSHEET.md
 
 ## Workspaces
 
-| Space | Purpose | Apps |
-|:------|:--------|:-----|
-| **1** | Browser | Safari, Brave Browser |
-| **2** | Notes | Obsidian |
-| **3** | Code | WezTerm, Code, Xcode |
-| **4** | Catch-all | Everything else |
-| **5** | Documents | Preview, PDF Expert |
-| **6** | Raindrop | Raindrop.io |
-| **7** | Media | Spotify |
-| **8** | Office | Word, Excel, PowerPoint |
-| **9** | Comms | Slack, Discord, Mail, Telegram |
-| **10** | AI | Claude, Perplexity |
+| Space | Purpose | macOS Apps | Linux Apps |
+|:------|:--------|:-----------|:-----------|
+| **1** | Browser | Safari, Brave | brave, firefox |
+| **2** | Notes | Obsidian | obsidian |
+| **3** | Code | WezTerm, Code, Xcode | wezterm, code, kitty |
+| **4** | Catch-all | Everything else | Everything else |
+| **5** | Documents | Preview, PDF Expert | evince, zathura |
+| **6** | Raindrop | Raindrop.io | raindrop |
+| **7** | Media | Spotify | spotify |
+| **8** | Office | Word, Excel, PowerPoint | libreoffice |
+| **9** | Comms | Slack, Discord, Mail | slack, discord, thunderbird |
+| **10** | AI | Claude, Perplexity | claude |
 
 ---
 
 ## PRIMARY Layer: Window Management
 
 ### Focus (Cmd/Alt + hjkl)
-```
-PRIMARY + h     Focus window left
-PRIMARY + j     Focus window down
-PRIMARY + k     Focus window up
-PRIMARY + l     Focus window right
-```
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Focus left | Cmd + h | Alt + h |
+| Focus down | Cmd + j | Alt + j |
+| Focus up | Cmd + k | Alt + k |
+| Focus right | Cmd + l | Alt + l |
 
 ### Move (Cmd+Shift/Alt+Shift + hjkl)
-```
-PRIMARY+SHIFT + h     Move window left
-PRIMARY+SHIFT + j     Move window down
-PRIMARY+SHIFT + k     Move window up
-PRIMARY+SHIFT + l     Move window right
-```
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Move left | Cmd+Shift + h | Alt+Shift + h |
+| Move down | Cmd+Shift + j | Alt+Shift + j |
+| Move up | Cmd+Shift + k | Alt+Shift + k |
+| Move right | Cmd+Shift + l | Alt+Shift + l |
 
 ### Workspace Navigation
-```
-PRIMARY + 1-9         Switch to workspace 1-9
-PRIMARY + 0           Switch to workspace 10
-PRIMARY + [           Previous workspace
-PRIMARY + ]           Next workspace
-```
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Workspace 1-9 | Cmd + 1-9 | Alt + 1-9 |
+| Workspace 10 | Cmd + 0 | Alt + 0 |
+| Previous workspace | Cmd + [ | Alt + [ |
+| Next workspace | Cmd + ] | Alt + ] |
 
 ### Move to Workspace
-```
-PRIMARY+SHIFT + 1-9   Move window to workspace 1-9 (and follow)
-PRIMARY+SHIFT + 0     Move window to workspace 10
-```
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Move to WS 1-9 | Cmd+Shift + 1-9 | Alt+Shift + 1-9 |
+| Move to WS 10 | Cmd+Shift + 0 | Alt+Shift + 0 |
 
 ### Window Controls
-```
-PRIMARY + Return          Launch terminal (WezTerm)
-PRIMARY + `               Gather windows for current space
-PRIMARY + Escape          Focus window under mouse
-PRIMARY+SHIFT + f         Toggle fullscreen
-PRIMARY+SHIFT + Space     Toggle float/tile
-PRIMARY+SHIFT + \         Toggle split direction
-PRIMARY+SHIFT + r         Rotate layout 90°
-PRIMARY+SHIFT + b         Balance windows
-PRIMARY+SHIFT + x         Mirror x-axis
-PRIMARY+SHIFT + y         Mirror y-axis
-PRIMARY+CTRL + s          Insert stack
-PRIMARY+CTRL + t          Toggle BSP ↔ Stack layout
-```
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Launch terminal | Cmd + Return | Alt + Return |
+| Gather windows | Cmd + ` | Alt + ` |
+| Toggle fullscreen | Cmd+Shift + f | Alt+Shift + f |
+| Toggle float | Cmd+Shift + Space | Alt+Shift + Space |
+| Toggle split | Cmd+Shift + \\ | Alt+Shift + \\ |
+| Rotate layout | Cmd+Shift + r | Alt+Shift + r |
+| Balance windows | Cmd+Shift + b | - |
+| Kill window | - | Alt + q |
+
+---
+
+## TERTIARY Layer: Window Resizing
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Resize left | Alt+Shift + h | Super+Shift + h |
+| Resize down | Alt+Shift + j | Super+Shift + j |
+| Resize up | Alt+Shift + k | Super+Shift + k |
+| Resize right | Alt+Shift + l | Super+Shift + l |
 
 ---
 
 ## SECONDARY Layer: WezTerm Terminal
 
 ### Tabs (Alt/Super)
-```
-SECONDARY + t         New tab
-SECONDARY + w         Close tab
-SECONDARY + 1-9       Switch to tab 1-9
-SECONDARY + [         Previous tab
-SECONDARY + ]         Next tab
-```
 
-### Panes (Alt/Super)
-```
-SECONDARY + \         Split horizontal
-SECONDARY + -         Split vertical
-SECONDARY + x         Close pane
-SECONDARY + z         Toggle zoom
-```
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| New tab | Alt + t | Super + t |
+| Close pane/tab | Alt + w | Super + w |
+| Tab 1-9 | Alt + 1-9 | Super + 1-9 |
+| Previous tab | Alt + [ | Super + [ |
+| Next tab | Alt + ] | Super + ] |
 
-### Pane Navigation (Alt/Super + hjkl)
-```
-SECONDARY + h         Navigate left
-SECONDARY + j         Navigate down
-SECONDARY + k         Navigate up
-SECONDARY + l         Navigate right
-```
+### Panes
 
-### Pane Resizing (Alt+Shift/Super+Shift + hjkl)
-```
-SECONDARY+SHIFT + h   Resize left
-SECONDARY+SHIFT + j   Resize down
-SECONDARY+SHIFT + k   Resize up
-SECONDARY+SHIFT + l   Resize right
-```
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Split horizontal | Alt + \\ | Super + \\ |
+| Split vertical | Alt + - | Super + - |
+| Close pane | Alt + x | Super + x |
+| Toggle zoom | Alt + z | Super + z |
 
----
+### Pane Navigation
 
-## TERTIARY Layer: Window Resizing
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Navigate left | Alt + h | Super + h |
+| Navigate down | Alt + j | Super + j |
+| Navigate up | Alt + k | Super + k |
+| Navigate right | Alt + l | Super + l |
 
-```
-TERTIARY + h          Resize window left
-TERTIARY + j          Resize window down
-TERTIARY + k          Resize window up
-TERTIARY + l          Resize window right
-```
+### Pane Resizing
 
-> **Note:** When WezTerm has focus, TERTIARY resizes terminal panes. When other apps have focus, it resizes application windows.
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Resize left | Alt+Shift + h | Super+Shift + h |
+| Resize down | Alt+Shift + j | Super+Shift + j |
+| Resize up | Alt+Shift + k | Super+Shift + k |
+| Resize right | Alt+Shift + l | Super+Shift + l |
 
 ---
 
 ## QUATERNARY Layer: Shell Control
 
-```
-CTRL + c              Interrupt (kill) process
-CTRL + z              Suspend process
-CTRL + d              Logout (EOF)
-CTRL + l              Clear screen
-CTRL + r              Search history
-CTRL + a              Beginning of line (or tmux prefix)
-CTRL + e              End of line
-CTRL + w              Kill word backward
-```
+**Never intercepted by window manager - passed directly to terminal**
+
+| Action | Keybinding |
+|:-------|:-----------|
+| Interrupt (SIGINT) | Ctrl + c |
+| Suspend (SIGTSTP) | Ctrl + z |
+| End of input | Ctrl + d |
+| Clear screen | Ctrl + l |
+| Search history | Ctrl + r |
+| Beginning of line | Ctrl + a |
+| End of line | Ctrl + e |
 
 ---
 
-## TMUX Layer (Prefix: Ctrl+A)
-
-```
-C-a + \               Split vertical
-C-a + -               Split horizontal
-C-a + h/j/k/l         Navigate panes
-C-a + H/J/K/L         Resize panes
-C-a + c               New window
-C-a + 1-5             Switch to window 1-5
-C-a + r               Reload config
-C-a + d               Detach session
-```
-
----
-
-## App Launchers (Cmd+Alt / Alt+Super)
-
-```
-LAUNCHER + b          Brave Browser
-LAUNCHER + o          Obsidian
-LAUNCHER + c          VS Code
-LAUNCHER + r          Raindrop.io
-LAUNCHER + m          Spotify (music)
-LAUNCHER + t          WezTerm (terminal)
-```
-
----
-
-## Bunches (Cmd+Ctrl / Alt+Ctrl)
-
-```
-BUNCH + 1             Study (Obsidian, Brave, WezTerm, Preview → WS 2)
-BUNCH + 2             Guitar (Spotify, Brave → WS 7)
-BUNCH + 3             Coding (WezTerm, Code, Brave → WS 3)
-BUNCH + 4             Email (Mail, Slack, Brave → WS 9)
-BUNCH + 5             Reading (Preview, Obsidian → WS 5)
-```
-
-
----
-
-## Scratchpads (Dropdown Windows)
-
-Toggle floating windows that appear/hide with a hotkey:
+## LAUNCHER Layer: Quick App Launch
 
 | Action | macOS | Linux |
 |:-------|:------|:------|
-| Terminal scratchpad | `Cmd + \`` | `Alt + \`` |
-| Notes scratchpad | `Cmd+Alt + n` | `Alt+Super + n` |
+| Brave | Cmd+Alt + b | Alt+Super + b |
+| Obsidian | Cmd+Alt + o | Alt+Super + o |
+| Code | Cmd+Alt + c | Alt+Super + c |
+| Spotify | Cmd+Alt + m | Alt+Super + m |
+| WezTerm | Cmd+Alt + t | Alt+Super + t |
+| Raindrop | Cmd+Alt + r | Alt+Super + r |
+| File Manager | - | Alt+Super + f |
+| App Launcher | - | Alt+Super + Space |
 
-Configure in `registry.yaml`:
-```yaml
-scratchpads:
-  terminal:
-    app: wezterm
-    key: "grave"
-    size: { width: 80, height: 40 }
-    position: "top"    # top, bottom, center
-```
+---
+
+## BUNCH Layer: Environment Presets
+
+| Bunch | macOS | Linux |
+|:------|:------|:------|
+| Study | Cmd+Ctrl + 1 | Alt+Ctrl + F1 |
+| Guitar | Cmd+Ctrl + 2 | Alt+Ctrl + F2 |
+| Coding | Cmd+Ctrl + 3 | Alt+Ctrl + F3 |
+| Email | Cmd+Ctrl + 4 | Alt+Ctrl + F4 |
+| Reading | Cmd+Ctrl + 5 | Alt+Ctrl + F5 |
+
+---
+
+## Scratchpads
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Terminal scratchpad | Cmd+Shift + ` | Alt+Shift + ` |
+| Notes scratchpad | Cmd+Alt + n | Alt+Super + n |
 
 ---
 
 ## Session Management
 
-Save and restore window layouts:
-
 | Action | macOS | Linux |
 |:-------|:------|:------|
-| Quick save | `Cmd+Ctrl + s` | `Alt+Ctrl + s` |
-| Quick restore | `Cmd+Ctrl+Shift + s` | `Alt+Ctrl+Shift + s` |
+| Quick save | Cmd+Ctrl + s | Alt+Ctrl + s |
+| Quick restore | Cmd+Ctrl+Shift + s | Alt+Ctrl+Shift + s |
+
+---
+
+## Hyper Key (via keyd on Linux / Karabiner on macOS)
+
+**Caps Lock becomes a modifier key**
+
+| Action | Keybinding |
+|:-------|:-----------|
+| Escape | Caps (tap) |
+| Left | Caps + h |
+| Down | Caps + j |
+| Up | Caps + k |
+| Right | Caps + l |
+| Home | Caps + y |
+| Page Down | Caps + u |
+| Page Up | Caps + i |
+| End | Caps + o |
+| Delete Forward | Caps + Backspace |
+| Select Left | Caps + a |
+| Select Down | Caps + s |
+| Select Right | Caps + d |
+| Select Up | Caps + w |
+| Word Left | Caps + f |
+| Word Right | Caps + g |
+| Word Select Left | Caps + q |
+| Word Select Right | Caps + e |
+| Toggle Caps Lock | Caps + ' |
+
+---
+
+## Linux-Specific: Screenshots & Clipboard
+
+| Action | Keybinding |
+|:-------|:-----------|
+| Screenshot (region) | Print |
+| Screenshot (full) | Shift + Print |
+| Clipboard history | Alt + v |
+
+---
+
+## CLI Commands
 
 ```bash
-uke-session save deep-work      # Save current layout
-uke-session restore deep-work   # Restore layout
-uke-session list                # List all sessions
-uke-session delete <n>       # Delete a session
-```
----
+uke gen              # Generate platform configs
+uke reload           # Restart window manager
+uke status           # Show current status
+uke edit             # Edit registry.yaml
+uke-doctor           # Health check
 
-## UKE CLI Commands
-
-```bash
-uke gen               Generate configs from registry.yaml
-uke reload            Restart window manager
-uke status            Show current state
-uke validate          Check configurations
-uke edit              Edit registry.yaml
-uke edit skhd         Edit generated skhd config
-uke log tail          View recent logs
-uke-bunch list        List available bunches
-uke-bunch <name>      Run a bunch
-uke-gather            Organize windows to workspaces
-uke-scratchpad <n> Toggle dropdown windows
-uke-session <cmd>     Save/restore layouts
-uke-logs <component>  Live log viewer (uke|yabai|skhd|hyprland|all)
+uke-gather           # Organize windows by workspace
+uke-bunch study      # Launch study environment
+uke-scratchpad term  # Toggle dropdown terminal
+uke-session save     # Save window layout
+uke-session restore  # Restore window layout
+uke-logs hyprland    # View Hyprland logs
 ```
 
 ---
 
-## Quick Reference
+## Quick Reference Card
 
-| Action | macOS | Linux |
-|:-------|:------|:------|
-| Focus window | `Cmd + hjkl` | `Alt + hjkl` |
-| Move window | `Cmd+Shift + hjkl` | `Alt+Shift + hjkl` |
-| Resize window | `Alt+Shift + hjkl` | `Super+Shift + hjkl` |
-| Switch workspace | `Cmd + 1-9` | `Alt + 1-9` |
-| Move to workspace | `Cmd+Shift + 1-9` | `Alt+Shift + 1-9` |
-| Launch terminal | `Cmd + Return` | `Alt + Return` |
-| Fullscreen | `Cmd+Shift + f` | `Alt+Shift + f` |
-| Gather windows | `Cmd + \`` | `Alt + \`` |
-| Terminal scratchpad | `Cmd + \`` | `Alt + \`` |
-| Quick save session | `Cmd+Ctrl + s` | `Alt+Ctrl + s` |
-| WezTerm pane nav | `Alt + hjkl` | `Super + hjkl` |
-| WezTerm split | `Alt + \ / -` | `Super + \ / -` |
-| Shell interrupt | `Ctrl + c` | `Ctrl + c` |
-
----
-
-## Philosophy
-
-- **PRIMARY** = OS-level window management (intercepted before apps)
-- **SECONDARY** = App-internal navigation (passed to apps like WezTerm)
-- **TERTIARY** = Resizing (context-aware: windows or terminal panes)
-- **QUATERNARY** = Shell commands (never override Ctrl+C, Ctrl+Z)
-- **No conflicts** = Each layer has exclusive control of its domain
-- **Cross-platform** = Same logical keys, different physical modifiers
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     UKE QUICK REFERENCE (Linux)                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  FOCUS      Alt + hjkl          MOVE       Alt+Shift + hjkl                 │
+│  RESIZE     Super+Shift + hjkl  WORKSPACE  Alt + 1-9,0                      │
+│  TERMINAL   Alt + Return        KILL       Alt + q                          │
+│  FULLSCREEN Alt+Shift + f       FLOAT      Alt+Shift + Space                │
+│  GATHER     Alt + `             LAUNCHER   Alt+Super + Space                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  WEZTERM PANES: Super + hjkl (nav) | Super + \\ - (split) | Super + z (zoom)│
+│  WEZTERM TABS:  Super + t (new) | Super + w (close) | Super + 1-9 (switch)  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  CAPS + hjkl = Arrows | CAPS + wasd = Select | CAPS + fg = Word Jump        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 
 
@@ -5519,6 +5934,670 @@ uke reload
 
 
 ################################################################################
+FILE PATH: uke/docs/ARCH-INSTALL.md
+################################################################################
+
+# UKE v6.3 - Arch Linux Installation Guide
+
+This guide covers setting up UKE (Unified Keyboard Environment) on Arch Linux with Hyprland.
+
+## Prerequisites
+
+### Required Packages
+
+```bash
+# Window Manager & Core
+sudo pacman -S hyprland hyprpaper
+
+# UKE Dependencies
+sudo pacman -S stow jq git neovim
+
+# Terminal & Shell
+sudo pacman -S wezterm zsh tmux
+
+# Hyprland Ecosystem (highly recommended)
+sudo pacman -S waybar dunst wofi
+sudo pacman -S grim slurp wl-clipboard cliphist
+sudo pacman -S polkit-kde-agent
+
+# keyd (for Caps Lock → Hyper Key remapping)
+sudo pacman -S keyd
+
+# Optional but recommended
+sudo pacman -S ripgrep fd eza bat
+```
+
+### AUR Packages (optional)
+
+```bash
+# Using yay or paru
+yay -S brave-bin obsidian-bin spotify
+```
+
+## Installation
+
+### 1. Clone UKE
+
+```bash
+# Clone to your dotfiles directory
+git clone https://github.com/YOUR_USERNAME/uke.git ~/dotfiles/uke
+cd ~/dotfiles/uke
+```
+
+### 2. Run the Installer
+
+```bash
+./scripts/install.sh
+```
+
+This will:
+- Check dependencies
+- Generate Hyprland config
+- Link binaries to `~/.local/bin`
+- Stow dotfiles (wezterm, tmux, zsh, nvim)
+- Set up keyd (with sudo prompt)
+
+### 3. Set Up keyd (if not done automatically)
+
+keyd requires root access to write to `/etc/keyd/`:
+
+```bash
+# Run the keyd setup script
+./scripts/keyd-setup.sh
+
+# Or manually:
+sudo mkdir -p /etc/keyd
+sudo ln -sf ~/dotfiles/uke/stow/keyd/.config/keyd/default.conf /etc/keyd/default.conf
+sudo systemctl enable --now keyd
+```
+
+### 4. Add User to Input Group
+
+For keyd to work properly:
+
+```bash
+sudo usermod -aG input $USER
+# Log out and back in for this to take effect
+```
+
+### 5. Verify Installation
+
+```bash
+uke-doctor
+```
+
+## Configuration
+
+### Modifier Hierarchy on Linux
+
+| Layer | Modifier | Scope |
+|:------|:---------|:------|
+| PRIMARY | Alt | Window Manager (Hyprland) |
+| SECONDARY | Super | Terminal UI (WezTerm) |
+| TERTIARY | Super+Shift | Window Resizing |
+| QUATERNARY | Ctrl | Shell (never intercepted) |
+
+### Key Bindings
+
+| Action | Keybinding |
+|:-------|:-----------|
+| Focus window | Alt + hjkl |
+| Move window | Alt+Shift + hjkl |
+| Resize window | Super+Shift + hjkl |
+| Switch workspace | Alt + 1-9, 0 |
+| Move to workspace | Alt+Shift + 1-9, 0 |
+| Launch terminal | Alt + Return |
+| Toggle fullscreen | Alt+Shift + f |
+| Toggle float | Alt+Shift + Space |
+| Kill window | Alt + q |
+| App launcher | Alt+Super + Space |
+| Gather windows | Alt + ` |
+| Scratchpad terminal | Alt+Shift + ` |
+
+### Caps Lock (via keyd)
+
+| Action | Keybinding |
+|:-------|:-----------|
+| Escape | Caps (tap) |
+| Arrow keys | Caps + hjkl |
+| Page Up/Down | Caps + i/u |
+| Home/End | Caps + y/o |
+| Select | Caps + wasd |
+| Word jump | Caps + fg |
+| Word select | Caps + qe |
+| Toggle Caps Lock | Caps + ' |
+
+## Directory Structure
+
+```
+~/dotfiles/uke/
+├── config/registry.yaml     # Source of truth (edit this)
+├── gen/hyprland/           # Generated config (don't edit)
+├── stow/
+│   ├── keyd/               # Caps Lock config
+│   ├── nvim/               # Neovim config
+│   ├── wezterm/            # Terminal config
+│   ├── tmux/               # tmux config
+│   └── zsh/                # Shell config
+├── bin/                    # UKE commands
+├── bunches/                # Environment presets
+└── scripts/
+    ├── install.sh          # Main installer
+    └── keyd-setup.sh       # keyd setup helper
+```
+
+## Customization
+
+### Edit Hyprland Config
+
+The generated config is at `gen/hyprland/hyprland.conf`. To customize:
+
+1. **For persistent changes**: Edit the generator in `lib/gen.sh`
+2. **For quick tests**: Edit the generated file directly (will be overwritten by `uke gen`)
+
+### Custom Autostart
+
+Add your autostart commands to the Hyprland config:
+
+```bash
+exec-once = nm-applet
+exec-once = blueman-applet
+exec-once = /path/to/your/script
+```
+
+### Custom Window Rules
+
+Add rules for your applications:
+
+```bash
+windowrulev2 = workspace 4, class:^(steam)$
+windowrulev2 = float, class:^(mpv)$
+```
+
+### Custom Keybindings
+
+```bash
+bind = ALT SUPER, p, exec, pavucontrol
+bind = ALT SUPER, e, exec, thunar
+```
+
+## Troubleshooting
+
+### keyd Not Working
+
+```bash
+# Check service status
+systemctl status keyd
+
+# Check if user is in input group
+groups | grep input
+
+# Reload keyd
+sudo keyd reload
+
+# View keyd logs
+journalctl -u keyd -f
+```
+
+### Hyprland Not Loading Config
+
+```bash
+# Check if config is linked correctly
+ls -la ~/.config/hypr/hyprland.conf
+
+# Should point to:
+# ~/dotfiles/uke/gen/hyprland/hyprland.conf
+
+# Regenerate config
+uke gen
+
+# Reload Hyprland
+hyprctl reload
+```
+
+### Window Rules Not Working
+
+Check the window class name:
+
+```bash
+# In Hyprland, open the window then:
+hyprctl clients | grep -i class
+```
+
+Use the exact class name (case-sensitive) in rules.
+
+### Binaries Not Found
+
+Ensure `~/.local/bin` is in your PATH:
+
+```bash
+# Add to ~/.zshrc if not present:
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+## Updating
+
+```bash
+cd ~/dotfiles/uke
+git pull
+uke gen
+uke reload
+```
+
+## Uninstalling
+
+```bash
+cd ~/dotfiles/uke
+./scripts/uke-wipe.sh
+```
+
+## Support
+
+- Run `uke-doctor` for diagnostics
+- Check `uke-debug dump` for detailed info
+- See `docs/TROUBLESHOOTING.md` for common issues
+
+
+
+################################################################################
+FILE PATH: uke/gen/hyprland/hyprland.conf
+################################################################################
+
+# ==============================================================================
+# HYPRLAND CONFIG - AUTO-GENERATED BY UKE v6.2
+# ==============================================================================
+# Unified Keyboard Environment for Linux
+# 
+# Modifier Hierarchy:
+#   PRIMARY:    Alt         → Window Manager (focus, move, workspaces)
+#   SECONDARY:  Super       → Terminal UI (WezTerm handles internally)
+#   TERTIARY:   Super+Shift → Window Resizing
+#   QUATERNARY: Ctrl        → Shell (never intercepted)
+# ==============================================================================
+
+# ==============================================================================
+# MONITORS
+# ==============================================================================
+# Configure your monitors here. Example:
+# monitor=DP-1, 2560x1440@144, 0x0, 1
+# monitor=HDMI-A-1, 1920x1080@60, 2560x0, 1
+monitor=,preferred,auto,1
+
+# ==============================================================================
+# GENERAL SETTINGS
+# ==============================================================================
+general {
+    gaps_in = 2
+    gaps_out = 4
+    border_size = 2
+    col.active_border = rgba(88c0d0ff)
+    col.inactive_border = rgba(3b4252ff)
+    layout = dwindle
+    resize_on_border = true
+}
+
+# ==============================================================================
+# DECORATION
+# ==============================================================================
+decoration {
+    rounding = 4
+    
+    blur {
+        enabled = true
+        size = 6
+        passes = 2
+        new_optimizations = true
+    }
+    
+    shadow {
+        enabled = true
+        range = 8
+        render_power = 2
+        color = rgba(1a1a1aee)
+    }
+}
+
+# ==============================================================================
+# ANIMATIONS
+# ==============================================================================
+animations {
+    enabled = true
+    
+    bezier = easeOutQuint, 0.22, 1, 0.36, 1
+    bezier = easeInOutQuint, 0.83, 0, 0.17, 1
+    
+    animation = windows, 1, 4, easeOutQuint, slide
+    animation = windowsOut, 1, 4, easeOutQuint, slide
+    animation = border, 1, 10, default
+    animation = fade, 1, 5, default
+    animation = workspaces, 1, 4, easeInOutQuint, slide
+}
+
+# ==============================================================================
+# INPUT
+# ==============================================================================
+input {
+    kb_layout = us
+    follow_mouse = 1
+    sensitivity = 0
+    
+    touchpad {
+        natural_scroll = true
+        tap-to-click = true
+    }
+}
+
+# ==============================================================================
+# GESTURES
+# ==============================================================================
+gestures {
+    workspace_swipe = true
+    workspace_swipe_fingers = 3
+}
+
+# ==============================================================================
+# DWINDLE LAYOUT (BSP-like)
+# ==============================================================================
+dwindle {
+    pseudotile = true
+    preserve_split = true
+    force_split = 2
+}
+
+# ==============================================================================
+# MASTER LAYOUT (alternative)
+# ==============================================================================
+master {
+    new_status = master
+}
+
+# ==============================================================================
+# MISC
+# ==============================================================================
+misc {
+    force_default_wallpaper = 0
+    disable_hyprland_logo = true
+    disable_splash_rendering = true
+}
+
+# ==============================================================================
+# ENVIRONMENT VARIABLES
+# ==============================================================================
+env = XCURSOR_SIZE,24
+env = QT_QPA_PLATFORMTHEME,qt6ct
+
+# ==============================================================================
+# AUTOSTART
+# ==============================================================================
+exec-once = waybar
+exec-once = dunst
+exec-once = /usr/lib/polkit-kde-authentication-agent-1
+exec-once = hyprpaper
+exec-once = wl-paste --type text --watch cliphist store
+exec-once = wl-paste --type image --watch cliphist store
+
+# ==============================================================================
+# WINDOW FOCUS NAVIGATION (PRIMARY: Alt + hjkl)
+# ==============================================================================
+bind = ALT, h, movefocus, l
+bind = ALT, j, movefocus, d
+bind = ALT, k, movefocus, u
+bind = ALT, l, movefocus, r
+
+# ==============================================================================
+# WINDOW MOVEMENT (PRIMARY + SHIFT: Alt+Shift + hjkl)
+# ==============================================================================
+bind = ALT SHIFT, h, movewindow, l
+bind = ALT SHIFT, j, movewindow, d
+bind = ALT SHIFT, k, movewindow, u
+bind = ALT SHIFT, l, movewindow, r
+
+# ==============================================================================
+# WINDOW RESIZING (TERTIARY: Super+Shift + hjkl)
+# ==============================================================================
+bind = SUPER SHIFT, h, resizeactive, -50 0
+bind = SUPER SHIFT, j, resizeactive, 0 50
+bind = SUPER SHIFT, k, resizeactive, 0 -50
+bind = SUPER SHIFT, l, resizeactive, 50 0
+
+# Resize mode (alternative)
+bind = ALT, r, submap, resize
+submap = resize
+binde = , h, resizeactive, -20 0
+binde = , j, resizeactive, 0 20
+binde = , k, resizeactive, 0 -20
+binde = , l, resizeactive, 20 0
+bind = , escape, submap, reset
+bind = , return, submap, reset
+submap = reset
+
+# ==============================================================================
+# LAUNCH TERMINAL (PRIMARY + Return)
+# ==============================================================================
+bind = ALT, return, exec, wezterm
+
+# ==============================================================================
+# WINDOW CONTROLS
+# ==============================================================================
+bind = ALT SHIFT, f, fullscreen, 0
+bind = ALT SHIFT, space, togglefloating
+bind = ALT SHIFT, backslash, togglesplit
+bind = ALT SHIFT, r, layoutmsg, orientationcycle
+bind = ALT, q, killactive
+
+# Smart Focus (focus window under cursor)
+bind = ALT, escape, focuscurrentorlast
+
+# ==============================================================================
+# LAYOUT CONTROLS
+# ==============================================================================
+bind = ALT CTRL, t, exec, hyprctl keyword general:layout "$(hyprctl getoption general:layout | grep -q dwindle && echo master || echo dwindle)"
+bind = ALT SHIFT, b, exec, hyprctl dispatch layoutmsg swapwithmaster
+
+# Cycle through windows
+bind = ALT, Tab, cyclenext
+bind = ALT SHIFT, Tab, cyclenext, prev
+
+# ==============================================================================
+# WORKSPACE NAVIGATION (PRIMARY + Number)
+# ==============================================================================
+bind = ALT, 1, workspace, 1
+bind = ALT, 2, workspace, 2
+bind = ALT, 3, workspace, 3
+bind = ALT, 4, workspace, 4
+bind = ALT, 5, workspace, 5
+bind = ALT, 6, workspace, 6
+bind = ALT, 7, workspace, 7
+bind = ALT, 8, workspace, 8
+bind = ALT, 9, workspace, 9
+bind = ALT, 0, workspace, 10
+
+# Workspace navigation with brackets
+bind = ALT, bracketleft, workspace, e-1
+bind = ALT, bracketright, workspace, e+1
+
+# ==============================================================================
+# MOVE WINDOW TO WORKSPACE (PRIMARY + SHIFT + Number)
+# ==============================================================================
+bind = ALT SHIFT, 1, movetoworkspace, 1
+bind = ALT SHIFT, 2, movetoworkspace, 2
+bind = ALT SHIFT, 3, movetoworkspace, 3
+bind = ALT SHIFT, 4, movetoworkspace, 4
+bind = ALT SHIFT, 5, movetoworkspace, 5
+bind = ALT SHIFT, 6, movetoworkspace, 6
+bind = ALT SHIFT, 7, movetoworkspace, 7
+bind = ALT SHIFT, 8, movetoworkspace, 8
+bind = ALT SHIFT, 9, movetoworkspace, 9
+bind = ALT SHIFT, 0, movetoworkspace, 10
+
+# Move without following
+bind = ALT CTRL, 1, movetoworkspacesilent, 1
+bind = ALT CTRL, 2, movetoworkspacesilent, 2
+bind = ALT CTRL, 3, movetoworkspacesilent, 3
+bind = ALT CTRL, 4, movetoworkspacesilent, 4
+bind = ALT CTRL, 5, movetoworkspacesilent, 5
+bind = ALT CTRL, 6, movetoworkspacesilent, 6
+bind = ALT CTRL, 7, movetoworkspacesilent, 7
+bind = ALT CTRL, 8, movetoworkspacesilent, 8
+bind = ALT CTRL, 9, movetoworkspacesilent, 9
+bind = ALT CTRL, 0, movetoworkspacesilent, 10
+
+# ==============================================================================
+# GATHER WINDOWS (Alt + `)
+# ==============================================================================
+bind = ALT, grave, exec, $HOME/.local/bin/uke-gather
+
+# ==============================================================================
+# QUICK APP LAUNCHERS (LAUNCHER: Alt+Super)
+# ==============================================================================
+bind = ALT SUPER, b, exec, brave
+bind = ALT SUPER, o, exec, obsidian
+bind = ALT SUPER, c, exec, code
+bind = ALT SUPER, r, exec, raindrop
+bind = ALT SUPER, m, exec, spotify
+bind = ALT SUPER, t, exec, wezterm
+bind = ALT SUPER, f, exec, thunar
+bind = ALT SUPER, space, exec, wofi --show drun
+
+# ==============================================================================
+# BUNCHES (BUNCH: Alt+Ctrl)
+# ==============================================================================
+bind = ALT CTRL, F1, exec, $HOME/.local/bin/uke-bunch study
+bind = ALT CTRL, F2, exec, $HOME/.local/bin/uke-bunch guitar
+bind = ALT CTRL, F3, exec, $HOME/.local/bin/uke-bunch coding
+bind = ALT CTRL, F4, exec, $HOME/.local/bin/uke-bunch email
+bind = ALT CTRL, F5, exec, $HOME/.local/bin/uke-bunch reading
+
+# ==============================================================================
+# SCRATCHPADS
+# ==============================================================================
+# Terminal scratchpad (Alt + `)
+bind = ALT SHIFT, grave, exec, $HOME/.local/bin/uke-scratchpad terminal
+
+# Notes scratchpad (Alt+Super + n)
+bind = ALT SUPER, n, exec, $HOME/.local/bin/uke-scratchpad notes
+
+# ==============================================================================
+# SESSION MANAGEMENT
+# ==============================================================================
+bind = ALT CTRL, s, exec, $HOME/.local/bin/uke-session quick-save
+bind = ALT CTRL SHIFT, s, exec, $HOME/.local/bin/uke-session quick-restore
+
+# ==============================================================================
+# SCREENSHOT & CLIPBOARD
+# ==============================================================================
+bind = , Print, exec, grim -g "$(slurp)" - | wl-copy
+bind = SHIFT, Print, exec, grim - | wl-copy
+bind = ALT, v, exec, cliphist list | wofi --dmenu | cliphist decode | wl-copy
+
+# ==============================================================================
+# MOUSE BINDINGS
+# ==============================================================================
+bindm = ALT, mouse:272, movewindow
+bindm = ALT, mouse:273, resizewindow
+
+# ==============================================================================
+# WINDOW RULES
+# ==============================================================================
+# Float utility windows
+windowrulev2 = float, class:^(pavucontrol)$
+windowrulev2 = float, class:^(nm-connection-editor)$
+windowrulev2 = float, class:^(blueman-manager)$
+windowrulev2 = float, class:^(thunar)$,title:^(File Operation Progress)$
+windowrulev2 = float, class:^(org.gnome.Calculator)$
+windowrulev2 = float, class:^(file-roller)$
+windowrulev2 = float, title:^(Picture-in-Picture)$
+windowrulev2 = float, title:^(Preferences)$
+windowrulev2 = float, title:^(Settings)$
+
+# Sticky windows
+windowrulev2 = pin, title:^(Picture-in-Picture)$
+windowrulev2 = pin, class:^(org.gnome.Calculator)$
+
+# Terminal opacity
+windowrulev2 = opacity 0.92 0.88, class:^(wezterm)$
+windowrulev2 = opacity 0.92 0.88, class:^(Alacritty)$
+windowrulev2 = opacity 0.92 0.88, class:^(kitty)$
+
+# ==============================================================================
+# WORKSPACE ASSIGNMENTS
+# ==============================================================================
+# Space 1: Browser
+windowrulev2 = workspace 1, class:^(brave-browser)$
+windowrulev2 = workspace 1, class:^(Brave-browser)$
+windowrulev2 = workspace 1, class:^(firefox)$
+windowrulev2 = workspace 1, class:^(chromium)$
+
+# Space 2: Notes
+windowrulev2 = workspace 2, class:^(obsidian)$
+windowrulev2 = workspace 2, class:^(Obsidian)$
+
+# Space 3: Code
+windowrulev2 = workspace 3, class:^(wezterm)$
+windowrulev2 = workspace 3, class:^(WezTerm)$
+windowrulev2 = workspace 3, class:^(code-oss)$
+windowrulev2 = workspace 3, class:^(Code)$
+windowrulev2 = workspace 3, class:^(VSCodium)$
+windowrulev2 = workspace 3, class:^(jetbrains-.*)$
+windowrulev2 = workspace 3, class:^(Alacritty)$
+windowrulev2 = workspace 3, class:^(kitty)$
+
+# Space 4: Catch-all (default)
+
+# Space 5: Documents
+windowrulev2 = workspace 5, class:^(evince)$
+windowrulev2 = workspace 5, class:^(zathura)$
+windowrulev2 = workspace 5, class:^(org.pwmt.zathura)$
+windowrulev2 = workspace 5, class:^(okular)$
+windowrulev2 = workspace 5, class:^(org.gnome.Evince)$
+
+# Space 6: Raindrop
+windowrulev2 = workspace 6, class:^(Raindrop.io)$
+windowrulev2 = workspace 6, class:^(raindropio)$
+
+# Space 7: Media
+windowrulev2 = workspace 7, class:^(Spotify)$
+windowrulev2 = workspace 7, class:^(spotify)$
+
+# Space 8: Office
+windowrulev2 = workspace 8, class:^(libreoffice-.*)$
+windowrulev2 = workspace 8, class:^(soffice)$
+windowrulev2 = workspace 8, class:^(org.libreoffice.*)$
+windowrulev2 = workspace 8, class:^(ONLYOFFICE.*)$
+
+# Space 9: Communication
+windowrulev2 = workspace 9, class:^(Slack)$
+windowrulev2 = workspace 9, class:^(slack)$
+windowrulev2 = workspace 9, class:^(discord)$
+windowrulev2 = workspace 9, class:^(Discord)$
+windowrulev2 = workspace 9, class:^(thunderbird)$
+windowrulev2 = workspace 9, class:^(Thunderbird)$
+windowrulev2 = workspace 9, class:^(telegram-desktop)$
+windowrulev2 = workspace 9, class:^(TelegramDesktop)$
+windowrulev2 = workspace 9, class:^(whatsapp-.*)$
+windowrulev2 = workspace 9, class:^(Signal)$
+
+# Space 10: AI
+windowrulev2 = workspace 10, class:^(claude)$
+windowrulev2 = workspace 10, title:^(Claude)$
+
+# ==============================================================================
+# WORKSPACE NAMES (optional - for status bars)
+# ==============================================================================
+# workspace = 1, name:Browser
+# workspace = 2, name:Notes
+# workspace = 3, name:Code
+# workspace = 4, name:Misc
+# workspace = 5, name:Docs
+# workspace = 6, name:Raindrop
+# workspace = 7, name:Media
+# workspace = 8, name:Office
+# workspace = 9, name:Comms
+# workspace = 10, name:AI
+
+
+
+################################################################################
 FILE PATH: uke/gen/skhd/skhdrc
 ################################################################################
 
@@ -5611,7 +6690,6 @@ cmd + shift - 0x1D : yabai -m window --space 10 --focus
 # ─────────────────────────────────────────────────────────────────────────────
 # Gather Windows (Cmd + `)
 # ─────────────────────────────────────────────────────────────────────────────
-# [cite_start]Note: 0x32 is the keycode for Grave (`)[cite: 668].
 cmd - 0x32 : $HOME/.local/bin/uke-gather
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -5634,7 +6712,7 @@ cmd + ctrl - 4 : $HOME/.local/bin/uke-bunch email
 cmd + ctrl - 5 : $HOME/.local/bin/uke-bunch reading
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Scratchpads (Cmd + Shift + `)
+# Scratchpads
 # ─────────────────────────────────────────────────────────────────────────────
 cmd + shift - 0x32 : $HOME/.local/bin/uke-scratchpad terminal
 cmd + alt - n : $HOME/.local/bin/uke-scratchpad notes
@@ -5709,61 +6787,30 @@ yabai -m rule --add title="Settings" manage=off
 # ==============================================================================
 # WORKSPACE ASSIGNMENTS
 # ==============================================================================
-
-# Space 1
 yabai -m rule --add app="^Safari$" space=^1
 yabai -m rule --add app="^Brave Browser$" space=^1
-
-# Space 2
 yabai -m rule --add app="^Obsidian$" space=^2
-
-# Space 3
 yabai -m rule --add app="^WezTerm$" space=^3
 yabai -m rule --add app="^Code$" space=^3
 yabai -m rule --add app="^Xcode$" space=^3
-
-# Space 5
 yabai -m rule --add app="^Preview$" space=^5
 yabai -m rule --add app="^PDF Expert$" space=^5
-
-# Space 6
 yabai -m rule --add app="^Raindrop.io$" space=^6
-
-# Space 7
 yabai -m rule --add app="^Spotify$" space=^7
-
-# Space 8
 yabai -m rule --add app="^Microsoft Word$" space=^8
 yabai -m rule --add app="^Microsoft Excel$" space=^8
 yabai -m rule --add app="^Microsoft PowerPoint$" space=^8
-
-# Space 9
 yabai -m rule --add app="^Slack$" space=^9
 yabai -m rule --add app="^Discord$" space=^9
 yabai -m rule --add app="^Mail$" space=^9
 yabai -m rule --add app="^Telegram$" space=^9
 yabai -m rule --add app="^WhatsApp$" space=^9
-
-# Space 10
 yabai -m rule --add app="^Claude$" space=^10
 yabai -m rule --add app="^Perplexity$" space=^10
 
-# ==============================================================================
-# MONITOR ASSIGNMENTS
-# ==============================================================================
-yabai -m space 1 --display 1 2>/dev/null || true
-yabai -m space 2 --display 1 2>/dev/null || true
-yabai -m space 3 --display 1 2>/dev/null || true
-yabai -m space 4 --display 1 2>/dev/null || true
-yabai -m space 5 --display 1 2>/dev/null || true
-yabai -m space 6 --display 2 2>/dev/null || true
-yabai -m space 7 --display 2 2>/dev/null || true
-yabai -m space 8 --display 2 2>/dev/null || true
-yabai -m space 9 --display 2 2>/dev/null || true
-yabai -m space 10 --display 2 2>/dev/null || true
-
 # Catch-all
 yabai -m rule --add app!="^(Safari|Brave Browser|Obsidian|WezTerm|Code|Xcode|Preview|PDF Expert|Raindrop.io|Spotify|Microsoft Word|Microsoft Excel|Microsoft PowerPoint|Slack|Discord|Mail|Telegram|WhatsApp|Claude|Perplexity)$" space=^4
+
 echo "yabai: Configuration loaded"
 
 
@@ -5915,7 +6962,7 @@ FILE PATH: uke/scripts/install.sh
 
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Installer v6.2
+# UKE Installer v6.3 - Arch Linux Ready
 # ==============================================================================
 set -euo pipefail
 
@@ -5924,19 +6971,54 @@ UKE_ROOT="${SCRIPT_DIR%/scripts}"
 
 # Colors
 RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
-BOLD=$'\e[1m' RESET=$'\e[0m'
+BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
 
 ok()   { echo "${GREEN}✓${RESET} $*"; }
 fail() { echo "${RED}✗${RESET} $*"; }
 info() { echo "${BLUE}→${RESET} $*"; }
 warn() { echo "${YELLOW}!${RESET} $*"; }
 
-# OS Detection
+# ==============================================================================
+# OS & Distro Detection
+# ==============================================================================
 case "$(uname -s)" in
     Darwin) OS="macos" ;;
     Linux)  OS="linux" ;;
     *)      echo "Unsupported OS"; exit 1 ;;
 esac
+
+# Detect Linux distribution
+DISTRO=""
+if [[ "$OS" == "linux" ]]; then
+    if [[ -f /etc/arch-release ]]; then
+        DISTRO="arch"
+    elif [[ -f /etc/debian_version ]]; then
+        DISTRO="debian"
+    elif [[ -f /etc/fedora-release ]]; then
+        DISTRO="fedora"
+    else
+        DISTRO="unknown"
+    fi
+fi
+
+# ==============================================================================
+# Package Manager Detection
+# ==============================================================================
+get_pkg_manager() {
+    if [[ "$OS" == "macos" ]]; then
+        echo "brew"
+    elif command -v pacman &>/dev/null; then
+        echo "pacman"
+    elif command -v apt &>/dev/null; then
+        echo "apt"
+    elif command -v dnf &>/dev/null; then
+        echo "dnf"
+    else
+        echo "unknown"
+    fi
+}
+
+PKG_MANAGER=$(get_pkg_manager)
 
 # ==============================================================================
 # Dependency Check
@@ -5945,6 +7027,7 @@ check_deps() {
     info "Checking dependencies..."
     local missing=()
     
+    # Core dependencies (all platforms)
     for cmd in git stow jq; do
         command -v "$cmd" &>/dev/null || missing+=("$cmd")
     done
@@ -5952,19 +7035,45 @@ check_deps() {
     if [[ "$OS" == "macos" ]]; then
         command -v yabai &>/dev/null || missing+=("yabai")
         command -v skhd &>/dev/null || missing+=("skhd")
+        command -v yq &>/dev/null || missing+=("yq")
     else
         command -v hyprctl &>/dev/null || missing+=("hyprland")
+        command -v keyd &>/dev/null || missing+=("keyd")
     fi
     
     if [[ ${#missing[@]} -gt 0 ]]; then
         fail "Missing dependencies: ${missing[*]}"
         echo ""
         echo "Install with:"
-        if [[ "$OS" == "macos" ]]; then
-            echo "  brew install ${missing[*]}"
-        else
-            echo "  sudo pacman -S ${missing[*]}"
-        fi
+        case "$PKG_MANAGER" in
+            brew)
+                echo "  brew install ${missing[*]}"
+                ;;
+            pacman)
+                # Map package names for Arch
+                local arch_pkgs=""
+                for pkg in "${missing[@]}"; do
+                    case "$pkg" in
+                        hyprland) arch_pkgs+="hyprland " ;;
+                        keyd)     arch_pkgs+="keyd " ;;
+                        *)        arch_pkgs+="$pkg " ;;
+                    esac
+                done
+                echo "  sudo pacman -S $arch_pkgs"
+                echo ""
+                echo "  # For AUR packages (if needed):"
+                echo "  yay -S ${missing[*]}"
+                ;;
+            apt)
+                echo "  sudo apt install ${missing[*]}"
+                ;;
+            dnf)
+                echo "  sudo dnf install ${missing[*]}"
+                ;;
+            *)
+                echo "  Please install: ${missing[*]}"
+                ;;
+        esac
         exit 1
     fi
     
@@ -5988,6 +7097,8 @@ create_dirs() {
     mkdir -p ~/.config/skhd
     mkdir -p ~/.config/yabai
     mkdir -p ~/.config/hypr
+    mkdir -p ~/.config/keyd
+    mkdir -p ~/.local/state/uke
     ok "Directories created"
 }
 
@@ -6019,6 +7130,7 @@ link_configs() {
         ln -sf "$UKE_ROOT/gen/yabai/yabairc" "$HOME/.config/yabai/yabairc"
         ok "Linked: yabairc"
     else
+        # Hyprland config
         ln -sf "$UKE_ROOT/gen/hyprland/hyprland.conf" "$HOME/.config/hypr/hyprland.conf"
         ok "Linked: hyprland.conf"
     fi
@@ -6031,9 +7143,10 @@ stow_dotfiles() {
     info "Stowing dotfiles..."
     cd "$UKE_ROOT/stow"
     
+    # Common packages
     local packages=(wezterm tmux zsh nvim)
     
-    # Note: keyd is managed separately (requires sudo/system-level config)
+    # Platform-specific packages
     if [[ "$OS" == "macos" ]]; then
         packages+=(karabiner)
     fi
@@ -6043,6 +7156,55 @@ stow_dotfiles() {
             stow -t "$HOME" -R "$pkg" 2>/dev/null && ok "Stowed: $pkg" || warn "Skipped: $pkg"
         fi
     done
+}
+
+# ==============================================================================
+# Setup keyd (Linux only - requires sudo)
+# ==============================================================================
+setup_keyd() {
+    if [[ "$OS" != "linux" ]]; then
+        return 0
+    fi
+    
+    if ! command -v keyd &>/dev/null; then
+        warn "keyd not installed, skipping keyd setup"
+        return 0
+    fi
+    
+    info "Setting up keyd..."
+    
+    local keyd_config="$UKE_ROOT/stow/keyd/.config/keyd/default.conf"
+    
+    if [[ ! -f "$keyd_config" ]]; then
+        warn "keyd config not found at $keyd_config"
+        return 1
+    fi
+    
+    # Check if we have sudo access
+    if ! sudo -n true 2>/dev/null; then
+        warn "keyd requires sudo to link to /etc/keyd/"
+        echo ""
+        echo "${YELLOW}To complete keyd setup, run:${RESET}"
+        echo "  sudo mkdir -p /etc/keyd"
+        echo "  sudo ln -sf $keyd_config /etc/keyd/default.conf"
+        echo "  sudo systemctl enable --now keyd"
+        echo ""
+        return 0
+    fi
+    
+    # We have sudo, do the setup
+    sudo mkdir -p /etc/keyd
+    sudo ln -sf "$keyd_config" /etc/keyd/default.conf
+    ok "Linked keyd config to /etc/keyd/"
+    
+    # Enable and start keyd service
+    if systemctl is-enabled keyd &>/dev/null; then
+        sudo systemctl restart keyd
+        ok "keyd service restarted"
+    else
+        sudo systemctl enable --now keyd
+        ok "keyd service enabled and started"
+    fi
 }
 
 # ==============================================================================
@@ -6065,8 +7227,36 @@ start_services() {
         yabai --restart-service 2>/dev/null && ok "yabai restarted" || warn "yabai restart failed"
         skhd --restart-service 2>/dev/null && ok "skhd restarted" || warn "skhd restart failed"
     else
-        hyprctl reload 2>/dev/null && ok "hyprland reloaded" || warn "hyprland reload failed"
+        # Hyprland reloads automatically when config changes
+        if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+            hyprctl reload 2>/dev/null && ok "hyprland reloaded" || warn "hyprland reload failed"
+        else
+            warn "Hyprland not running - config will load on next start"
+        fi
     fi
+}
+
+# ==============================================================================
+# Print Arch-specific Help
+# ==============================================================================
+print_arch_help() {
+    if [[ "$OS" != "linux" ]] || [[ "$DISTRO" != "arch" ]]; then
+        return 0
+    fi
+    
+    echo ""
+    echo "${BOLD}Arch Linux Notes:${RESET}"
+    echo ""
+    echo "  ${DIM}# Recommended packages:${RESET}"
+    echo "  sudo pacman -S hyprland keyd waybar dunst wofi grim slurp wl-clipboard cliphist"
+    echo "  sudo pacman -S wezterm neovim stow jq ripgrep fd"
+    echo ""
+    echo "  ${DIM}# Optional AUR packages:${RESET}"
+    echo "  yay -S brave-bin obsidian-bin spotify"
+    echo ""
+    echo "  ${DIM}# Enable keyd service:${RESET}"
+    echo "  sudo systemctl enable --now keyd"
+    echo ""
 }
 
 # ==============================================================================
@@ -6075,10 +7265,11 @@ start_services() {
 main() {
     echo ""
     echo "${BOLD}╔══════════════════════════════════════╗${RESET}"
-    echo "${BOLD}║     UKE v6.2 Installer               ║${RESET}"
+    echo "${BOLD}║     UKE v6.3 Installer               ║${RESET}"
     echo "${BOLD}╚══════════════════════════════════════╝${RESET}"
     echo ""
     echo "Platform: $OS"
+    [[ -n "$DISTRO" ]] && echo "Distro:   $DISTRO"
     echo "UKE Root: $UKE_ROOT"
     echo ""
     
@@ -6096,6 +7287,9 @@ main() {
         --gen)
             generate_configs
             ;;
+        --keyd)
+            setup_keyd
+            ;;
         full|*)
             check_deps
             create_dirs
@@ -6104,6 +7298,7 @@ main() {
             link_configs
             stow_dotfiles
             setup_bunches
+            setup_keyd
             start_services
             
             echo ""
@@ -6114,6 +7309,8 @@ main() {
             echo "  1. Restart your terminal (or run: source ~/.zshrc)"
             echo "  2. Test with: uke status"
             echo "  3. See: docs/CHEATSHEET.md for keybindings"
+            
+            print_arch_help
             ;;
     esac
 }
@@ -6300,18 +7497,236 @@ echo "  cd $UKE_ROOT && ./scripts/install.sh"
 
 
 ################################################################################
+FILE PATH: uke/scripts/keyd-setup.sh
+################################################################################
+
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE keyd Setup Script
+# ==============================================================================
+# keyd requires system-level configuration in /etc/keyd/
+# This script handles the sudo operations needed for keyd setup.
+#
+# Usage:
+#   ./keyd-setup.sh           # Install and enable keyd config
+#   ./keyd-setup.sh --status  # Check keyd status
+#   ./keyd-setup.sh --remove  # Remove UKE keyd config
+#   ./keyd-setup.sh --reload  # Reload keyd service
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UKE_ROOT="${SCRIPT_DIR%/scripts}"
+KEYD_SOURCE="$UKE_ROOT/stow/keyd/.config/keyd/default.conf"
+KEYD_TARGET="/etc/keyd/default.conf"
+
+# Colors
+RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
+BOLD=$'\e[1m' RESET=$'\e[0m'
+
+ok()   { echo "${GREEN}✓${RESET} $*"; }
+fail() { echo "${RED}✗${RESET} $*"; }
+info() { echo "${BLUE}→${RESET} $*"; }
+warn() { echo "${YELLOW}!${RESET} $*"; }
+
+# ==============================================================================
+# Check Prerequisites
+# ==============================================================================
+check_prereqs() {
+    if [[ "$(uname -s)" != "Linux" ]]; then
+        fail "keyd is only available on Linux"
+        exit 1
+    fi
+    
+    if ! command -v keyd &>/dev/null; then
+        fail "keyd not installed"
+        echo ""
+        echo "Install with:"
+        if command -v pacman &>/dev/null; then
+            echo "  sudo pacman -S keyd"
+        elif command -v apt &>/dev/null; then
+            echo "  # Build from source: https://github.com/rvaiya/keyd"
+        fi
+        exit 1
+    fi
+    
+    if [[ ! -f "$KEYD_SOURCE" ]]; then
+        fail "Source config not found: $KEYD_SOURCE"
+        exit 1
+    fi
+}
+
+# ==============================================================================
+# Install keyd Config
+# ==============================================================================
+install_keyd() {
+    check_prereqs
+    
+    info "Installing keyd configuration..."
+    
+    # Create /etc/keyd if it doesn't exist
+    if [[ ! -d /etc/keyd ]]; then
+        sudo mkdir -p /etc/keyd
+        ok "Created /etc/keyd/"
+    fi
+    
+    # Symlink the config
+    sudo ln -sf "$KEYD_SOURCE" "$KEYD_TARGET"
+    ok "Linked config to $KEYD_TARGET"
+    
+    # Enable and start/restart keyd service
+    if systemctl is-active keyd &>/dev/null; then
+        sudo systemctl restart keyd
+        ok "keyd service restarted"
+    else
+        sudo systemctl enable --now keyd
+        ok "keyd service enabled and started"
+    fi
+    
+    echo ""
+    echo "${GREEN}keyd setup complete!${RESET}"
+    echo ""
+    echo "Your Caps Lock key now works as:"
+    echo "  • Tap: Escape"
+    echo "  • Hold + hjkl: Arrow keys"
+    echo "  • Hold + yuio: Home/PageUp/PageDown/End"
+    echo "  • Hold + wasd: Selection (Shift+Arrow)"
+    echo "  • Hold + qe:   Word selection (Ctrl+Shift+Arrow)"
+    echo ""
+}
+
+# ==============================================================================
+# Show Status
+# ==============================================================================
+show_status() {
+    echo "${BOLD}keyd Status:${RESET}"
+    echo ""
+    
+    # Check if keyd is installed
+    if command -v keyd &>/dev/null; then
+        ok "keyd installed: $(keyd --version 2>/dev/null || echo 'version unknown')"
+    else
+        fail "keyd not installed"
+        return 1
+    fi
+    
+    # Check service status
+    if systemctl is-active keyd &>/dev/null; then
+        ok "keyd service: active"
+    else
+        fail "keyd service: inactive"
+    fi
+    
+    # Check config symlink
+    if [[ -L "$KEYD_TARGET" ]]; then
+        local target=$(readlink "$KEYD_TARGET")
+        ok "Config symlink: $KEYD_TARGET → $target"
+    elif [[ -f "$KEYD_TARGET" ]]; then
+        warn "Config exists but not a symlink: $KEYD_TARGET"
+    else
+        fail "Config not found: $KEYD_TARGET"
+    fi
+    
+    echo ""
+    
+    # Show current config summary
+    if [[ -f "$KEYD_TARGET" ]]; then
+        info "Current config summary:"
+        grep -E "^\[|^[a-z]+ = " "$KEYD_TARGET" 2>/dev/null | head -20 || true
+    fi
+}
+
+# ==============================================================================
+# Remove keyd Config
+# ==============================================================================
+remove_keyd() {
+    info "Removing UKE keyd configuration..."
+    
+    if [[ -L "$KEYD_TARGET" ]]; then
+        sudo rm "$KEYD_TARGET"
+        ok "Removed symlink: $KEYD_TARGET"
+    elif [[ -f "$KEYD_TARGET" ]]; then
+        warn "Config is not a symlink, not removing: $KEYD_TARGET"
+    else
+        warn "Config not found: $KEYD_TARGET"
+    fi
+    
+    # Restart keyd to use default config (if any)
+    if systemctl is-active keyd &>/dev/null; then
+        sudo systemctl restart keyd
+        ok "keyd service restarted"
+    fi
+    
+    echo ""
+    echo "keyd config removed. Your Caps Lock should return to normal after restart."
+}
+
+# ==============================================================================
+# Reload keyd
+# ==============================================================================
+reload_keyd() {
+    info "Reloading keyd service..."
+    
+    if ! systemctl is-active keyd &>/dev/null; then
+        sudo systemctl start keyd
+        ok "keyd service started"
+    else
+        sudo keyd reload
+        ok "keyd reloaded"
+    fi
+}
+
+# ==============================================================================
+# Main
+# ==============================================================================
+case "${1:-install}" in
+    install|--install)
+        install_keyd
+        ;;
+    status|--status)
+        show_status
+        ;;
+    remove|--remove|uninstall|--uninstall)
+        remove_keyd
+        ;;
+    reload|--reload)
+        reload_keyd
+        ;;
+    -h|--help|help)
+        echo "UKE keyd Setup Script"
+        echo ""
+        echo "Usage:"
+        echo "  $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  install   Install and enable keyd config (default)"
+        echo "  status    Show keyd status"
+        echo "  remove    Remove UKE keyd config"
+        echo "  reload    Reload keyd service"
+        echo "  help      Show this help"
+        ;;
+    *)
+        fail "Unknown command: $1"
+        echo "Run '$0 --help' for usage"
+        exit 1
+        ;;
+esac
+
+
+
+################################################################################
 FILE PATH: uke/lib/gen.sh
 ################################################################################
 
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Config Generator v6.2.2
+# UKE Config Generator v6.3.0 - Arch Linux Ready
 # ==============================================================================
 set -euo pipefail
 source "$(dirname "$0")/../lib/core.sh"
 
 # ==============================================================================
-# SKHD Generator
+# SKHD Generator (macOS only)
 # ==============================================================================
 gen_skhd() {
     local out="$UKE_GEN/skhd/skhdrc"
@@ -6409,7 +7824,6 @@ cmd + shift - 0x1D : yabai -m window --space 10 --focus
 # ─────────────────────────────────────────────────────────────────────────────
 # Gather Windows (Cmd + `)
 # ─────────────────────────────────────────────────────────────────────────────
-# [cite_start]Note: 0x32 is the keycode for Grave (`)[cite: 668].
 cmd - 0x32 : $HOME/.local/bin/uke-gather
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -6432,7 +7846,7 @@ cmd + ctrl - 4 : $HOME/.local/bin/uke-bunch email
 cmd + ctrl - 5 : $HOME/.local/bin/uke-bunch reading
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Scratchpads (Cmd + Shift + `)
+# Scratchpads
 # ─────────────────────────────────────────────────────────────────────────────
 cmd + shift - 0x32 : $HOME/.local/bin/uke-scratchpad terminal
 cmd + alt - n : $HOME/.local/bin/uke-scratchpad notes
@@ -6444,11 +7858,12 @@ cmd + ctrl - s : $HOME/.local/bin/uke-session quick-save
 cmd + ctrl + shift - s : $HOME/.local/bin/uke-session quick-restore
 EOF
 
+    chmod +x "$out"
     ok "Generated: $out"
 }
 
 # ==============================================================================
-# YABAI Generator
+# Yabai Generator (macOS only)
 # ==============================================================================
 gen_yabai() {
     local out="$UKE_GEN/yabai/yabairc"
@@ -6456,7 +7871,6 @@ gen_yabai() {
     
     log_info "Generating yabai config..."
     
-    # Header and basic config
     cat > "$out" << 'EOF'
 #!/usr/bin/env sh
 # ==============================================================================
@@ -6497,134 +7911,380 @@ yabai -m rule --add app="^Alacritty$" opacity=0.92
 yabai -m rule --add app="^iTerm2$" opacity=0.92
 yabai -m rule --add app="^Terminal$" opacity=0.95
 
-EOF
-
-    # Window Rules
-    cat >> "$out" << 'EOF'
 # ==============================================================================
 # WINDOW RULES
 # ==============================================================================
-EOF
+yabai -m rule --add app="^System Settings$" manage=off
+yabai -m rule --add app="^Calculator$" manage=off sticky=on
+yabai -m rule --add app="^Finder$" manage=off
+yabai -m rule --add app="^App Store$" manage=off
+yabai -m rule --add app="^Karabiner-Elements$" manage=off
+yabai -m rule --add app="^Karabiner-EventViewer$" manage=off
+yabai -m rule --add app="^zoom.us$" manage=off sticky=on opacity=1.0
+yabai -m rule --add app="^FaceTime$" manage=off sticky=on
+yabai -m rule --add title="Picture in Picture" manage=off sticky=on layer=above
+yabai -m rule --add app="^Code$" title="Settings" manage=off
+yabai -m rule --add title="Preferences" manage=off
+yabai -m rule --add title="Settings" manage=off
 
-    local rule_count
-    rule_count=$(yq -r '.window_rules | length' "$UKE_CONFIG/registry.yaml" 2>/dev/null || echo "0")
-    
-    if [[ "$rule_count" -gt 0 ]]; then
-        for i in $(seq 0 $((rule_count - 1))); do
-            local app title float center sticky opacity topmost
-            
-            app=$(yq -r ".window_rules[$i].match.app | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            title=$(yq -r ".window_rules[$i].match.title | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            float=$(yq -r ".window_rules[$i].float | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            center=$(yq -r ".window_rules[$i].center | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            sticky=$(yq -r ".window_rules[$i].sticky | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            opacity=$(yq -r ".window_rules[$i].opacity | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            topmost=$(yq -r ".window_rules[$i].topmost | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            
-            local rule_opts=""
-            [[ "$float" == "true" ]] && rule_opts="$rule_opts manage=off"
-            [[ "$sticky" == "true" ]] && rule_opts="$rule_opts sticky=on"
-            [[ -n "$opacity" ]] && rule_opts="$rule_opts opacity=$opacity"
-            [[ "$topmost" == "true" ]] && rule_opts="$rule_opts layer=above"
-            
-            if [[ -n "$rule_opts" ]]; then
-                if [[ -n "$app" && -n "$title" ]]; then
-                    echo "yabai -m rule --add app=\"^${app}$\" title=\"${title}\"$rule_opts" >> "$out"
-                elif [[ -n "$app" ]]; then
-                    echo "yabai -m rule --add app=\"^${app}$\"$rule_opts" >> "$out"
-                elif [[ -n "$title" ]]; then
-                    echo "yabai -m rule --add title=\"${title}\"$rule_opts" >> "$out"
-                fi
-            fi
-        done
-    fi
-    echo "" >> "$out"
-
-    # Workspace App Assignments
-    cat >> "$out" << 'EOF'
 # ==============================================================================
 # WORKSPACE ASSIGNMENTS
 # ==============================================================================
-EOF
-
-    for ws in $(yq -r '.workspaces | keys | .[]' "$UKE_CONFIG/registry.yaml" 2>/dev/null); do
-        local apps
-        apps=$(yq -r ".workspaces.${ws}.apps | .[]?" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-        [[ -z "$apps" ]] && continue
-        
-        echo "" >> "$out"
-        echo "# Space $ws" >> "$out"
-        
-        for app_key in $apps; do
-            local app_name
-            app_name=$(yq -r ".apps.${app_key}.macos | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            [[ -z "$app_name" ]] && continue
-            echo "yabai -m rule --add app=\"^${app_name}$\" space=^${ws}" >> "$out"
-        done
-    done
-
-    # Monitor Assignments
-    local monitors_enabled
-    monitors_enabled=$(yq -r '.monitors.enabled | select(. != null)' "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-    
-    if [[ "$monitors_enabled" == "true" ]]; then
-        cat >> "$out" << 'EOF'
-
-# ==============================================================================
-# MONITOR ASSIGNMENTS
-# ==============================================================================
-EOF
-        local display_count
-        display_count=$(yq -r '.monitors.displays | length' "$UKE_CONFIG/registry.yaml" 2>/dev/null || echo "0")
-        
-        for d in $(seq 0 $((display_count - 1))); do
-            local display_index
-            display_index=$(yq -r ".monitors.displays[$d].index | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            
-            local ws_list
-            ws_list=$(yq -r ".monitors.displays[$d].workspaces | .[]?" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            
-            for ws in $ws_list; do
-                echo "yabai -m space $ws --display $display_index 2>/dev/null || true" >> "$out"
-            done
-        done
-    fi
-
-    # Catch-all rule
-    cat >> "$out" << 'EOF'
+yabai -m rule --add app="^Safari$" space=^1
+yabai -m rule --add app="^Brave Browser$" space=^1
+yabai -m rule --add app="^Obsidian$" space=^2
+yabai -m rule --add app="^WezTerm$" space=^3
+yabai -m rule --add app="^Code$" space=^3
+yabai -m rule --add app="^Xcode$" space=^3
+yabai -m rule --add app="^Preview$" space=^5
+yabai -m rule --add app="^PDF Expert$" space=^5
+yabai -m rule --add app="^Raindrop.io$" space=^6
+yabai -m rule --add app="^Spotify$" space=^7
+yabai -m rule --add app="^Microsoft Word$" space=^8
+yabai -m rule --add app="^Microsoft Excel$" space=^8
+yabai -m rule --add app="^Microsoft PowerPoint$" space=^8
+yabai -m rule --add app="^Slack$" space=^9
+yabai -m rule --add app="^Discord$" space=^9
+yabai -m rule --add app="^Mail$" space=^9
+yabai -m rule --add app="^Telegram$" space=^9
+yabai -m rule --add app="^WhatsApp$" space=^9
+yabai -m rule --add app="^Claude$" space=^10
+yabai -m rule --add app="^Perplexity$" space=^10
 
 # Catch-all
-EOF
-    local all_apps=""
-    for ws in $(yq -r '.workspaces | keys | .[]' "$UKE_CONFIG/registry.yaml" 2>/dev/null); do
-        for app_key in $(yq -r ".workspaces.${ws}.apps | .[]?" "$UKE_CONFIG/registry.yaml" 2>/dev/null); do
-            local app_name
-            app_name=$(yq -r ".apps.${app_key}.macos | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            [[ -z "$app_name" ]] && continue
-            [[ -n "$all_apps" ]] && all_apps="$all_apps|"
-            all_apps="$all_apps$app_name"
-        done
-    done
-    
-    if [[ -n "$all_apps" ]]; then
-        echo "yabai -m rule --add app!=\"^($all_apps)$\" space=^4" >> "$out"
-    fi
+yabai -m rule --add app!="^(Safari|Brave Browser|Obsidian|WezTerm|Code|Xcode|Preview|PDF Expert|Raindrop.io|Spotify|Microsoft Word|Microsoft Excel|Microsoft PowerPoint|Slack|Discord|Mail|Telegram|WhatsApp|Claude|Perplexity)$" space=^4
 
-    cat >> "$out" << 'EOF'
 echo "yabai: Configuration loaded"
 EOF
+
     chmod +x "$out"
     ok "Generated: $out"
 }
 
 # ==============================================================================
-# Hyprland Generator
+# Hyprland Generator (Linux)
 # ==============================================================================
 gen_hyprland() {
     local out="$UKE_GEN/hyprland/hyprland.conf"
     mkdir -p "$(dirname "$out")"
     log_info "Generating Hyprland config..."
-    echo "# Hyprland Config Generated by UKE" > "$out"
+    
+    cat > "$out" << 'EOF'
+# ==============================================================================
+# HYPRLAND CONFIG - AUTO-GENERATED BY UKE v6.3
+# ==============================================================================
+# Unified Keyboard Environment for Linux
+# 
+# Modifier Hierarchy:
+#   PRIMARY:    Alt         → Window Manager (focus, move, workspaces)
+#   SECONDARY:  Super       → Terminal UI (WezTerm handles internally)
+#   TERTIARY:   Super+Shift → Window Resizing
+#   QUATERNARY: Ctrl        → Shell (never intercepted)
+# ==============================================================================
+
+# ==============================================================================
+# MONITORS
+# ==============================================================================
+monitor=,preferred,auto,1
+
+# ==============================================================================
+# GENERAL SETTINGS
+# ==============================================================================
+general {
+    gaps_in = 2
+    gaps_out = 4
+    border_size = 2
+    col.active_border = rgba(88c0d0ff)
+    col.inactive_border = rgba(3b4252ff)
+    layout = dwindle
+    resize_on_border = true
+}
+
+# ==============================================================================
+# DECORATION
+# ==============================================================================
+decoration {
+    rounding = 4
+    
+    blur {
+        enabled = true
+        size = 6
+        passes = 2
+        new_optimizations = true
+    }
+    
+    shadow {
+        enabled = true
+        range = 8
+        render_power = 2
+        color = rgba(1a1a1aee)
+    }
+}
+
+# ==============================================================================
+# ANIMATIONS
+# ==============================================================================
+animations {
+    enabled = true
+    
+    bezier = easeOutQuint, 0.22, 1, 0.36, 1
+    bezier = easeInOutQuint, 0.83, 0, 0.17, 1
+    
+    animation = windows, 1, 4, easeOutQuint, slide
+    animation = windowsOut, 1, 4, easeOutQuint, slide
+    animation = border, 1, 10, default
+    animation = fade, 1, 5, default
+    animation = workspaces, 1, 4, easeInOutQuint, slide
+}
+
+# ==============================================================================
+# INPUT
+# ==============================================================================
+input {
+    kb_layout = us
+    follow_mouse = 1
+    sensitivity = 0
+    
+    touchpad {
+        natural_scroll = true
+        tap-to-click = true
+    }
+}
+
+# ==============================================================================
+# GESTURES
+# ==============================================================================
+gestures {
+    workspace_swipe = true
+    workspace_swipe_fingers = 3
+}
+
+# ==============================================================================
+# DWINDLE LAYOUT (BSP-like)
+# ==============================================================================
+dwindle {
+    pseudotile = true
+    preserve_split = true
+    force_split = 2
+}
+
+# ==============================================================================
+# MASTER LAYOUT
+# ==============================================================================
+master {
+    new_status = master
+}
+
+# ==============================================================================
+# MISC
+# ==============================================================================
+misc {
+    force_default_wallpaper = 0
+    disable_hyprland_logo = true
+    disable_splash_rendering = true
+}
+
+# ==============================================================================
+# ENVIRONMENT VARIABLES
+# ==============================================================================
+env = XCURSOR_SIZE,24
+env = QT_QPA_PLATFORMTHEME,qt6ct
+
+# ==============================================================================
+# AUTOSTART
+# ==============================================================================
+exec-once = waybar
+exec-once = dunst
+exec-once = /usr/lib/polkit-kde-authentication-agent-1
+exec-once = hyprpaper
+exec-once = wl-paste --type text --watch cliphist store
+exec-once = wl-paste --type image --watch cliphist store
+
+# ==============================================================================
+# WINDOW FOCUS NAVIGATION (PRIMARY: Alt + hjkl)
+# ==============================================================================
+bind = ALT, h, movefocus, l
+bind = ALT, j, movefocus, d
+bind = ALT, k, movefocus, u
+bind = ALT, l, movefocus, r
+
+# ==============================================================================
+# WINDOW MOVEMENT (PRIMARY + SHIFT: Alt+Shift + hjkl)
+# ==============================================================================
+bind = ALT SHIFT, h, movewindow, l
+bind = ALT SHIFT, j, movewindow, d
+bind = ALT SHIFT, k, movewindow, u
+bind = ALT SHIFT, l, movewindow, r
+
+# ==============================================================================
+# WINDOW RESIZING (TERTIARY: Super+Shift + hjkl)
+# ==============================================================================
+bind = SUPER SHIFT, h, resizeactive, -50 0
+bind = SUPER SHIFT, j, resizeactive, 0 50
+bind = SUPER SHIFT, k, resizeactive, 0 -50
+bind = SUPER SHIFT, l, resizeactive, 50 0
+
+# ==============================================================================
+# LAUNCH TERMINAL (PRIMARY + Return)
+# ==============================================================================
+bind = ALT, return, exec, wezterm
+
+# ==============================================================================
+# WINDOW CONTROLS
+# ==============================================================================
+bind = ALT SHIFT, f, fullscreen, 0
+bind = ALT SHIFT, space, togglefloating
+bind = ALT SHIFT, backslash, togglesplit
+bind = ALT SHIFT, r, layoutmsg, orientationcycle
+bind = ALT, q, killactive
+bind = ALT, escape, focuscurrentorlast
+
+# ==============================================================================
+# LAYOUT CONTROLS
+# ==============================================================================
+bind = ALT CTRL, t, exec, hyprctl keyword general:layout "$(hyprctl getoption general:layout | grep -q dwindle && echo master || echo dwindle)"
+bind = ALT Tab, cyclenext
+bind = ALT SHIFT, Tab, cyclenext, prev
+
+# ==============================================================================
+# WORKSPACE NAVIGATION (PRIMARY + Number)
+# ==============================================================================
+bind = ALT, 1, workspace, 1
+bind = ALT, 2, workspace, 2
+bind = ALT, 3, workspace, 3
+bind = ALT, 4, workspace, 4
+bind = ALT, 5, workspace, 5
+bind = ALT, 6, workspace, 6
+bind = ALT, 7, workspace, 7
+bind = ALT, 8, workspace, 8
+bind = ALT, 9, workspace, 9
+bind = ALT, 0, workspace, 10
+bind = ALT, bracketleft, workspace, e-1
+bind = ALT, bracketright, workspace, e+1
+
+# ==============================================================================
+# MOVE WINDOW TO WORKSPACE (PRIMARY + SHIFT + Number)
+# ==============================================================================
+bind = ALT SHIFT, 1, movetoworkspace, 1
+bind = ALT SHIFT, 2, movetoworkspace, 2
+bind = ALT SHIFT, 3, movetoworkspace, 3
+bind = ALT SHIFT, 4, movetoworkspace, 4
+bind = ALT SHIFT, 5, movetoworkspace, 5
+bind = ALT SHIFT, 6, movetoworkspace, 6
+bind = ALT SHIFT, 7, movetoworkspace, 7
+bind = ALT SHIFT, 8, movetoworkspace, 8
+bind = ALT SHIFT, 9, movetoworkspace, 9
+bind = ALT SHIFT, 0, movetoworkspace, 10
+
+# ==============================================================================
+# GATHER WINDOWS (Alt + `)
+# ==============================================================================
+bind = ALT, grave, exec, $HOME/.local/bin/uke-gather
+
+# ==============================================================================
+# QUICK APP LAUNCHERS (LAUNCHER: Alt+Super)
+# ==============================================================================
+bind = ALT SUPER, b, exec, brave
+bind = ALT SUPER, o, exec, obsidian
+bind = ALT SUPER, c, exec, code
+bind = ALT SUPER, r, exec, raindrop
+bind = ALT SUPER, m, exec, spotify
+bind = ALT SUPER, t, exec, wezterm
+bind = ALT SUPER, f, exec, thunar
+bind = ALT SUPER, space, exec, wofi --show drun
+
+# ==============================================================================
+# BUNCHES (BUNCH: Alt+Ctrl)
+# ==============================================================================
+bind = ALT CTRL, F1, exec, $HOME/.local/bin/uke-bunch study
+bind = ALT CTRL, F2, exec, $HOME/.local/bin/uke-bunch guitar
+bind = ALT CTRL, F3, exec, $HOME/.local/bin/uke-bunch coding
+bind = ALT CTRL, F4, exec, $HOME/.local/bin/uke-bunch email
+bind = ALT CTRL, F5, exec, $HOME/.local/bin/uke-bunch reading
+
+# ==============================================================================
+# SCRATCHPADS
+# ==============================================================================
+bind = ALT SHIFT, grave, exec, $HOME/.local/bin/uke-scratchpad terminal
+bind = ALT SUPER, n, exec, $HOME/.local/bin/uke-scratchpad notes
+
+# ==============================================================================
+# SESSION MANAGEMENT
+# ==============================================================================
+bind = ALT CTRL, s, exec, $HOME/.local/bin/uke-session quick-save
+bind = ALT CTRL SHIFT, s, exec, $HOME/.local/bin/uke-session quick-restore
+
+# ==============================================================================
+# SCREENSHOT & CLIPBOARD
+# ==============================================================================
+bind = , Print, exec, grim -g "$(slurp)" - | wl-copy
+bind = SHIFT, Print, exec, grim - | wl-copy
+bind = ALT, v, exec, cliphist list | wofi --dmenu | cliphist decode | wl-copy
+
+# ==============================================================================
+# MOUSE BINDINGS
+# ==============================================================================
+bindm = ALT, mouse:272, movewindow
+bindm = ALT, mouse:273, resizewindow
+
+# ==============================================================================
+# WINDOW RULES
+# ==============================================================================
+windowrulev2 = float, class:^(pavucontrol)$
+windowrulev2 = float, class:^(nm-connection-editor)$
+windowrulev2 = float, class:^(blueman-manager)$
+windowrulev2 = float, class:^(thunar)$,title:^(File Operation Progress)$
+windowrulev2 = float, class:^(org.gnome.Calculator)$
+windowrulev2 = float, class:^(file-roller)$
+windowrulev2 = float, title:^(Picture-in-Picture)$
+windowrulev2 = float, title:^(Preferences)$
+windowrulev2 = float, title:^(Settings)$
+
+windowrulev2 = pin, title:^(Picture-in-Picture)$
+windowrulev2 = pin, class:^(org.gnome.Calculator)$
+
+windowrulev2 = opacity 0.92 0.88, class:^(wezterm)$
+windowrulev2 = opacity 0.92 0.88, class:^(Alacritty)$
+windowrulev2 = opacity 0.92 0.88, class:^(kitty)$
+
+# ==============================================================================
+# WORKSPACE ASSIGNMENTS
+# ==============================================================================
+windowrulev2 = workspace 1, class:^(brave-browser)$
+windowrulev2 = workspace 1, class:^(Brave-browser)$
+windowrulev2 = workspace 1, class:^(firefox)$
+windowrulev2 = workspace 1, class:^(chromium)$
+windowrulev2 = workspace 2, class:^(obsidian)$
+windowrulev2 = workspace 2, class:^(Obsidian)$
+windowrulev2 = workspace 3, class:^(wezterm)$
+windowrulev2 = workspace 3, class:^(WezTerm)$
+windowrulev2 = workspace 3, class:^(code-oss)$
+windowrulev2 = workspace 3, class:^(Code)$
+windowrulev2 = workspace 3, class:^(VSCodium)$
+windowrulev2 = workspace 3, class:^(jetbrains-.*)$
+windowrulev2 = workspace 3, class:^(Alacritty)$
+windowrulev2 = workspace 3, class:^(kitty)$
+windowrulev2 = workspace 5, class:^(evince)$
+windowrulev2 = workspace 5, class:^(zathura)$
+windowrulev2 = workspace 5, class:^(org.pwmt.zathura)$
+windowrulev2 = workspace 5, class:^(okular)$
+windowrulev2 = workspace 6, class:^(Raindrop.io)$
+windowrulev2 = workspace 6, class:^(raindropio)$
+windowrulev2 = workspace 7, class:^(Spotify)$
+windowrulev2 = workspace 7, class:^(spotify)$
+windowrulev2 = workspace 8, class:^(libreoffice-.*)$
+windowrulev2 = workspace 8, class:^(soffice)$
+windowrulev2 = workspace 9, class:^(Slack)$
+windowrulev2 = workspace 9, class:^(slack)$
+windowrulev2 = workspace 9, class:^(discord)$
+windowrulev2 = workspace 9, class:^(Discord)$
+windowrulev2 = workspace 9, class:^(thunderbird)$
+windowrulev2 = workspace 9, class:^(telegram-desktop)$
+windowrulev2 = workspace 10, class:^(claude)$
+windowrulev2 = workspace 10, title:^(Claude)$
+EOF
+
+    chmod +x "$out"
     ok "Generated: $out"
 }
 
@@ -6637,7 +8297,6 @@ gen_gather() {
 
     log_info "Generating uke-gather..."
     
-    # CRITICAL FIX: Add symlink resolution logic here
     cat > "$out" << 'HEADER'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -6653,7 +8312,7 @@ SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 
 source "$UKE_ROOT/lib/core.sh"
-require_cmd jq yq
+require_cmd jq
 
 gather_macos() {
     local current_space
@@ -6661,31 +8320,42 @@ gather_macos() {
     log_info "Gathering windows for space $current_space..."
     
     case $current_space in
-HEADER
-
-    for ws in $(yq -r '.workspaces | keys | .[]' "$UKE_CONFIG/registry.yaml"); do
-        local apps=$(yq -r ".workspaces.${ws}.apps | .[]?" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-        [[ -z "$apps" ]] && continue
-        
-        local selector=""
-        for app_key in $apps; do
-            local app_name=$(yq -r ".apps.${app_key}.macos | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
-            [[ -z "$app_name" ]] && continue
-            [[ -n "$selector" ]] && selector="$selector or "
-            selector="${selector}.app == \"$app_name\""
-        done
-        
-        [[ -z "$selector" ]] && continue
-        
-        cat >> "$out" << EOF
-        $ws)
-            yabai -m query --windows | jq -r '.[] | select($selector) | .id' | \
-                xargs -I {} yabai -m window {} --space $ws 2>/dev/null || true
+        1)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser") | .id' | \
+                xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
             ;;
-EOF
-    done
-    
-    cat >> "$out" << 'FOOTER'
+        2)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Obsidian") | .id' | \
+                xargs -I {} yabai -m window {} --space 2 2>/dev/null || true
+            ;;
+        3)
+            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode") | .id' | \
+                xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
+            ;;
+        5)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' | \
+                xargs -I {} yabai -m window {} --space 5 2>/dev/null || true
+            ;;
+        6)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Raindrop.io") | .id' | \
+                xargs -I {} yabai -m window {} --space 6 2>/dev/null || true
+            ;;
+        7)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' | \
+                xargs -I {} yabai -m window {} --space 7 2>/dev/null || true
+            ;;
+        8)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint") | .id' | \
+                xargs -I {} yabai -m window {} --space 8 2>/dev/null || true
+            ;;
+        9)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Slack" or .app == "Discord" or .app == "Mail") | .id' | \
+                xargs -I {} yabai -m window {} --space 9 2>/dev/null || true
+            ;;
+        10)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Claude" or .app == "Perplexity") | .id' | \
+                xargs -I {} yabai -m window {} --space 10 2>/dev/null || true
+            ;;
         *)
             log_info "No gather action for space $current_space"
             ;;
@@ -6694,11 +8364,56 @@ EOF
 }
 
 gather_linux() {
-    log_warn "Linux gather logic is currently a stub."
+    local current_ws
+    current_ws=$(hyprctl activeworkspace -j | jq -r '.id')
+    log_info "Gathering windows for workspace $current_ws..."
+    
+    case $current_ws in
+        1)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("brave|firefox|chromium"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "1,address:$addr" 2>/dev/null; done
+            ;;
+        2)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("obsidian"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "2,address:$addr" 2>/dev/null; done
+            ;;
+        3)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("wezterm|code|alacritty|kitty"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "3,address:$addr" 2>/dev/null; done
+            ;;
+        5)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("evince|zathura|okular"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "5,address:$addr" 2>/dev/null; done
+            ;;
+        6)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("raindrop"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "6,address:$addr" 2>/dev/null; done
+            ;;
+        7)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("spotify"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "7,address:$addr" 2>/dev/null; done
+            ;;
+        8)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("libreoffice|soffice"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "8,address:$addr" 2>/dev/null; done
+            ;;
+        9)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("slack|discord|thunderbird|telegram"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "9,address:$addr" 2>/dev/null; done
+            ;;
+        10)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("claude"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "10,address:$addr" 2>/dev/null; done
+            ;;
+        *)
+            log_info "No gather action for workspace $current_ws"
+            ;;
+    esac
+    ok "Windows gathered"
 }
 
 is_macos && gather_macos || gather_linux
-FOOTER
+HEADER
 
     chmod +x "$out"
     ok "Generated: $out"
@@ -6727,6 +8442,7 @@ case "${1:-all}" in
     all)      gen_all ;;
     *)        log_fatal "Unknown target: $1" ;;
 esac
+
 
 
 ################################################################################
