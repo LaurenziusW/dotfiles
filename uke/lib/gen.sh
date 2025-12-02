@@ -403,6 +403,82 @@ EOF
 }
 
 # ==============================================================================
+# Gather Script Generator
+# ==============================================================================
+gen_gather() {
+    local out="$UKE_BIN/uke-gather"
+    # Ensure bin directory exists
+    mkdir -p "$(dirname "$out")"
+
+    log_info "Generating uke-gather..."
+    
+    # Header
+    cat > "$out" << 'HEADER'
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+source "$UKE_ROOT/lib/core.sh"
+require_cmd jq yq
+
+gather_macos() {
+    local current_space
+    current_space=$(yabai -m query --spaces --space | jq -r '.index')
+    log_info "Gathering windows for space $current_space..."
+    
+    case $current_space in
+HEADER
+
+    # Generate cases from registry.yaml
+    for ws in $(yq -r '.workspaces | keys | .[]' "$UKE_CONFIG/registry.yaml"); do
+        local apps=$(yq -r ".workspaces.${ws}.apps | .[]?" "$UKE_CONFIG/registry.yaml")
+        [[ -z "$apps" ]] && continue
+        
+        # Build selector
+        local selector=""
+        for app_key in $apps; do
+            local app_name=$(yq -r ".apps.${app_key}.macos // empty" "$UKE_CONFIG/registry.yaml")
+            [[ -z "$app_name" ]] && continue
+            [[ -n "$selector" ]] && selector="$selector or "
+            selector="${selector}.app == \"$app_name\""
+        done
+        
+        [[ -z "$selector" ]] && continue
+        
+        cat >> "$out" << EOF
+        $ws)
+            yabai -m query --windows | jq -r '.[] | select($selector) | .id' | \\
+                xargs -I {} yabai -m window {} --space $ws 2>/dev/null || true
+            ;;
+EOF
+    done
+    
+    # Footer
+    cat >> "$out" << 'FOOTER'
+        *)
+            log_info "No gather action for space $current_space"
+            ;;
+    esac
+    ok "Windows gathered for space $current_space"
+}
+
+gather_linux() {
+    local current_space
+    current_space=$(hyprctl activeworkspace | grep 'workspace ID' | awk '{print $3}')
+    log_info "Gathering windows for Linux Workspace $current_space..."
+    
+    # Linux implementation logic (simplified stub for stability)
+    log_warn "Linux gather logic is currently a stub in this version."
+}
+
+is_macos && gather_macos || gather_linux
+FOOTER
+
+    chmod +x "$out"
+    ok "Generated: $out"
+}
+
+# ==============================================================================
 # Main
 # ==============================================================================
 gen_all() {
@@ -415,6 +491,8 @@ gen_all() {
         gen_hyprland
     fi
     
+    gen_gather
+    
     ok "All configs generated"
 }
 
@@ -422,6 +500,7 @@ case "${1:-all}" in
     skhd)     gen_skhd ;;
     yabai)    gen_yabai ;;
     hyprland) gen_hyprland ;;
+    gather)   gen_gather ;;
     all)      gen_all ;;
     *)        log_fatal "Unknown target: $1" ;;
 esac
