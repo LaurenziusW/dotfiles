@@ -56,59 +56,28 @@ yabai -m rule --add title="Settings" manage=off
 # ==============================================================================
 # WORKSPACE ASSIGNMENTS
 # ==============================================================================
-
-# Space 1
 yabai -m rule --add app="^Safari$" space=^1
 yabai -m rule --add app="^Brave Browser$" space=^1
-
-# Space 2
 yabai -m rule --add app="^Obsidian$" space=^2
-
-# Space 3
 yabai -m rule --add app="^WezTerm$" space=^3
 yabai -m rule --add app="^Code$" space=^3
 yabai -m rule --add app="^Xcode$" space=^3
-
-# Space 5
 yabai -m rule --add app="^Preview$" space=^5
 yabai -m rule --add app="^PDF Expert$" space=^5
-
-# Space 6
 yabai -m rule --add app="^Raindrop.io$" space=^6
-
-# Space 7
 yabai -m rule --add app="^Spotify$" space=^7
-
-# Space 8
 yabai -m rule --add app="^Microsoft Word$" space=^8
 yabai -m rule --add app="^Microsoft Excel$" space=^8
 yabai -m rule --add app="^Microsoft PowerPoint$" space=^8
-
-# Space 9
 yabai -m rule --add app="^Slack$" space=^9
 yabai -m rule --add app="^Discord$" space=^9
 yabai -m rule --add app="^Mail$" space=^9
 yabai -m rule --add app="^Telegram$" space=^9
 yabai -m rule --add app="^WhatsApp$" space=^9
-
-# Space 10
 yabai -m rule --add app="^Claude$" space=^10
 yabai -m rule --add app="^Perplexity$" space=^10
 
-# ==============================================================================
-# MONITOR ASSIGNMENTS
-# ==============================================================================
-yabai -m space 1 --display 1 2>/dev/null || true
-yabai -m space 2 --display 1 2>/dev/null || true
-yabai -m space 3 --display 1 2>/dev/null || true
-yabai -m space 4 --display 1 2>/dev/null || true
-yabai -m space 5 --display 1 2>/dev/null || true
-yabai -m space 6 --display 2 2>/dev/null || true
-yabai -m space 7 --display 2 2>/dev/null || true
-yabai -m space 8 --display 2 2>/dev/null || true
-yabai -m space 9 --display 2 2>/dev/null || true
-yabai -m space 10 --display 2 2>/dev/null || true
-
 # Catch-all
 yabai -m rule --add app!="^(Safari|Brave Browser|Obsidian|WezTerm|Code|Xcode|Preview|PDF Expert|Raindrop.io|Spotify|Microsoft Word|Microsoft Excel|Microsoft PowerPoint|Slack|Discord|Mail|Telegram|WhatsApp|Claude|Perplexity)$" space=^4
+
 echo "yabai: Configuration loaded"

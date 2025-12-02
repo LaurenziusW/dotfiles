@@ -87,7 +87,6 @@ cmd + shift - 0x1D : yabai -m window --space 10 --focus
 # ─────────────────────────────────────────────────────────────────────────────
 # Gather Windows (Cmd + `)
 # ─────────────────────────────────────────────────────────────────────────────
-# [cite_start]Note: 0x32 is the keycode for Grave (`)[cite: 668].
 cmd - 0x32 : $HOME/.local/bin/uke-gather
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -110,7 +109,7 @@ cmd + ctrl - 4 : $HOME/.local/bin/uke-bunch email
 cmd + ctrl - 5 : $HOME/.local/bin/uke-bunch reading
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Scratchpads (Cmd + Shift + `)
+# Scratchpads
 # ─────────────────────────────────────────────────────────────────────────────
 cmd + shift - 0x32 : $HOME/.local/bin/uke-scratchpad terminal
 cmd + alt - n : $HOME/.local/bin/uke-scratchpad notes
