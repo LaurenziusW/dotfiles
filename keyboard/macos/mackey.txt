@@ -1,0 +1,83 @@
+{
+  "title": "German Layer (Right Option)",
+  "rules": [
+    {
+      "description": "Right Option Layer (a,o,u,s -> ä,ö,ü,ß + Shift for Caps)",
+      "manipulators": [
+        {
+          "description": "Hold Right Option to activate German Layer",
+          "from": { "key_code": "right_option", "modifiers": { "optional": ["any"] } },
+          "to": [ { "set_variable": { "name": "german_layer", "value": 1 } } ],
+          "to_after_key_up": [ { "set_variable": { "name": "german_layer", "value": 0 } } ],
+          "type": "basic"
+        },
+        
+        // --- LOWERCASE ---
+        {
+          "conditions": [ { "name": "german_layer", "type": "variable_if", "value": 1 } ],
+          "from": { "key_code": "a" },
+          "to": [ { "key_code": "u", "modifiers": ["left_option"] }, { "key_code": "a" } ],
+          "type": "basic"
+        },
+        {
+          "conditions": [ { "name": "german_layer", "type": "variable_if", "value": 1 } ],
+          "from": { "key_code": "o" },
+          "to": [ { "key_code": "u", "modifiers": ["left_option"] }, { "key_code": "o" } ],
+          "type": "basic"
+        },
+        {
+          "conditions": [ { "name": "german_layer", "type": "variable_if", "value": 1 } ],
+          "from": { "key_code": "u" },
+          "to": [ { "key_code": "u", "modifiers": ["left_option"] }, { "key_code": "u" } ],
+          "type": "basic"
+        },
+        {
+          "conditions": [ { "name": "german_layer", "type": "variable_if", "value": 1 } ],
+          "from": { "key_code": "s" },
+          "to": [ { "key_code": "s", "modifiers": ["left_option"] } ],
+          "type": "basic"
+        },
+
+        // --- UPPERCASE (Shift held) ---
+        {
+          "conditions": [ { "name": "german_layer", "type": "variable_if", "value": 1 } ],
+          "from": { "key_code": "a", "modifiers": { "mandatory": ["left_shift"] } },
+          "to": [ { "key_code": "u", "modifiers": ["left_option"] }, { "key_code": "a", "modifiers": ["left_shift"] } ],
+          "type": "basic"
+        },
+        {
+          "conditions": [ { "name": "german_layer", "type": "variable_if", "value": 1 } ],
+          "from": { "key_code": "o", "modifiers": { "mandatory": ["left_shift"] } },
+          "to": [ { "key_code": "u", "modifiers": ["left_option"] }, { "key_code": "o", "modifiers": ["left_shift"] } ],
+          "type": "basic"
+        },
+        {
+          "conditions": [ { "name": "german_layer", "type": "variable_if", "value": 1 } ],
+          "from": { "key_code": "u", "modifiers": { "mandatory": ["left_shift"] } },
+          "to": [ { "key_code": "u", "modifiers": ["left_option"] }, { "key_code": "u", "modifiers": ["left_shift"] } ],
+          "type": "basic"
+        },
+        
+        // --- UPPERCASE (Right Shift held - if you use right shift) ---
+        {
+          "conditions": [ { "name": "german_layer", "type": "variable_if", "value": 1 } ],
+          "from": { "key_code": "a", "modifiers": { "mandatory": ["right_shift"] } },
+          "to": [ { "key_code": "u", "modifiers": ["left_option"] }, { "key_code": "a", "modifiers": ["left_shift"] } ],
+          "type": "basic"
+        },
+        {
+          "conditions": [ { "name": "german_layer", "type": "variable_if", "value": 1 } ],
+          "from": { "key_code": "o", "modifiers": { "mandatory": ["right_shift"] } },
+          "to": [ { "key_code": "u", "modifiers": ["left_option"] }, { "key_code": "o", "modifiers": ["left_shift"] } ],
+          "type": "basic"
+        },
+        {
+          "conditions": [ { "name": "german_layer", "type": "variable_if", "value": 1 } ],
+          "from": { "key_code": "u", "modifiers": { "mandatory": ["right_shift"] } },
+          "to": [ { "key_code": "u", "modifiers": ["left_option"] }, { "key_code": "u", "modifiers": ["left_shift"] } ],
+          "type": "basic"
+        }
+      ]
+    }
+  ]
+}
