@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Backup - Manual backup utility for UKE configs
+# UKE Backup - Config backup utility
 # ==============================================================================
 set -euo pipefail
 
@@ -17,8 +17,10 @@ create_backup() {
     log_info "Creating backup: $backup_dir"
     mkdir -p "$backup_dir"
     
-    cp "$UKE_CONFIG/registry.yaml" "$backup_dir/" && ok "Backed up registry"
+    # Backup registry
+    cp "$UKE_CONFIG/registry.yaml" "$backup_dir/" && ok "Backed up registry.yaml"
     
+    # Backup generated configs
     if is_macos; then
         [[ -f "$UKE_GEN/skhd/skhdrc" ]] && cp "$UKE_GEN/skhd/skhdrc" "$backup_dir/"
         [[ -f "$UKE_GEN/yabai/yabairc" ]] && cp "$UKE_GEN/yabai/yabairc" "$backup_dir/"
@@ -26,16 +28,18 @@ create_backup() {
         [[ -f "$UKE_GEN/hyprland/hyprland.conf" ]] && cp "$UKE_GEN/hyprland/hyprland.conf" "$backup_dir/"
     fi
     
+    # Create manifest
     cat > "$backup_dir/MANIFEST.txt" << EOF
-UKE Backup - $timestamp
-Platform: $(uname -s)
+UKE Backup
+Created: $(date)
+Platform: $UKE_OS
 Version: $UKE_VERSION
+
 Files:
-$(ls -1 "$backup_dir")
+$(ls -1 "$backup_dir" | grep -v MANIFEST)
 EOF
     
     ok "Backup complete: $backup_dir"
-    return 0
 }
 
 list_backups() {
@@ -47,8 +51,7 @@ list_backups() {
     echo "Available backups:"
     for backup in "$BACKUP_ROOT"/*; do
         [[ -d "$backup" ]] || continue
-        local name=$(basename "$backup")
-        echo "  $name"
+        echo "  $(basename "$backup")"
     done
 }
 
@@ -58,23 +61,22 @@ restore_backup() {
     
     [[ -d "$backup_dir" ]] || log_fatal "Backup not found: $name"
     
-    log_warn "This will overwrite your current registry!"
+    log_warn "This will overwrite your current configs!"
     read -p "Continue? (y/N) " -n 1 -r
     echo
     [[ $REPLY =~ ^[Yy]$ ]] || { log_info "Aborted"; return 1; }
     
     [[ -f "$backup_dir/registry.yaml" ]] && {
         cp "$backup_dir/registry.yaml" "$UKE_CONFIG/"
-        ok "Restored registry"
+        ok "Restored registry.yaml"
     }
     
     log_info "Run 'uke gen && uke reload' to apply"
-    return 0
 }
 
 case "${1:-}" in
     create|"") create_backup ;;
-    list)      list_backups ;;
-    restore)   shift; restore_backup "$@" ;;
-    *)         log_fatal "Usage: uke-backup {create|list|restore <name>}" ;;
+    list|ls)   list_backups ;;
+    restore)   restore_backup "${2:-}" ;;
+    *)         echo "Usage: uke-backup [create|list|restore <name>]" ;;
 esac

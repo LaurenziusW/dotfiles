@@ -1,14 +1,6 @@
+# Stow ignore patterns
 \.git
 \.gitignore
-\.DS_Store
-\.stow-local-ignore
-README\.md
+README.*
 LICENSE
-scripts
-docs
-config
-lib
-bin
-gen
-bunches
-templates
+\.DS_Store

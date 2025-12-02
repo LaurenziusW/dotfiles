@@ -1,177 +1,208 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Installer
+# UKE Installer v6.1
 # ==============================================================================
 set -euo pipefail
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UKE_ROOT="${SCRIPT_DIR%/scripts}"
-source "$UKE_ROOT/lib/core.sh"
 
-# ------------------------------------------------------------------------------
-# Pre-flight
-# ------------------------------------------------------------------------------
+# Colors
+RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
+BOLD=$'\e[1m' RESET=$'\e[0m'
+
+ok()   { echo "${GREEN}✓${RESET} $*"; }
+fail() { echo "${RED}✗${RESET} $*"; }
+info() { echo "${BLUE}→${RESET} $*"; }
+warn() { echo "${YELLOW}!${RESET} $*"; }
+
+# OS Detection
+case "$(uname -s)" in
+    Darwin) OS="macos" ;;
+    Linux)  OS="linux" ;;
+    *)      echo "Unsupported OS"; exit 1 ;;
+esac
+
+# ==============================================================================
+# Dependency Check
+# ==============================================================================
 check_deps() {
+    info "Checking dependencies..."
     local missing=()
     
-    command -v git &>/dev/null || missing+=("git")
-    command -v stow &>/dev/null || missing+=("stow")
-    command -v yq &>/dev/null || missing+=("yq")
-    command -v jq &>/dev/null || missing+=("jq")
+    for cmd in git stow jq; do
+        command -v "$cmd" &>/dev/null || missing+=("$cmd")
+    done
     
-    if is_macos; then
+    if [[ "$OS" == "macos" ]]; then
         command -v yabai &>/dev/null || missing+=("yabai")
         command -v skhd &>/dev/null || missing+=("skhd")
+    else
+        command -v hyprctl &>/dev/null || missing+=("hyprland")
     fi
     
     if [[ ${#missing[@]} -gt 0 ]]; then
-        log_error "Missing dependencies: ${missing[*]}"
+        fail "Missing dependencies: ${missing[*]}"
         echo ""
-        if is_macos; then
-            echo "Install with: brew install ${missing[*]}"
+        echo "Install with:"
+        if [[ "$OS" == "macos" ]]; then
+            echo "  brew install ${missing[*]}"
         else
-            echo "Install with your package manager"
+            echo "  sudo pacman -S ${missing[*]}"
         fi
         exit 1
     fi
     
-    ok "All dependencies present"
+    ok "All dependencies installed"
 }
 
-# ------------------------------------------------------------------------------
-# Backup
-# ------------------------------------------------------------------------------
-backup_existing() {
-    local backup_dir="$HOME/.uke-backup-$(date +%Y%m%d-%H%M%S)"
-    local backed_up=0
+# ==============================================================================
+# Generate Configs
+# ==============================================================================
+generate_configs() {
+    info "Generating configs..."
+    bash "$UKE_ROOT/lib/gen.sh" all
+}
+
+# ==============================================================================
+# Create Directories
+# ==============================================================================
+create_dirs() {
+    info "Creating directories..."
+    mkdir -p ~/.local/bin
+    mkdir -p ~/.config/skhd
+    mkdir -p ~/.config/yabai
+    mkdir -p ~/.config/hypr
+    mkdir -p ~/.config/nvim
+    ok "Directories created"
+}
+
+# ==============================================================================
+# Link Binaries
+# ==============================================================================
+link_binaries() {
+    info "Linking binaries to ~/.local/bin..."
     
-    for item in .config/skhd .config/yabai .config/hypr .wezterm.lua .tmux.conf .zshrc .config/nvim .config/karabiner; do
-        if [[ -e "$HOME/$item" && ! -L "$HOME/$item" ]]; then
-            mkdir -p "$backup_dir"
-            cp -r "$HOME/$item" "$backup_dir/" 2>/dev/null && backed_up=$((backed_up + 1))
-        fi
+    for bin in "$UKE_ROOT/bin"/*; do
+        [[ -f "$bin" ]] || continue
+        local name=$(basename "$bin")
+        chmod +x "$bin"
+        ln -sf "$bin" "$HOME/.local/bin/$name"
+        ok "Linked: $name"
     done
+}
+
+# ==============================================================================
+# Link Generated Configs
+# ==============================================================================
+link_configs() {
+    info "Linking generated configs..."
     
-    if [[ $backed_up -gt 0 ]]; then
-        ok "Backed up $backed_up items to $backup_dir"
+    if [[ "$OS" == "macos" ]]; then
+        ln -sf "$UKE_ROOT/gen/skhd/skhdrc" "$HOME/.config/skhd/skhdrc"
+        ok "Linked: skhdrc"
+        
+        ln -sf "$UKE_ROOT/gen/yabai/yabairc" "$HOME/.config/yabai/yabairc"
+        ok "Linked: yabairc"
+    else
+        ln -sf "$UKE_ROOT/gen/hyprland/hyprland.conf" "$HOME/.config/hypr/hyprland.conf"
+        ok "Linked: hyprland.conf"
     fi
 }
 
-# ------------------------------------------------------------------------------
-# Stow Packages
-# ------------------------------------------------------------------------------
-stow_packages() {
-    log_info "Installing stow packages..."
+# ==============================================================================
+# Stow Dotfiles
+# ==============================================================================
+stow_dotfiles() {
+    info "Stowing dotfiles..."
+    cd "$UKE_ROOT/stow"
     
-    local packages=()
+    local packages=(wezterm tmux zsh nvim)
     
-    # Platform-specific
-    if is_macos; then
+    if [[ "$OS" == "macos" ]]; then
         packages+=(karabiner)
     else
         packages+=(keyd)
     fi
     
-    # Shared
-    packages+=(wezterm tmux zsh nvim)
-    
-    cd "$UKE_STOW"
     for pkg in "${packages[@]}"; do
         if [[ -d "$pkg" ]]; then
-            stow -R "$pkg" -t "$HOME" 2>/dev/null && ok "Stowed: $pkg" || log_warn "Failed: $pkg"
-        else
-            log_warn "Package not found: $pkg"
+            stow -R "$pkg" 2>/dev/null && ok "Stowed: $pkg" || warn "Skipped: $pkg"
         fi
     done
 }
 
-# ------------------------------------------------------------------------------
-# Link Binaries
-# ------------------------------------------------------------------------------
-link_bins() {
-    log_info "Linking binaries..."
-    
-    mkdir -p "$HOME/.local/bin"
-    
-    for bin in "$UKE_BIN"/*; do
-        [[ -f "$bin" ]] || continue
-        local name="$(basename "$bin")"
-        ln -sf "$bin" "$HOME/.local/bin/$name"
-        chmod +x "$bin"
-    done
-    
-    ok "Linked binaries to ~/.local/bin"
+# ==============================================================================
+# Make Bunches Executable
+# ==============================================================================
+setup_bunches() {
+    info "Setting up bunches..."
+    chmod +x "$UKE_ROOT/bunches"/*.sh 2>/dev/null || true
+    chmod +x "$UKE_ROOT/templates"/*.sh 2>/dev/null || true
+    ok "Bunches ready"
 }
 
-# ------------------------------------------------------------------------------
-# Link Generated Configs
-# ------------------------------------------------------------------------------
-link_gen() {
-    log_info "Linking generated configs..."
+# ==============================================================================
+# Start Services
+# ==============================================================================
+start_services() {
+    info "Starting services..."
     
-    if is_macos; then
-        mkdir -p "$HOME/.config/skhd" "$HOME/.config/yabai"
-        [[ -f "$UKE_GEN/skhd/skhdrc" ]] && ln -sf "$UKE_GEN/skhd/skhdrc" "$HOME/.config/skhd/skhdrc"
-        [[ -f "$UKE_GEN/yabai/yabairc" ]] && ln -sf "$UKE_GEN/yabai/yabairc" "$HOME/.config/yabai/yabairc"
-        ok "Linked skhd and yabai configs"
+    if [[ "$OS" == "macos" ]]; then
+        yabai --restart-service 2>/dev/null && ok "yabai restarted" || warn "yabai restart failed"
+        skhd --restart-service 2>/dev/null && ok "skhd restarted" || warn "skhd restart failed"
     else
-        mkdir -p "$HOME/.config/hypr"
-        [[ -f "$UKE_GEN/hyprland/hyprland.conf" ]] && ln -sf "$UKE_GEN/hyprland/hyprland.conf" "$HOME/.config/hypr/hyprland.conf"
-        ok "Linked hyprland config"
+        hyprctl reload 2>/dev/null && ok "hyprland reloaded" || warn "hyprland reload failed"
     fi
 }
 
-# ------------------------------------------------------------------------------
-# Generate Configs
-# ------------------------------------------------------------------------------
-generate_configs() {
-    log_info "Generating configs from registry..."
-    if [[ -f "$UKE_LIB/gen.sh" ]]; then
-        bash "$UKE_LIB/gen.sh" all
-    else
-        log_warn "gen.sh not found, skipping generation"
-    fi
-}
-
-# ------------------------------------------------------------------------------
+# ==============================================================================
 # Main
-# ------------------------------------------------------------------------------
+# ==============================================================================
 main() {
-    echo "UKE Installer v$UKE_VERSION"
-    echo "=========================="
+    echo ""
+    echo "${BOLD}╔══════════════════════════════════════╗${RESET}"
+    echo "${BOLD}║     UKE v6.1 Installer               ║${RESET}"
+    echo "${BOLD}╚══════════════════════════════════════╝${RESET}"
+    echo ""
+    echo "Platform: $OS"
+    echo "UKE Root: $UKE_ROOT"
     echo ""
     
-    case "${1:-}" in
-        --check) check_deps; exit 0 ;;
-        --bins)  link_bins; exit 0 ;;
-        --stow)  stow_packages; exit 0 ;;
-        --gen)   generate_configs; exit 0 ;;
-        --help|-h)
-            echo "Usage: $0 [option]"
-            echo "  (no args)  Full install"
-            echo "  --check    Check dependencies only"
-            echo "  --stow     Stow packages only"
-            echo "  --bins     Link binaries only"
-            echo "  --gen      Generate configs only"
-            exit 0
+    case "${1:-full}" in
+        --check)
+            check_deps
+            ;;
+        --stow)
+            stow_dotfiles
+            ;;
+        --link)
+            link_binaries
+            link_configs
+            ;;
+        --gen)
+            generate_configs
+            ;;
+        full|*)
+            check_deps
+            create_dirs
+            generate_configs
+            link_binaries
+            link_configs
+            stow_dotfiles
+            setup_bunches
+            start_services
+            
+            echo ""
+            echo "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+            echo "${GREEN}✓ Installation complete!${RESET}"
+            echo ""
+            echo "Next steps:"
+            echo "  1. Restart your terminal (or run: source ~/.zshrc)"
+            echo "  2. Test with: uke status"
+            echo "  3. See: docs/CHEATSHEET.md for keybindings"
             ;;
     esac
-    
-    check_deps
-    backup_existing
-    generate_configs
-    stow_packages
-    link_bins
-    link_gen
-    
-    echo ""
-    ok "Installation complete!"
-    echo ""
-    echo "Next steps:"
-    echo "  1. source ~/.zshrc"
-    echo "  2. uke reload"
-    echo ""
-    echo "Edit config: uke edit"
-    echo "Apply changes: uke gen && uke reload"
 }
 
 main "$@"

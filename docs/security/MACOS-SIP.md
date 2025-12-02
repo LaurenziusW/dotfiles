@@ -1,242 +1,111 @@
-# macOS Security Configuration
+# macOS SIP Configuration for Yabai
 
-Yabai Scripting Addition setup and SIP management.
+## Overview
 
-## System Integrity Protection (SIP)
+System Integrity Protection (SIP) restricts certain operations on macOS. Yabai requires partial SIP modification for full functionality.
 
-Yabai's Scripting Addition injects into Dock.app, requiring partial SIP disable.
+## Feature Comparison
 
-### Check Status
+| Feature | SIP Enabled | SIP Partial |
+|:--------|:------------|:------------|
+| Window focus | ✓ | ✓ |
+| Window resize | ✓ | ✓ |
+| Window move | ✓ | ✓ |
+| Space switching | ✗ | ✓ |
+| Space creation | ✗ | ✓ |
+| Move to space | ✗ | ✓ |
+
+**Bottom line:** For UKE's workspace management features, you need partial SIP.
+
+## Checking SIP Status
 
 ```bash
 csrutil status
 ```
 
-### Disable SIP
+## Modifying SIP (Apple Silicon)
 
-**Apple Silicon:**
+1. **Shut down** your Mac completely
+
+2. **Boot to Recovery:**
+   - Hold power button until "Loading startup options" appears
+   - Select "Options" → Continue
+
+3. **Open Terminal** from Utilities menu
+
+4. **Run command:**
+   ```bash
+   csrutil enable --without fs --without debug --without nvram
+   ```
+
+5. **Reboot**
+
+6. **Enable ARM64E ABI:**
+   ```bash
+   sudo nvram boot-args=-arm64e_preview_abi
+   ```
+
+7. **Reboot again**
+
+## Modifying SIP (Intel Mac)
+
+1. **Shut down** your Mac completely
+
+2. **Boot to Recovery:**
+   - Hold Cmd+R during startup
+
+3. **Open Terminal** from Utilities menu
+
+4. **Run command:**
+   ```bash
+   csrutil enable --without fs --without debug --without nvram
+   ```
+
+5. **Reboot**
+
+## Loading the Scripting Addition
+
+After SIP modification, yabai's scripting addition must be loaded:
+
 ```bash
-# Boot to Recovery: Hold power until "Loading startup options"
-# Click Options → Continue → Select admin user → enter password
-# Utilities → Terminal
+# Add to sudoers for password-less loading
+echo "$(whoami) ALL=(root) NOPASSWD: sha256:$(shasum -a 256 $(which yabai) | cut -d " " -f 1) $(which yabai) --load-sa" | sudo tee /private/etc/sudoers.d/yabai
 
-csrutil enable --without fs --without debug --without nvram
-reboot
-```
-
-**Intel:**
-```bash
-# Boot to Recovery: Hold Cmd+R during boot
-# Utilities → Terminal
-
-csrutil disable --with kext --with dtrace --with nvram --with basesystem
-reboot
-```
-
-### Re-enable (for system updates)
-
-```bash
-# In Recovery Mode Terminal:
-csrutil enable
-reboot
-```
-
-## Yabai Scripting Addition
-
-### Install
-
-```bash
-sudo yabai --install-sa
+# Load the scripting addition
 sudo yabai --load-sa
 ```
 
-### Verify
+The yabairc config already includes `sudo yabai --load-sa`.
+
+## Verifying
 
 ```bash
-yabai --check-sa
-# Should show: "Scripting addition installed correctly"
-```
-
-### Sudoers (passwordless load)
-
-```bash
-sudo visudo -f /private/etc/sudoers.d/yabai
-```
-
-Add:
-```
-<user> ALL=(root) NOPASSWD: sha256:<hash> <path> --load-sa
-```
-
-Get hash and path:
-```bash
-shasum -a 256 $(which yabai)
-```
-
-Example:
-```
-laurenz ALL=(root) NOPASSWD: sha256:abc123... /opt/homebrew/bin/yabai --load-sa
-```
-
-### ARM64E Preview ABI (Apple Silicon only)
-
-Required for Scripting Addition on Apple Silicon:
-
-```bash
-sudo nvram boot-args=-arm64e_preview_abi
-sudo reboot
-```
-
-Verify:
-```bash
-nvram boot-args
-```
-
-## Accessibility Permissions
-
-System Settings → Privacy & Security → Accessibility:
-- [x] yabai
-- [x] skhd
-- [x] WezTerm
-
-## Troubleshooting
-
-### "Scripting addition not installed"
-
-```bash
-sudo yabai --uninstall-sa
-sudo yabai --install-sa
-sudo yabai --load-sa
-yabai --restart-service
-```
-
-### "Operation not permitted"
-
-SIP check:
-```bash
-csrutil status  # Should show disabled features
-yabai --check-sa
-```
-
-If enabled, redo SIP disable in Recovery.
-
-### After macOS Update
-
-Updates may re-enable SIP:
-```bash
-# 1. Check
+# Check SIP status
 csrutil status
 
-# 2. If enabled, boot to Recovery and disable again
-# 3. Re-install SA
-sudo yabai --install-sa
-sudo yabai --load-sa
-
-# 4. (Apple Silicon) Re-enable ARM64E
-sudo nvram boot-args=-arm64e_preview_abi
-sudo reboot
+# Test space switching
+yabai -m space --focus 2
 ```
 
-## Service Management
+## Reverting
 
-```bash
-# Start on login
-brew services start yabai
-brew services start skhd
+To restore full SIP:
 
-# Manual control
-yabai --restart-service
-skhd --restart-service
+1. Boot to Recovery
+2. Run: `csrutil enable`
+3. Reboot
 
-# Status
-brew services list | grep -E "yabai|skhd"
-```
+## Security Considerations
 
-## Logs
+Partially disabling SIP reduces system protections. The specific flags disabled:
 
-```bash
-tail -f /tmp/yabai_*.err.log
-tail -f /tmp/skhd_*.err.log
-```
+- `fs`: Filesystem protections (needed for yabai injection)
+- `debug`: Debugging restrictions
+- `nvram`: Boot argument modifications
 
-## Complete Setup Sequence
+This is a trade-off between functionality and security. Consider your threat model.
 
-```bash
-# 1. Install Homebrew packages
-brew install koekeishiya/formulae/yabai
-brew install koekeishiya/formulae/skhd
+## References
 
-# 2. Boot to Recovery, disable SIP
-# (See "Disable SIP" section above)
-
-# 3. (Apple Silicon only)
-sudo nvram boot-args=-arm64e_preview_abi
-sudo reboot
-
-# 4. Install Scripting Addition
-sudo yabai --install-sa
-sudo yabai --load-sa
-
-# 5. Configure sudoers
-sudo visudo -f /private/etc/sudoers.d/yabai
-# Add line with hash from: shasum -a 256 $(which yabai)
-
-# 6. Deploy configs
-cd ~/dotfiles
-stow yabai skhd
-
-# 7. Start services
-brew services start yabai
-brew services start skhd
-
-# 8. Grant Accessibility permissions
-# System Settings → Privacy & Security → Accessibility
-
-# 9. Verify
-yabai --check-sa
-csrutil status
-```
-
-## Security Notes
-
-- SIP partial disable reduces system security
-- Scripting Addition runs with root privileges
-- Only disable minimum required SIP features
-- FileVault (disk encryption) unaffected
-- Firewall can stay enabled
-- Gatekeeper unaffected
-
-## Uninstall
-
-```bash
-# 1. Stop services
-brew services stop yabai
-brew services stop skhd
-
-# 2. Remove Scripting Addition
-sudo yabai --uninstall-sa
-
-# 3. Remove sudoers
-sudo rm /private/etc/sudoers.d/yabai
-
-# 4. Re-enable SIP
-# Boot to Recovery:
-csrutil enable
-reboot
-
-# 5. (Apple Silicon) Remove ARM64E
-sudo nvram -d boot-args
-sudo reboot
-
-# 6. Remove configs
-rm -rf ~/.config/yabai ~/.config/skhd
-
-# 7. Uninstall packages
-brew uninstall yabai skhd
-```
-
----
-
-**Last Updated**: 2024-11-27  
-**macOS**: 14+ (Sonoma)  
-**Architecture**: Intel & Apple Silicon
+- [Yabai Wiki: Disabling SIP](https://github.com/koekeishiya/yabai/wiki/Disabling-System-Integrity-Protection)
+- [Apple: About SIP](https://support.apple.com/en-us/HT204899)

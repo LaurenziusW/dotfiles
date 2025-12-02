@@ -1,72 +1,97 @@
-# UKE v6 - Unified Keyboard Environment
+# UKE - Unified Keyboard Environment v6.1
 
-Cross-platform keyboard-driven workflow system.
+**One keyboard workflow for macOS and Linux.**
+
+UKE provides identical keyboard-driven window management across platforms through a single configuration that generates platform-specific configs.
 
 ## Quick Start
 
 ```bash
-tar -xzf uke-v6.tar.gz
-mv uke ~/dotfiles/
+# Clone/extract to ~/dotfiles/uke
 cd ~/dotfiles/uke
+
+# Install
 ./scripts/install.sh
-uke gen && uke reload
+
+# Verify
+uke-doctor
 ```
+
+## Features
+
+- **Cross-platform**: Same muscle memory on macOS (yabai/skhd) and Linux (Hyprland)
+- **Single source of truth**: Edit `config/registry.yaml`, generate platform configs
+- **10 workspaces**: Organized by purpose (Browser, Notes, Code, etc.)
+- **Bunches**: Environment presets (study, coding, guitar, email, reading)
+- **Gather**: Organize scattered windows to their designated workspaces
+- **Conflict-free**: Layered modifier system prevents keybinding conflicts
+
+## Modifier Hierarchy
+
+| Layer | macOS | Linux | Scope |
+|:------|:------|:------|:------|
+| PRIMARY | Cmd | Alt | Window Manager |
+| SECONDARY | Alt | Super | Terminal (WezTerm) |
+| TERTIARY | Alt+Shift | Super+Shift | Resize |
+| QUATERNARY | Ctrl | Ctrl | Shell |
+
+## Key Commands
+
+```bash
+uke gen              # Generate platform configs
+uke reload           # Restart window manager
+uke-gather           # Organize windows (Cmd+`)
+uke-bunch study      # Launch study environment (Cmd+Ctrl+1)
+uke-doctor           # Health check
+```
+
+## Essential Keybindings
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Focus window | Cmd + hjkl | Alt + hjkl |
+| Move window | Cmd+Shift + hjkl | Alt+Shift + hjkl |
+| Switch workspace | Cmd + 1-9 | Alt + 1-9 |
+| Launch terminal | Cmd + Return | Alt + Return |
+| Gather windows | Cmd + \` | Alt + \` |
+| WezTerm panes | Alt + hjkl | Super + hjkl |
+
+See `docs/CHEATSHEET.md` for complete reference.
 
 ## Structure
 
 ```
 uke/
-├── config/registry.yaml   # Source of truth
-├── lib/                   # core.sh, gen.sh, wm.sh
-├── bin/                   # uke, uke-bunch, uke-gather, uke-doctor, uke-backup, uke-debug
-├── gen/                   # Generated configs (don't edit)
-├── stow/                  # Stow packages
-├── scripts/ai/            # AI helpers
-└── docs/                  # ARCHITECTURE, TROUBLESHOOTING, MIGRATION
+├── config/registry.yaml    # Edit this
+├── lib/                    # Core scripts
+├── gen/                    # Generated (don't edit)
+├── bin/                    # CLI commands
+├── bunches/                # Environment presets
+├── stow/                   # Dotfiles
+└── docs/                   # Documentation
 ```
 
-## Workflow
+## Documentation
 
-```bash
-uke edit            # Edit registry.yaml
-uke gen             # Generate platform configs
-uke reload          # Apply changes
-```
+- [CHEATSHEET.md](docs/CHEATSHEET.md) - Quick reference
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design
+- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Problem solving
+- [MIGRATION.md](docs/MIGRATION.md) - Upgrade guide
 
-## Modifiers
+## Requirements
 
-| Modifier | macOS | Linux | Use |
-|----------|-------|-------|-----|
-| primary | Cmd | Alt | Focus, workspaces |
-| primary_shift | Cmd+Shift | Alt+Shift | Move windows |
-| tertiary | Cmd+Alt | Super | Launchers |
-| bunch | Cmd+Ctrl | Super+Ctrl | Bunches |
-| resize | Alt+Shift | Alt+Shift | Resize |
+**macOS:**
+- yabai
+- skhd
+- borders (optional, for window borders)
 
-## CLI
+**Linux:**
+- Hyprland
 
-```bash
-uke gen             # Generate configs
-uke reload          # Reload WM
-uke status          # Status
-uke edit            # Edit registry
-uke validate        # Validate
-uke log tail        # View logs
+**Both:**
+- stow
+- jq
 
-uke-doctor          # Health check
-uke-backup          # Backup configs
-uke-debug dump      # Diagnostics
-```
+## License
 
-## AI Helpers
-
-```bash
-./scripts/ai/dump-context.sh    # Full project dump
-./scripts/ai/prompt.sh debug    # Debug prompt
-```
-
-## Deps
-
-- stow, yq, jq
-- macOS: yabai, skhd
-- Linux: hyprland, keyd
+MIT

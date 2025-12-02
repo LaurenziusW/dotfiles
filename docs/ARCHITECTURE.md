@@ -1,101 +1,249 @@
-# UKE Architecture
+# UKE v6.1 - Architecture
 
-## Design Principles
+## Overview
 
-1. **Single Source of Truth**: registry.yaml drives all platform configs
-2. **Generate, Don't Modify**: Never edit generated configs directly
-3. **Platform Abstraction**: Write once, run on macOS and Linux
-4. **Fail Fast**: Validate early, error clearly
-5. **Observable**: Logging, debugging, health checks built-in
-
-## Data Flow
+The **Unified Keyboard Environment (UKE)** provides identical keyboard-driven workflows across macOS and Linux through a single source of truth that generates platform-specific configurations.
 
 ```
-registry.yaml
-    ↓
-lib/gen.sh (reads registry)
-    ↓
-gen/{skhd,yabai,hyprland}/ (generates)
-    ↓
-WM symlinks (install.sh creates)
-    ↓
-Window Manager (reads at runtime)
+┌─────────────────────────────────────────────────────────────────────┐
+│                     config/registry.yaml                            │
+│                    (Single Source of Truth)                         │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │
+                             │  uke gen
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                        lib/gen.sh                                    │
+│                    (Config Generator)                                │
+└────────┬───────────────────┼───────────────────────┬────────────────┘
+         │                   │                       │
+         ▼                   ▼                       ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────────────┐
+│ gen/skhd/skhdrc │ │gen/yabai/yabairc│ │ gen/hyprland/hyprland.conf  │
+│    (macOS)      │ │    (macOS)      │ │        (Linux)              │
+└────────┬────────┘ └────────┬────────┘ └──────────────┬──────────────┘
+         │                   │                         │
+         ▼                   ▼                         ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────────────┐
+│  skhd daemon    │ │  yabai daemon   │ │     Hyprland compositor     │
+└─────────────────┘ └─────────────────┘ └─────────────────────────────┘
 ```
 
-## Component Responsibilities
+## Directory Structure
 
-### config/registry.yaml
-- Modifier definitions (primary, tertiary, bunch, resize)
-- Application bundle IDs / class names
-- Workspace definitions and app assignments
-- Keybinding specifications
-- Bunch definitions
+```
+uke/
+├── config/
+│   └── registry.yaml      # Single source of truth
+│
+├── lib/
+│   ├── core.sh            # Foundation: paths, logging, OS detection
+│   ├── wm.sh              # Window manager abstraction layer
+│   └── gen.sh             # Config generator
+│
+├── gen/                   # Generated configs (don't edit!)
+│   ├── skhd/skhdrc
+│   ├── yabai/yabairc
+│   └── hyprland/hyprland.conf
+│
+├── bin/
+│   ├── uke                # Main CLI
+│   ├── uke-gather         # Window organization
+│   ├── uke-bunch          # Environment presets
+│   ├── uke-doctor         # Health check
+│   ├── uke-backup         # Backup utility
+│   └── uke-debug          # Diagnostics
+│
+├── bunches/
+│   ├── lib-os-detect.sh   # OS detection helpers
+│   ├── bunch-manager.sh   # Bunch management CLI
+│   ├── study.sh           # Study environment
+│   ├── guitar.sh          # Guitar practice
+│   ├── coding.sh          # Development
+│   ├── email.sh           # Communication
+│   └── reading.sh         # Focused reading
+│
+├── stow/                  # Dotfiles (symlinked to ~)
+│   ├── wezterm/
+│   ├── tmux/
+│   ├── zsh/
+│   ├── nvim/
+│   ├── karabiner/         # macOS only
+│   └── keyd/              # Linux only
+│
+├── templates/
+│   └── bunch-template.sh  # Template for new bunches
+│
+├── scripts/
+│   └── install.sh         # Installation script
+│
+└── docs/
+    ├── ARCHITECTURE.md    # This file
+    ├── CHEATSHEET.md      # Quick reference
+    ├── TROUBLESHOOTING.md # Problem solving
+    └── MIGRATION.md       # Upgrade guide
+```
 
-### lib/core.sh
-- Platform detection (is_macos)
-- Path constants (UKE_ROOT, UKE_CONFIG, UKE_GEN)
-- Logging functions (log_info, log_error, ok, fail)
-- Utility functions (require_cmd, require_file)
+## Component Details
 
-### lib/gen.sh
-- YAML parsing with yq
-- Platform-specific config generation
-- Modifier resolution for target platform
-- Workspace rule generation
-- Keybinding translation
+### Core Library (`lib/core.sh`)
 
-### lib/wm.sh
-- Window manager abstraction
-- Platform-agnostic operations (reload, focus, workspace)
-- Runtime WM interaction
-- Status queries
+Foundation for all scripts:
 
-### bin/uke
-- Primary CLI entry point
-- Command routing (gen, reload, status, edit, validate)
-- High-level orchestration
+- **Path Resolution**: Automatically finds UKE_ROOT
+- **OS Detection**: `is_macos()`, `is_linux()`, `$UKE_OS`
+- **Logging**: `log_info`, `log_warn`, `log_error`, `log_fatal`
+- **Utilities**: `require_cmd`, `require_file`, `ok`, `fail`
 
-### bin/uke-bunch
-- Bunch execution
-- App launching per platform
-- Workspace focusing
+### Window Manager Abstraction (`lib/wm.sh`)
 
-### bin/uke-gather
-- Window organization
-- Workspace-based gathering
+Platform-agnostic window management:
 
-### bin/uke-doctor
-- Health checks
-- Dependency verification
-- Link validation
+```bash
+wm_focus left|right|up|down     # Focus window
+wm_move left|right|up|down      # Move window
+wm_resize left|right|up|down    # Resize window
+wm_workspace 3                   # Switch workspace
+wm_move_to_workspace 5           # Move window to workspace
+wm_fullscreen                    # Toggle fullscreen
+wm_reload                        # Restart services
+```
 
-### bin/uke-backup
-- Manual backup/restore
-- Manifest generation
+### Config Generator (`lib/gen.sh`)
 
-### bin/uke-debug
-- System diagnostics
-- Keybinding tracing
+Transforms `registry.yaml` into platform configs:
+
+- `gen_skhd()` → macOS hotkeys
+- `gen_yabai()` → macOS window manager rules
+- `gen_hyprland()` → Linux compositor config
+
+### Bunches System
+
+Environment presets that launch apps and focus workspaces:
+
+```bash
+uke-bunch study    # Opens Obsidian, Brave, WezTerm → focuses WS 2
+uke-bunch coding   # Opens WezTerm, Code, Brave → focuses WS 3
+```
+
+Individual scripts in `bunches/` can be customized.
+
+### Gather System
+
+Organizes windows to their assigned workspaces:
+
+```bash
+uke-gather         # Move all windows to correct workspaces
+# Triggered by: Cmd + ` (macOS) / Alt + ` (Linux)
+```
 
 ## Modifier Hierarchy
 
-Purpose: Prevent conflicts between WM and terminal/tmux
+The key to conflict-free operation:
 
-| Level | macOS | Linux | Usage |
-|-------|-------|-------|-------|
-| Primary | Cmd | Alt | Window focus, workspace switch |
-| Primary+Shift | Cmd+Shift | Alt+Shift | Window move, workspace move |
-| Tertiary | Cmd+Alt | Super | Launchers, utilities |
-| Bunch | Cmd+Ctrl | Super+Ctrl | Bunch triggers |
-| Resize | Alt+Shift | Alt+Shift | Window resize |
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  LAYER        │ macOS Key │ Linux Key │ Intercepted By              │
+├───────────────┼───────────┼───────────┼─────────────────────────────┤
+│  PRIMARY      │ Cmd (⌘)   │ Alt       │ skhd/Hyprland (global)      │
+│  SECONDARY    │ Alt (⌥)   │ Super     │ WezTerm (app-level)         │
+│  TERTIARY     │ Alt+Shift │ Super+Shft│ Context-aware (WM or app)   │
+│  QUATERNARY   │ Ctrl      │ Ctrl      │ Shell (never intercepted)   │
+│  TMUX         │ Ctrl+A    │ Ctrl+A    │ tmux (prefix mode)          │
+└───────────────┴───────────┴───────────┴─────────────────────────────┘
+```
 
-Terminal apps use:
-- Alt (macOS/Linux): tab/pane navigation
-- Ctrl: tmux prefix, shell controls
+**Why this works:**
 
-## Extension Points
+1. **PRIMARY** is intercepted by the window manager before apps see it
+2. **SECONDARY** is passed through to apps (WezTerm uses it for internal nav)
+3. **QUATERNARY** is sacred for shell operations - never override Ctrl+C/Z
 
-- Add new commands: `bin/uke` case statement
-- Add new generators: `lib/gen.sh` functions
-- Add new platforms: `lib/wm.sh` abstractions
-- Add new bunches: `config/registry.yaml` bunches section
+## Data Flow
+
+### Editing Workflow
+
+```
+User edits registry.yaml
+        │
+        ▼
+uke gen              # Generates platform configs
+        │
+        ▼
+uke reload           # Restarts window manager services
+        │
+        ▼
+Changes take effect
+```
+
+### Gather Workflow
+
+```
+User presses Cmd + `
+        │
+        ▼
+skhd triggers uke-gather
+        │
+        ▼
+uke-gather queries current workspace
+        │
+        ▼
+For current workspace, find all windows belonging there
+        │
+        ▼
+Move each window to its designated workspace
+```
+
+### Bunch Workflow
+
+```
+User presses Cmd+Ctrl+1
+        │
+        ▼
+skhd triggers uke-bunch study
+        │
+        ▼
+uke-bunch reads bunch definition
+        │
+        ▼
+Launches: Obsidian, Brave, WezTerm, Preview
+        │
+        ▼
+Focuses workspace 2 (Notes)
+```
+
+## Installation
+
+```bash
+# Clone or extract to ~/dotfiles/uke
+cd ~/dotfiles/uke
+
+# Generate configs
+./bin/uke gen
+
+# Stow dotfiles
+cd stow && stow wezterm tmux zsh nvim
+
+# Link binaries
+mkdir -p ~/.local/bin
+ln -sf ~/dotfiles/uke/bin/* ~/.local/bin/
+
+# Link generated configs
+ln -sf ~/dotfiles/uke/gen/skhd/skhdrc ~/.config/skhd/skhdrc
+ln -sf ~/dotfiles/uke/gen/yabai/yabairc ~/.config/yabai/yabairc
+
+# Restart services
+yabai --restart-service
+skhd --restart-service
+```
+
+## Key Design Decisions
+
+1. **Single source of truth**: All config in registry.yaml
+2. **Generated configs**: Never edit gen/ files directly
+3. **Stow-based dotfiles**: Easy management and version control
+4. **Cross-platform abstraction**: Same scripts work on both OSes
+5. **Modular bunches**: Individual scripts for each environment
+6. **4px gaps**: Minimal, consistent spacing
+7. **Click-to-focus**: No mouse-follows-focus surprises
+8. **App name matching**: Uses actual app names, not bundle IDs

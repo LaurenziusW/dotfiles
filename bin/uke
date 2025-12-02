@@ -24,18 +24,12 @@ cmd_status() {
     echo "Root: $UKE_ROOT"
     echo ""
     wm_running && ok "Window manager running" || fail "Window manager not running"
-    echo "Current workspace: $(wm_current_workspace)"
+    echo "Current workspace: $(wm_current_workspace 2>/dev/null || echo 'unknown')"
 }
 
 cmd_validate() {
     log_info "Validating configuration..."
     require_file "$UKE_CONFIG/registry.yaml"
-    
-    if command -v yq &>/dev/null; then
-        yq '.' "$UKE_CONFIG/registry.yaml" > /dev/null && ok "Registry YAML valid" || fail "Registry YAML invalid"
-    else
-        log_warn "yq not found, skipping YAML validation"
-    fi
     
     if is_macos; then
         [[ -f "$UKE_GEN/skhd/skhdrc" ]] && ok "skhd config exists" || fail "skhd config missing"
@@ -93,6 +87,13 @@ Examples:
   uke gen                    # Generate all configs
   uke edit                   # Edit registry.yaml
   uke gen && uke reload      # Apply changes
+
+Companion commands:
+  uke-gather                 # Organize windows to workspaces
+  uke-bunch <n>           # Run environment preset
+  uke-doctor                 # Health check
+  uke-backup                 # Backup configs
+  uke-debug                  # Diagnostics
 EOF
 }
 

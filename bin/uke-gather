@@ -3,130 +3,117 @@
 # UKE Gather - Organize windows to correct workspaces
 # ==============================================================================
 # This script detects the current workspace and gathers all windows that
-# "belong" to it based on the app assignments in registry.yaml
+# "belong" to it based on the app-to-workspace mapping.
+#
+# Hotkey: Cmd + ` (macOS) / Alt + ` (Linux)
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
-source "$UKE_ROOT/lib/wm.sh"
 
 require_cmd jq
 
-# Hardcoded app-to-workspace mapping (matches registry.yaml)
-# This is more reliable than parsing YAML at runtime
-declare -A APP_WS=(
-    # Space 1: Browser
-    ["Safari"]=1
-    ["Brave Browser"]=1
-    
-    # Space 2: Notes
-    ["Obsidian"]=2
-    
-    # Space 3: Code
-    ["WezTerm"]=3
-    ["Code"]=3
-    ["Xcode"]=3
-    
-    # Space 5: Documents
-    ["Preview"]=5
-    ["PDF Expert"]=5
-    
-    # Space 6: Raindrop
-    ["Raindrop.io"]=6
-    
-    # Space 7: Media
-    ["Spotify"]=7
-    
-    # Space 8: Office
-    ["Microsoft Word"]=8
-    ["Microsoft Excel"]=8
-    ["Microsoft PowerPoint"]=8
-    
-    # Space 9: Communication
-    ["Slack"]=9
-    ["Discord"]=9
-    ["Mail"]=9
-    ["Telegram"]=9
-    ["WhatsApp"]=9
-    
-    # Space 10: AI
-    ["Claude"]=10
-    ["Perplexity"]=10
-)
+# ==============================================================================
+# App to Workspace Mapping
+# ==============================================================================
+# This MUST match the rules in yabairc/hyprland.conf
 
 gather_macos() {
-    local current_ws
-    current_ws=$(wm_current_workspace)
-    log_info "Gathering windows for macOS Space $current_ws..."
+    local current_space
+    current_space=$(yabai -m query --spaces --space | jq -r '.index')
     
-    local windows
-    windows=$(yabai -m query --windows 2>/dev/null) || { log_error "Failed to query windows"; return 1; }
+    log_info "Gathering windows for macOS Space $current_space..."
     
-    echo "$windows" | jq -c '.[]' 2>/dev/null | while read -r win; do
-        local app_name space wid
-        app_name=$(echo "$win" | jq -r '.app')
-        space=$(echo "$win" | jq -r '.space')
-        wid=$(echo "$win" | jq -r '.id')
-        
-        # Check if this app has a designated workspace
-        if [[ -n "${APP_WS[$app_name]:-}" ]]; then
-            local target="${APP_WS[$app_name]}"
-            if [[ "$space" != "$target" ]]; then
-                log_debug "Moving $app_name (id: $wid) from space $space to space $target"
-                yabai -m window "$wid" --space "$target" 2>/dev/null || true
-            fi
-        fi
-    done
+    case $current_space in
+        1) # Browser
+            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser") | .id' | \
+                xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
+            ;;
+        2) # Notes
+            yabai -m query --windows | jq -r '.[] | select(.app == "Obsidian") | .id' | \
+                xargs -I {} yabai -m window {} --space 2 2>/dev/null || true
+            ;;
+        3) # Terminal & Code
+            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode") | .id' | \
+                xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
+            ;;
+        5) # Documents
+            yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' | \
+                xargs -I {} yabai -m window {} --space 5 2>/dev/null || true
+            ;;
+        6) # Raindrop
+            yabai -m query --windows | jq -r '.[] | select(.app == "Raindrop.io") | .id' | \
+                xargs -I {} yabai -m window {} --space 6 2>/dev/null || true
+            ;;
+        7) # Media
+            yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' | \
+                xargs -I {} yabai -m window {} --space 7 2>/dev/null || true
+            ;;
+        8) # Office
+            yabai -m query --windows | jq -r '.[] | select(.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint") | .id' | \
+                xargs -I {} yabai -m window {} --space 8 2>/dev/null || true
+            ;;
+        9) # Communication
+            yabai -m query --windows | jq -r '.[] | select(.app == "Slack" or .app == "Discord" or .app == "Mail" or .app == "Telegram" or .app == "WhatsApp") | .id' | \
+                xargs -I {} yabai -m window {} --space 9 2>/dev/null || true
+            ;;
+        10) # AI
+            yabai -m query --windows | jq -r '.[] | select(.app == "Claude" or .app == "Perplexity") | .id' | \
+                xargs -I {} yabai -m window {} --space 10 2>/dev/null || true
+            ;;
+        *) # Space 4 (Catch-all) and others
+            log_info "No gather action defined for space $current_space"
+            ;;
+    esac
     
-    ok "Windows gathered"
+    ok "Windows gathered for space $current_space"
 }
 
 gather_linux() {
-    local current_ws
-    current_ws=$(wm_current_workspace)
-    log_info "Gathering windows for Linux Workspace $current_ws..."
+    local current_space
+    current_space=$(hyprctl activeworkspace | grep 'workspace ID' | awk '{print $3}')
     
-    local windows
-    windows=$(hyprctl clients -j 2>/dev/null) || { log_error "Failed to query windows"; return 1; }
+    log_info "Gathering windows for Linux Workspace $current_space..."
     
-    # Linux class names (from registry.yaml)
-    declare -A LINUX_WS=(
-        ["Safari"]=1
-        ["Brave-browser"]=1
-        ["obsidian"]=2
-        ["org.wezfurlong.wezterm"]=3
-        ["Code"]=3
-        ["org.gnome.Evince"]=5
-        ["PDFExpert"]=5
-        ["Raindrop"]=6
-        ["Spotify"]=7
-        ["libreoffice-writer"]=8
-        ["libreoffice-calc"]=8
-        ["libreoffice-impress"]=8
-        ["Slack"]=9
-        ["discord"]=9
-        ["thunderbird"]=9
-        ["org.telegram.desktop"]=9
-    )
+    case $current_space in
+        1) # Browser
+            hyprctl dispatch movetoworkspace 1,class:Safari 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 1,class:Brave-browser 2>/dev/null || true
+            ;;
+        2) # Notes
+            hyprctl dispatch movetoworkspace 2,class:obsidian 2>/dev/null || true
+            ;;
+        3) # Terminal & Code
+            hyprctl dispatch movetoworkspace 3,class:org.wezfurlong.wezterm 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 3,class:Code 2>/dev/null || true
+            ;;
+        5) # Documents
+            hyprctl dispatch movetoworkspace 5,class:org.gnome.Evince 2>/dev/null || true
+            ;;
+        6) # Raindrop
+            hyprctl dispatch movetoworkspace 6,class:Raindrop 2>/dev/null || true
+            ;;
+        7) # Media
+            hyprctl dispatch movetoworkspace 7,class:Spotify 2>/dev/null || true
+            ;;
+        8) # Office
+            hyprctl dispatch movetoworkspace 8,class:libreoffice-writer 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 8,class:libreoffice-calc 2>/dev/null || true
+            ;;
+        9) # Communication
+            hyprctl dispatch movetoworkspace 9,class:Slack 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 9,class:discord 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 9,class:thunderbird 2>/dev/null || true
+            ;;
+        *) # Catch-all
+            log_info "No gather action defined for workspace $current_space"
+            ;;
+    esac
     
-    echo "$windows" | jq -c '.[]' 2>/dev/null | while read -r win; do
-        local class current addr
-        class=$(echo "$win" | jq -r '.class')
-        current=$(echo "$win" | jq -r '.workspace.id')
-        addr=$(echo "$win" | jq -r '.address')
-        
-        if [[ -n "${LINUX_WS[$class]:-}" ]]; then
-            local target="${LINUX_WS[$class]}"
-            if [[ "$current" != "$target" ]]; then
-                log_debug "Moving $class to workspace $target"
-                hyprctl dispatch movetoworkspacesilent "$target,address:$addr" 2>/dev/null || true
-            fi
-        fi
-    done
-    
-    ok "Windows gathered"
+    ok "Windows gathered for workspace $current_space"
 }
 
-is_macos && gather_macos "$@" || gather_linux "$@"
+# Run appropriate function based on OS
+is_macos && gather_macos || gather_linux

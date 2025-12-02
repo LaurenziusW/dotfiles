@@ -1,233 +1,137 @@
 # ==============================================================================
-# UKE Registry v6.1 - Single Source of Truth
+# UKE Registry v6.1
 # ==============================================================================
+# Single source of truth for the Unified Keyboard Environment
 # Edit this file, then run: uke gen && uke reload
 # ==============================================================================
-# CRITICAL: macOS app values MUST use app names (e.g., "Brave Browser")
-#           NOT bundle IDs, for uke-gather to work correctly!
-# ==============================================================================
 
-version: "6.1"
+version: "6.1.0"
 
 # ==============================================================================
-# MODIFIERS
+# Modifiers
 # ==============================================================================
-# PRIMARY: Window manager operations (focus, workspaces)
-# PRIMARY_SHIFT: Move windows, window controls
-# TERTIARY: App launchers (Cmd+Alt / Alt+Super)
-# BUNCH: Environment presets (Cmd+Ctrl / Alt+Ctrl)
-# RESIZE: Window resizing (Alt+Shift / Super+Shift)
-# OPTION: Utility layer (Alt / Super alone)
-# ==============================================================================
+# Maps logical modifier names to physical keys per platform
 modifiers:
-  primary:       { macos: "cmd",           linux: "ALT" }
-  primary_shift: { macos: "cmd + shift",   linux: "ALT SHIFT" }
-  tertiary:      { macos: "cmd + alt",     linux: "ALT SUPER" }
-  bunch:         { macos: "cmd + ctrl",    linux: "ALT CTRL" }
-  resize:        { macos: "alt + shift",   linux: "SUPER SHIFT" }
-  option:        { macos: "alt",           linux: "SUPER" }
+  primary:        { macos: "cmd",           linux: "ALT" }
+  primary_shift:  { macos: "cmd + shift",   linux: "ALT SHIFT" }
+  secondary:      { macos: "alt",           linux: "SUPER" }
+  tertiary:       { macos: "alt + shift",   linux: "SUPER SHIFT" }
+  quaternary:     { macos: "ctrl",          linux: "CTRL" }
+  bunch:          { macos: "cmd + ctrl",    linux: "ALT CTRL" }
+  launcher:       { macos: "cmd + alt",     linux: "ALT SUPER" }
 
 # ==============================================================================
-# APPS - Platform-specific identifiers
+# Applications
 # ==============================================================================
-# CRITICAL: macOS values MUST be app names as shown in Activity Monitor,
-#           NOT bundle IDs! This is required for uke-gather string matching.
-# ==============================================================================
+# Maps app nicknames to actual app names per platform
 apps:
   # Browsers
-  safari:     { macos: "Safari",              linux: "Safari" }
-  brave:      { macos: "Brave Browser",       linux: "Brave-browser" }
+  safari:      { macos: "Safari",           linux: "" }
+  brave:       { macos: "Brave Browser",    linux: "brave" }
   
-  # Notes & Writing
-  obsidian:   { macos: "Obsidian",            linux: "obsidian" }
+  # Notes & Documents
+  obsidian:    { macos: "Obsidian",         linux: "obsidian" }
+  preview:     { macos: "Preview",          linux: "evince" }
+  pdfexpert:   { macos: "PDF Expert",       linux: "" }
   
   # Development
-  wezterm:    { macos: "WezTerm",             linux: "org.wezfurlong.wezterm" }
-  vscode:     { macos: "Code",                linux: "Code" }
-  xcode:      { macos: "Xcode",               linux: "" }
-  
-  # Documents & Reading
-  preview:    { macos: "Preview",             linux: "org.gnome.Evince" }
-  pdf-expert: { macos: "PDF Expert",          linux: "PDFExpert" }
-  
-  # Bookmarks
-  raindrop:   { macos: "Raindrop.io",         linux: "Raindrop" }
+  wezterm:     { macos: "WezTerm",          linux: "wezterm" }
+  code:        { macos: "Code",             linux: "code" }
+  xcode:       { macos: "Xcode",            linux: "" }
   
   # Media
-  spotify:    { macos: "Spotify",             linux: "Spotify" }
+  spotify:     { macos: "Spotify",          linux: "spotify" }
+  raindrop:    { macos: "Raindrop.io",      linux: "raindrop" }
   
   # Office
-  word:       { macos: "Microsoft Word",      linux: "libreoffice-writer" }
-  excel:      { macos: "Microsoft Excel",     linux: "libreoffice-calc" }
-  powerpoint: { macos: "Microsoft PowerPoint", linux: "libreoffice-impress" }
+  word:        { macos: "Microsoft Word",       linux: "libreoffice-writer" }
+  excel:       { macos: "Microsoft Excel",      linux: "libreoffice-calc" }
+  powerpoint:  { macos: "Microsoft PowerPoint", linux: "libreoffice-impress" }
   
   # Communication
-  slack:      { macos: "Slack",               linux: "Slack" }
-  discord:    { macos: "Discord",             linux: "discord" }
-  mail:       { macos: "Mail",                linux: "thunderbird" }
-  telegram:   { macos: "Telegram",            linux: "org.telegram.desktop" }
-  whatsapp:   { macos: "WhatsApp",            linux: "whatsapp-for-linux" }
+  slack:       { macos: "Slack",            linux: "slack" }
+  discord:     { macos: "Discord",          linux: "discord" }
+  mail:        { macos: "Mail",             linux: "thunderbird" }
+  telegram:    { macos: "Telegram",         linux: "telegram" }
+  whatsapp:    { macos: "WhatsApp",         linux: "" }
   
   # AI
-  claude:     { macos: "Claude",              linux: "Claude" }
-  perplexity: { macos: "Perplexity",          linux: "Perplexity" }
+  claude:      { macos: "Claude",           linux: "" }
+  perplexity:  { macos: "Perplexity",       linux: "" }
 
 # ==============================================================================
-# WORKSPACES
+# Workspaces
 # ==============================================================================
+# Defines what apps belong on which workspace
 workspaces:
-  1:  { name: "browser",       apps: [safari, brave] }
-  2:  { name: "notes",         apps: [obsidian] }
-  3:  { name: "code",          apps: [wezterm, vscode, xcode] }
-  4:  { name: "catchall",      catch_all: true }
-  5:  { name: "documents",     apps: [preview, pdf-expert] }
-  6:  { name: "raindrop",      apps: [raindrop] }
-  7:  { name: "media",         apps: [spotify] }
-  8:  { name: "office",        apps: [word, excel, powerpoint] }
-  9:  { name: "communication", apps: [slack, discord, mail, telegram, whatsapp] }
-  10: { name: "ai",            apps: [claude, perplexity] }
+  1:  { name: "browser",   apps: [safari, brave] }
+  2:  { name: "notes",     apps: [obsidian] }
+  3:  { name: "code",      apps: [wezterm, code, xcode] }
+  4:  { name: "catch-all", apps: [] }
+  5:  { name: "documents", apps: [preview, pdfexpert] }
+  6:  { name: "raindrop",  apps: [raindrop] }
+  7:  { name: "media",     apps: [spotify] }
+  8:  { name: "office",    apps: [word, excel, powerpoint] }
+  9:  { name: "comms",     apps: [slack, discord, mail, telegram, whatsapp] }
+  10: { name: "ai",        apps: [claude, perplexity] }
 
 # ==============================================================================
-# KEYBINDINGS
+# Bunches
 # ==============================================================================
-
-keys:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Smart Focus & Utilities (PRIMARY)
-  # ─────────────────────────────────────────────────────────────────────────────
-  - { key: escape, mod: primary, macos: "yabai -m window --focus mouse", linux: "" }
-  
-  # Toggle Keyboard (macOS Shortcuts automation)
-  - { key: escape, mod: option, macos: "/usr/bin/shortcuts run 'ToggleKeyboard'", linux: "" }
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Window Focus Navigation (PRIMARY + hjkl)
-  # ─────────────────────────────────────────────────────────────────────────────
-  - { key: h, mod: primary, macos: "yabai -m window --focus west",  linux: "movefocus l" }
-  - { key: j, mod: primary, macos: "yabai -m window --focus south", linux: "movefocus d" }
-  - { key: k, mod: primary, macos: "yabai -m window --focus north", linux: "movefocus u" }
-  - { key: l, mod: primary, macos: "yabai -m window --focus east",  linux: "movefocus r" }
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Window Movement (PRIMARY + SHIFT + hjkl)
-  # ─────────────────────────────────────────────────────────────────────────────
-  - { key: h, mod: primary_shift, macos: "yabai -m window --warp west",  linux: "movewindow l" }
-  - { key: j, mod: primary_shift, macos: "yabai -m window --warp south", linux: "movewindow d" }
-  - { key: k, mod: primary_shift, macos: "yabai -m window --warp north", linux: "movewindow u" }
-  - { key: l, mod: primary_shift, macos: "yabai -m window --warp east",  linux: "movewindow r" }
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Window Resizing (RESIZE modifier: Alt+Shift / Super+Shift)
-  # ─────────────────────────────────────────────────────────────────────────────
-  - { key: h, mod: resize, macos: "yabai -m window --resize left:-50:0",   linux: "resizeactive -50 0" }
-  - { key: j, mod: resize, macos: "yabai -m window --resize bottom:0:50",  linux: "resizeactive 0 50" }
-  - { key: k, mod: resize, macos: "yabai -m window --resize top:0:-50",    linux: "resizeactive 0 -50" }
-  - { key: l, mod: resize, macos: "yabai -m window --resize right:50:0",   linux: "resizeactive 50 0" }
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Launch Terminal
-  # ─────────────────────────────────────────────────────────────────────────────
-  - { key: return, mod: primary, macos: "open -a WezTerm", linux: "exec wezterm" }
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Window Controls (PRIMARY + SHIFT)
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Toggle fullscreen
-  - { key: f, mod: primary_shift, macos: "yabai -m window --toggle zoom-fullscreen", linux: "fullscreen 0" }
-  
-  # Toggle float/tile
-  - { key: space, mod: primary_shift, macos: "yabai -m window --toggle float", linux: "togglefloating" }
-  
-  # Toggle split direction (Cmd+Shift+\)
-  - { key: "\\", mod: primary_shift, macos: "yabai -m window --toggle split", linux: "togglesplit" }
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Advanced Layout Controls
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Stack windows (Cmd+Ctrl+S)
-  - { key: s, mod: bunch, macos: "yabai -m window --insert stack", linux: "" }
-  
-  # Rotate tree 90° (Cmd+Shift+R)
-  - { key: r, mod: primary_shift, macos: "yabai -m space --rotate 90", linux: "layoutmsg orientationcycle" }
-  
-  # Mirror tree X-axis (Cmd+Shift+X)
-  - { key: x, mod: primary_shift, macos: "yabai -m space --mirror x-axis", linux: "" }
-  
-  # Mirror tree Y-axis (Cmd+Shift+Y)
-  - { key: "y", mod: primary_shift, macos: "yabai -m space --mirror y-axis", linux: "" }
-  
-  # Balance windows (Cmd+Shift+B)
-  - { key: b, mod: primary_shift, macos: "yabai -m space --balance", linux: "" }
-  
-  # Toggle layout BSP <-> Stack (Cmd+Ctrl+T)
-  - { key: t, mod: bunch, macos: "yabai -m space --layout $(yabai -m query --spaces --space | jq -r 'if .type == \"bsp\" then \"stack\" else \"bsp\" end')", linux: "" }
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Workspace Navigation (PRIMARY + Number)
-  # ─────────────────────────────────────────────────────────────────────────────
-  - { key: "1", mod: primary, macos: "yabai -m space --focus 1",  linux: "workspace 1" }
-  - { key: "2", mod: primary, macos: "yabai -m space --focus 2",  linux: "workspace 2" }
-  - { key: "3", mod: primary, macos: "yabai -m space --focus 3",  linux: "workspace 3" }
-  - { key: "4", mod: primary, macos: "yabai -m space --focus 4",  linux: "workspace 4" }
-  - { key: "5", mod: primary, macos: "yabai -m space --focus 5",  linux: "workspace 5" }
-  - { key: "6", mod: primary, macos: "yabai -m space --focus 6",  linux: "workspace 6" }
-  - { key: "7", mod: primary, macos: "yabai -m space --focus 7",  linux: "workspace 7" }
-  - { key: "8", mod: primary, macos: "yabai -m space --focus 8",  linux: "workspace 8" }
-  - { key: "9", mod: primary, macos: "yabai -m space --focus 9",  linux: "workspace 9" }
-  - { key: "0", mod: primary, macos: "yabai -m space --focus 10", linux: "workspace 10" }
-  
-  # Previous/Next workspace
-  - { key: "[", mod: primary, macos: "yabai -m space --focus prev", linux: "workspace m-1" }
-  - { key: "]", mod: primary, macos: "yabai -m space --focus next", linux: "workspace m+1" }
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Move Window to Workspace (PRIMARY + SHIFT + Number)
-  # ─────────────────────────────────────────────────────────────────────────────
-  - { key: "1", mod: primary_shift, macos: "yabai -m window --space 1 --focus",  linux: "movetoworkspace 1" }
-  - { key: "2", mod: primary_shift, macos: "yabai -m window --space 2 --focus",  linux: "movetoworkspace 2" }
-  - { key: "3", mod: primary_shift, macos: "yabai -m window --space 3 --focus",  linux: "movetoworkspace 3" }
-  - { key: "4", mod: primary_shift, macos: "yabai -m window --space 4 --focus",  linux: "movetoworkspace 4" }
-  - { key: "5", mod: primary_shift, macos: "yabai -m window --space 5 --focus",  linux: "movetoworkspace 5" }
-  - { key: "6", mod: primary_shift, macos: "yabai -m window --space 6 --focus",  linux: "movetoworkspace 6" }
-  - { key: "7", mod: primary_shift, macos: "yabai -m window --space 7 --focus",  linux: "movetoworkspace 7" }
-  - { key: "8", mod: primary_shift, macos: "yabai -m window --space 8 --focus",  linux: "movetoworkspace 8" }
-  - { key: "9", mod: primary_shift, macos: "yabai -m window --space 9 --focus",  linux: "movetoworkspace 9" }
-  - { key: "0", mod: primary_shift, macos: "yabai -m window --space 10 --focus", linux: "movetoworkspace 10" }
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Gather Windows (Cmd + `)
-  # ─────────────────────────────────────────────────────────────────────────────
-  - { key: grave, mod: primary, both: "$HOME/.local/bin/uke-gather" }
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Quick App Launchers (TERTIARY: Cmd+Alt / Alt+Super)
-  # ─────────────────────────────────────────────────────────────────────────────
-  - { key: b, mod: tertiary, macos: "open -a 'Brave Browser'", linux: "exec brave" }
-  - { key: o, mod: tertiary, macos: "open -a Obsidian",        linux: "exec obsidian" }
-  - { key: c, mod: tertiary, macos: "open -a Code",            linux: "exec code" }
-  - { key: r, mod: tertiary, macos: "open -a Raindrop.io",     linux: "exec raindrop" }
-  - { key: m, mod: tertiary, macos: "open -a Spotify",         linux: "exec spotify" }
-  - { key: t, mod: tertiary, macos: "open -a WezTerm",         linux: "exec wezterm" }
-
-  # Linux-only: App launcher
-  - { key: space, mod: tertiary, linux: "exec wofi --show drun" }
-  - { key: q, mod: tertiary, linux: "killactive" }
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Bunches (BUNCH: Cmd+Ctrl / Alt+Ctrl)
-  # ─────────────────────────────────────────────────────────────────────────────
-  - { key: "1", mod: bunch, both: "$HOME/.local/bin/uke-bunch study" }
-  - { key: "2", mod: bunch, both: "$HOME/.local/bin/uke-bunch guitar" }
-  - { key: "3", mod: bunch, both: "$HOME/.local/bin/uke-bunch coding" }
-  - { key: "4", mod: bunch, both: "$HOME/.local/bin/uke-bunch email" }
-  - { key: "5", mod: bunch, both: "$HOME/.local/bin/uke-bunch reading" }
-
-# ==============================================================================
-# BUNCHES - Environment Presets
-# ==============================================================================
+# Environment presets (Cmd+Ctrl+1-5 on macOS, Alt+Ctrl+1-5 on Linux)
 bunches:
-  study:   { apps: [obsidian, brave, wezterm, preview], focus: 2 }
-  guitar:  { apps: [spotify, brave], focus: 7 }
-  coding:  { apps: [wezterm, vscode, brave], focus: 3 }
-  email:   { apps: [mail, slack, brave], focus: 9 }
-  reading: { apps: [preview, obsidian], focus: 5 }
+  study:
+    focus: 2
+    apps: [obsidian, brave, wezterm, preview]
+    
+  guitar:
+    focus: 7
+    apps: [spotify, brave]
+    
+  coding:
+    focus: 3
+    apps: [wezterm, code, brave]
+    
+  email:
+    focus: 9
+    apps: [mail, slack, brave]
+    
+  reading:
+    focus: 5
+    apps: [preview, obsidian]
+
+# ==============================================================================
+# Window Manager Settings
+# ==============================================================================
+window_manager:
+  macos:
+    layout: bsp
+    padding: 4
+    gap: 4
+    mouse_follows_focus: false
+    focus_follows_mouse: false
+    borders:
+      enabled: true
+      width: 3
+      active_color: "0xff88c0d0"
+      inactive_color: "0xff3b4252"
+  linux:
+    layout: dwindle
+    gaps_in: 4
+    gaps_out: 8
+    border_size: 2
+    active_border: "rgba(88c0d0ee)"
+    inactive_border: "rgba(3b4252aa)"
+
+# ==============================================================================
+# Float Rules
+# ==============================================================================
+# Apps that should always float (not be tiled)
+float_rules:
+  - "System Settings"
+  - "System Preferences"
+  - "Calculator"
+  - "Finder"
+  - "App Store"
+  - "Karabiner-Elements"
+  - "Karabiner-EventViewer"

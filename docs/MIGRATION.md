@@ -1,109 +1,170 @@
-# Migration Guide
+# UKE v6.1 - Migration Guide
 
-## v5 → v6
+## Upgrading from Previous Versions
 
-### Changes
+### From v5.x or Earlier
 
-1. **New maintenance scripts**
-   - `bin/uke-doctor` - health checks
-   - `bin/uke-backup` - backup/restore
-   - `bin/uke-debug` - diagnostics
+1. **Backup existing configs:**
+   ```bash
+   cp -r ~/dotfiles/uke ~/dotfiles/uke-backup
+   ```
 
-2. **Enhanced AI helpers**
-   - `scripts/ai/dump-context.sh` - complete project dump
+2. **Extract new version:**
+   ```bash
+   tar -xzf uke-v6.1-complete.tar.gz -C ~/dotfiles/
+   ```
 
-3. **New documentation**
-   - `docs/ARCHITECTURE.md`
-   - `docs/TROUBLESHOOTING.md`
-   - `docs/MIGRATION.md`
+3. **Regenerate configs:**
+   ```bash
+   cd ~/dotfiles/uke
+   ./bin/uke gen
+   ```
 
-4. **Directory structure finalized**
-   - `gen/` - generated configs
-   - `bunches/` - bunch definitions
-   - `templates/` - templates
+4. **Re-stow dotfiles:**
+   ```bash
+   cd ~/dotfiles/uke/stow
+   stow -R wezterm tmux zsh nvim
+   ```
 
-### Migration Steps
+5. **Reload services:**
+   ```bash
+   uke reload
+   ```
+
+---
+
+## Key Changes in v6.1
+
+### Restored Features
+
+- **4px padding** (was 8px in some versions)
+- **Click-to-focus** (mouse_follows_focus OFF)
+- **Borders utility** with Nord colors
+- **Smart Focus** (Cmd+Escape)
+- **Advanced layouts**: Stack, Rotate, Mirror, Balance
+- **Layout toggle**: BSP ↔ Stack (Cmd+Ctrl+t)
+
+### New Features
+
+- **Bunches system** with individual scripts
+- **lib-os-detect.sh** for cross-platform helpers
+- **bunch-manager.sh** CLI
+- **Improved uke-gather** with correct app name matching
+
+### Fixed Issues
+
+- **App name matching**: Uses actual names ("Brave Browser") not bundle IDs
+- **Numeric workspace keys**: Correctly handled in skhd (0x1D for key 0)
+- **Gather script**: Now properly moves windows
+
+---
+
+## File Location Changes
+
+| What | Old Location | New Location |
+|:-----|:-------------|:-------------|
+| Bunches | `~/workflow/bunches/` | `~/dotfiles/uke/bunches/` |
+| WezTerm | `~/.wezterm.lua` | `~/dotfiles/uke/stow/wezterm/.wezterm.lua` |
+| tmux | `~/.tmux.conf` | `~/dotfiles/uke/stow/tmux/.tmux.conf` |
+| zsh | `~/.zshrc` | `~/dotfiles/uke/stow/zsh/.zshrc` |
+
+---
+
+## Configuration Migration
+
+### If You Have Custom Bunches
+
+Your old bunches in `~/workflow/bunches/` can be moved:
 
 ```bash
-# Backup
-uke-backup create
+# Copy old bunches
+cp ~/workflow/bunches/*.sh ~/dotfiles/uke/bunches/
 
-# Update (if pulling from git)
-git pull
+# Update the source line in each bunch:
+# Old: source "$(dirname "$0")/lib-os-detect.sh"
+# New: source "$(dirname "$0")/lib-os-detect.sh"  # Same, should work
+```
 
-# Or extract new archive over existing
-tar -xzf uke-v6.tar.gz -C ~/dotfiles --strip-components=1
+### If You Have Custom Keybindings
 
-# Regenerate
-uke gen
+Add them to `config/registry.yaml` or directly edit the generated configs:
 
-# Verify
+```bash
+# Edit registry (preferred)
+uke edit
+
+# Or edit generated config directly (will be overwritten by uke gen)
+uke edit skhd
+```
+
+### If You Have Custom App Assignments
+
+Edit the workspaces section in `config/registry.yaml`:
+
+```yaml
+workspaces:
+  1:  { name: "browser", apps: [safari, brave, firefox] }  # Add firefox
+  11: { name: "gaming",  apps: [steam] }  # Add new workspace
+```
+
+---
+
+## Verifying Migration
+
+Run the health check:
+
+```bash
 uke-doctor
-
-# Apply
-uke reload
 ```
 
-## v4 → v5/v6
-
-### Breaking Changes
-
-1. **Directory structure changed**
-   - Old: `platform/macos/`, `platform/linux/`
-   - New: `gen/skhd/`, `gen/yabai/`, `gen/hyprland/`
-
-2. **Binary names unchanged**
-   - `uke` still primary CLI
-   - `uke-bunch`, `uke-gather` still available
-
-3. **Registry format stable**
-   - No changes to registry.yaml schema
-   - Existing registries work as-is
-
-### Migration Steps
-
-1. **Backup existing**
-```bash
-cd ~/dotfiles
-tar -czf uke-v4-backup.tar.gz uke/
+Expected output:
+```
+✓ stow installed
+✓ jq installed
+✓ yabai installed
+✓ skhd installed
+✓ registry.yaml exists
+✓ skhd config generated
+✓ yabai config generated
+✓ yabai running
+✓ skhd running
 ```
 
-2. **Extract new version**
-```bash
-rm -rf uke/
-tar -xzf uke-v6.tar.gz
-mv uke ~/dotfiles/
-```
+Test key functions:
 
-3. **Migrate registry** (if customized)
 ```bash
-# Copy your custom registry
-cp ~/uke-v4-backup/config/registry.yaml ~/dotfiles/uke/config/
-```
+# Test gather
+uke-gather
 
-4. **Regenerate and verify**
-```bash
-cd ~/dotfiles/uke
+# Test bunches
+uke-bunch list
+uke-bunch study
+
+# Test generation
 uke gen
-uke-doctor
-uke reload
 ```
 
-### Rollback
+---
+
+## Rolling Back
+
+If something goes wrong:
 
 ```bash
-cd ~/dotfiles
-rm -rf uke/
-tar -xzf uke-v4-backup.tar.gz
-uke reload
-```
+# Restore from backup
+rm -rf ~/dotfiles/uke
+mv ~/dotfiles/uke-backup ~/dotfiles/uke
 
-## Fresh Install
-
-```bash
-tar -xzf uke-v6.tar.gz
-mv uke ~/dotfiles/
+# Regenerate and reload
 cd ~/dotfiles/uke
-./scripts/install.sh
-uke gen && uke reload
+./bin/uke gen
+uke reload
 ```
+
+---
+
+## Getting Help
+
+1. Check `docs/TROUBLESHOOTING.md` for common issues
+2. Run `uke-debug dump` for diagnostics
+3. Compare your config with the default `config/registry.yaml`

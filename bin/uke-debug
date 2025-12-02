@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Debug - Diagnostics for UKE system
+# UKE Debug - Diagnostics
 # ==============================================================================
 set -euo pipefail
 
@@ -11,69 +11,80 @@ source "$UKE_ROOT/lib/wm.sh"
 
 dump_system() {
     cat << EOF
-=== UKE Debug Report ===
+╔══════════════════════════════════════════════════════════════════╗
+║                    UKE Debug Report                               ║
+╚══════════════════════════════════════════════════════════════════╝
+
 Generated: $(date)
 
-SYSTEM:
-  OS: $(uname -s)
+SYSTEM
+──────
+  OS:       $(uname -s) $(uname -r)
   Platform: $UKE_OS
-  Shell: $SHELL
-  User: $USER
-  Home: $HOME
+  Shell:    $SHELL
+  User:     $USER
+  Home:     $HOME
 
-UKE:
-  Version: $UKE_VERSION
-  Root: $UKE_ROOT
-  Config: $UKE_CONFIG
-  Gen: $UKE_GEN
+UKE
+────
+  Version:  $UKE_VERSION
+  Root:     $UKE_ROOT
+  Config:   $UKE_CONFIG
+  Gen:      $UKE_GEN
 
-DEPENDENCIES:
-$(for cmd in stow yq jq git yabai skhd hyprctl borders; do
-    if command -v $cmd &>/dev/null; then
-        echo "  ✓ $cmd: $(command -v $cmd)"
-    else
-        echo "  ✗ $cmd: not found"
-    fi
-done)
-
-WINDOW MANAGER:
-  Running: $(wm_running && echo "yes" || echo "no")
-  Current workspace: $(wm_current_workspace 2>/dev/null || echo "unknown")
-
-FILES:
-  Registry: $(ls -lh "$UKE_CONFIG/registry.yaml" 2>/dev/null || echo "missing")
-  Generated configs:
-$(if is_macos; then
-    ls -lh "$UKE_GEN/skhd/skhdrc" "$UKE_GEN/yabai/yabairc" 2>/dev/null | sed 's/^/    /' || echo "    missing"
-else
-    ls -lh "$UKE_GEN/hyprland/hyprland.conf" 2>/dev/null | sed 's/^/    /' || echo "    missing"
-fi)
-
-RECENT LOGS:
-$(tail -n 20 "$UKE_LOG_FILE" 2>/dev/null || echo "  No logs")
-
-=== End Debug Report ===
+DEPENDENCIES
+────────────
 EOF
+
+    for cmd in stow jq git yabai skhd hyprctl borders; do
+        if command -v $cmd &>/dev/null; then
+            printf "  ✓ %-12s %s\n" "$cmd:" "$(command -v $cmd)"
+        else
+            printf "  ✗ %-12s %s\n" "$cmd:" "not found"
+        fi
+    done
+
+    cat << EOF
+
+WINDOW MANAGER
+──────────────
+  Running:   $(wm_running && echo "yes" || echo "no")
+  Workspace: $(wm_current_workspace 2>/dev/null || echo "unknown")
+
+FILES
+─────
+  Registry: $(ls -lh "$UKE_CONFIG/registry.yaml" 2>/dev/null | awk '{print $5, $6, $7, $8}' || echo "missing")
+EOF
+
+    if is_macos; then
+        echo "  skhdrc:   $(ls -lh "$UKE_GEN/skhd/skhdrc" 2>/dev/null | awk '{print $5, $6, $7, $8}' || echo "missing")"
+        echo "  yabairc:  $(ls -lh "$UKE_GEN/yabai/yabairc" 2>/dev/null | awk '{print $5, $6, $7, $8}' || echo "missing")"
+    else
+        echo "  hyprland: $(ls -lh "$UKE_GEN/hyprland/hyprland.conf" 2>/dev/null | awk '{print $5, $6, $7, $8}' || echo "missing")"
+    fi
+
+    cat << EOF
+
+RECENT LOGS
+───────────
+EOF
+    tail -n 15 "$UKE_LOG_FILE" 2>/dev/null || echo "  No logs available"
+    
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════════"
 }
 
-trace_keybind() {
+trace_key() {
     local key="$1"
     log_info "Tracing keybinding: $key"
     
-    echo "Registry entry:"
-    yq ".keys[] | select(.key == \"$key\")" "$UKE_CONFIG/registry.yaml" 2>/dev/null || echo "Not found"
-    
     echo ""
-    echo "Generated config:"
-    if is_macos; then
-        grep -n "$key" "$UKE_GEN/skhd/skhdrc" 2>/dev/null || echo "Not found in skhdrc"
-    else
-        grep -n "$key" "$UKE_GEN/hyprland/hyprland.conf" 2>/dev/null || echo "Not found in hyprland.conf"
-    fi
+    echo "In generated skhd config:"
+    grep -n "$key" "$UKE_GEN/skhd/skhdrc" 2>/dev/null || echo "  Not found"
 }
 
 case "${1:-dump}" in
     dump)  dump_system ;;
-    trace) shift; trace_keybind "$@" ;;
-    *)     log_fatal "Usage: uke-debug {dump|trace <key>}" ;;
+    trace) trace_key "${2:-h}" ;;
+    *)     echo "Usage: uke-debug [dump|trace <key>]" ;;
 esac
