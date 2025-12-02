@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Debug diagnostics for UKE
+# ==============================================================================
+# UKE Debug - Diagnostics for UKE system
+# ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,7 +28,7 @@ UKE:
   Gen: $UKE_GEN
 
 DEPENDENCIES:
-$(for cmd in stow yq jq git yabai skhd hyprctl; do
+$(for cmd in stow yq jq git yabai skhd hyprctl borders; do
     if command -v $cmd &>/dev/null; then
         echo "  ✓ $cmd: $(command -v $cmd)"
     else

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Manual backup utility for UKE configs
+# ==============================================================================
+# UKE Backup - Manual backup utility for UKE configs
+# ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

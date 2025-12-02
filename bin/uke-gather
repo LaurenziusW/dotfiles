@@ -2,6 +2,9 @@
 # ==============================================================================
 # UKE Gather - Organize windows to correct workspaces
 # ==============================================================================
+# This script detects the current workspace and gathers all windows that
+# "belong" to it based on the app assignments in registry.yaml
+# ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,88 +12,118 @@ export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
 source "$UKE_ROOT/lib/wm.sh"
 
-require_cmd yq jq
+require_cmd jq
 
-REGISTRY="$UKE_CONFIG/registry.yaml"
-
-declare -A APP_WS
-
-build_mapping() {
-    local ws_list
-    ws_list=$(yq -r '.workspaces | keys[]' "$REGISTRY" 2>/dev/null) || return 1
+# Hardcoded app-to-workspace mapping (matches registry.yaml)
+# This is more reliable than parsing YAML at runtime
+declare -A APP_WS=(
+    # Space 1: Browser
+    ["Safari"]=1
+    ["Brave Browser"]=1
     
-    for ws in $ws_list; do
-        local app_keys
-        app_keys=$(yq -r ".workspaces.$ws.apps // [] | .[]" "$REGISTRY" 2>/dev/null) || continue
-        for app_key in $app_keys; do
-            local identifier
-            if is_macos; then
-                identifier=$(yq -r ".apps.$app_key.macos // \"\"" "$REGISTRY" 2>/dev/null)
-            else
-                identifier=$(yq -r ".apps.$app_key.linux // \"\"" "$REGISTRY" 2>/dev/null)
-            fi
-            [[ -n "$identifier" ]] && APP_WS["$identifier"]="$ws"
-        done
-    done
-}
+    # Space 2: Notes
+    ["Obsidian"]=2
+    
+    # Space 3: Code
+    ["WezTerm"]=3
+    ["Code"]=3
+    ["Xcode"]=3
+    
+    # Space 5: Documents
+    ["Preview"]=5
+    ["PDF Expert"]=5
+    
+    # Space 6: Raindrop
+    ["Raindrop.io"]=6
+    
+    # Space 7: Media
+    ["Spotify"]=7
+    
+    # Space 8: Office
+    ["Microsoft Word"]=8
+    ["Microsoft Excel"]=8
+    ["Microsoft PowerPoint"]=8
+    
+    # Space 9: Communication
+    ["Slack"]=9
+    ["Discord"]=9
+    ["Mail"]=9
+    ["Telegram"]=9
+    ["WhatsApp"]=9
+    
+    # Space 10: AI
+    ["Claude"]=10
+    ["Perplexity"]=10
+)
 
 gather_macos() {
-    local ws="${1:-$(wm_current_workspace)}"
-    log_info "Gathering windows for workspace $ws..."
-    
-    build_mapping
+    local current_ws
+    current_ws=$(wm_current_workspace)
+    log_info "Gathering windows for macOS Space $current_ws..."
     
     local windows
     windows=$(yabai -m query --windows 2>/dev/null) || { log_error "Failed to query windows"; return 1; }
     
     echo "$windows" | jq -c '.[]' 2>/dev/null | while read -r win; do
-        local app_name space
+        local app_name space wid
         app_name=$(echo "$win" | jq -r '.app')
         space=$(echo "$win" | jq -r '.space')
+        wid=$(echo "$win" | jq -r '.id')
         
-        for pattern in "${!APP_WS[@]}"; do
-            if [[ "$app_name" == *"$pattern"* ]]; then
-                local target="${APP_WS[$pattern]}"
-                if [[ "$space" != "$target" ]]; then
-                    local wid
-                    wid=$(echo "$win" | jq -r '.id')
-                    log_debug "Moving $app_name to workspace $target"
-                    yabai -m window "$wid" --space "$target" 2>/dev/null || true
-                fi
-                break
+        # Check if this app has a designated workspace
+        if [[ -n "${APP_WS[$app_name]:-}" ]]; then
+            local target="${APP_WS[$app_name]}"
+            if [[ "$space" != "$target" ]]; then
+                log_debug "Moving $app_name (id: $wid) from space $space to space $target"
+                yabai -m window "$wid" --space "$target" 2>/dev/null || true
             fi
-        done
+        fi
     done
     
     ok "Windows gathered"
 }
 
 gather_linux() {
-    local ws="${1:-$(wm_current_workspace)}"
-    log_info "Gathering windows for workspace $ws..."
-    
-    build_mapping
+    local current_ws
+    current_ws=$(wm_current_workspace)
+    log_info "Gathering windows for Linux Workspace $current_ws..."
     
     local windows
     windows=$(hyprctl clients -j 2>/dev/null) || { log_error "Failed to query windows"; return 1; }
     
+    # Linux class names (from registry.yaml)
+    declare -A LINUX_WS=(
+        ["Safari"]=1
+        ["Brave-browser"]=1
+        ["obsidian"]=2
+        ["org.wezfurlong.wezterm"]=3
+        ["Code"]=3
+        ["org.gnome.Evince"]=5
+        ["PDFExpert"]=5
+        ["Raindrop"]=6
+        ["Spotify"]=7
+        ["libreoffice-writer"]=8
+        ["libreoffice-calc"]=8
+        ["libreoffice-impress"]=8
+        ["Slack"]=9
+        ["discord"]=9
+        ["thunderbird"]=9
+        ["org.telegram.desktop"]=9
+    )
+    
     echo "$windows" | jq -c '.[]' 2>/dev/null | while read -r win; do
-        local class current
+        local class current addr
         class=$(echo "$win" | jq -r '.class')
         current=$(echo "$win" | jq -r '.workspace.id')
+        addr=$(echo "$win" | jq -r '.address')
         
-        for pattern in "${!APP_WS[@]}"; do
-            if [[ "$class" == *"$pattern"* ]]; then
-                local target="${APP_WS[$pattern]}"
-                if [[ "$current" != "$target" ]]; then
-                    local addr
-                    addr=$(echo "$win" | jq -r '.address')
-                    log_debug "Moving $class to workspace $target"
-                    hyprctl dispatch movetoworkspacesilent "$target,address:$addr" 2>/dev/null || true
-                fi
-                break
+        if [[ -n "${LINUX_WS[$class]:-}" ]]; then
+            local target="${LINUX_WS[$class]}"
+            if [[ "$current" != "$target" ]]; then
+                log_debug "Moving $class to workspace $target"
+                hyprctl dispatch movetoworkspacesilent "$target,address:$addr" 2>/dev/null || true
             fi
-        done
+        fi
     done
     
     ok "Windows gathered"

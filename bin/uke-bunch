@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Bunch Runner
+# UKE Bunch Runner - Environment Presets
 # ==============================================================================
 set -euo pipefail
 
@@ -9,46 +9,84 @@ export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
 source "$UKE_ROOT/lib/wm.sh"
 
-require_cmd yq
+# Bunch definitions (matching registry.yaml)
+declare -A BUNCH_APPS=(
+    ["study"]="obsidian brave wezterm preview"
+    ["guitar"]="spotify brave"
+    ["coding"]="wezterm vscode brave"
+    ["email"]="mail slack brave"
+    ["reading"]="preview obsidian"
+)
 
-REGISTRY="$UKE_CONFIG/registry.yaml"
+declare -A BUNCH_FOCUS=(
+    ["study"]=2
+    ["guitar"]=7
+    ["coding"]=3
+    ["email"]=9
+    ["reading"]=5
+)
+
+# App launch commands
+declare -A APP_MACOS=(
+    ["safari"]="open -a Safari"
+    ["brave"]="open -a 'Brave Browser'"
+    ["obsidian"]="open -a Obsidian"
+    ["wezterm"]="open -a WezTerm"
+    ["vscode"]="open -a Code"
+    ["preview"]="open -a Preview"
+    ["spotify"]="open -a Spotify"
+    ["slack"]="open -a Slack"
+    ["discord"]="open -a Discord"
+    ["mail"]="open -a Mail"
+)
+
+declare -A APP_LINUX=(
+    ["brave"]="brave"
+    ["obsidian"]="obsidian"
+    ["wezterm"]="wezterm"
+    ["vscode"]="code"
+    ["preview"]="evince"
+    ["spotify"]="spotify"
+    ["slack"]="slack"
+    ["discord"]="discord"
+    ["mail"]="thunderbird"
+)
 
 launch_app() {
     local app="$1"
-    local bundle
     
     if is_macos; then
-        bundle=$(yq -r ".apps.$app.macos // \"\"" "$REGISTRY")
-        [[ -n "$bundle" ]] && open -b "$bundle" &
+        local cmd="${APP_MACOS[$app]:-}"
+        if [[ -n "$cmd" ]]; then
+            eval "$cmd" &
+        fi
     else
-        bundle=$(yq -r ".apps.$app.linux // \"\"" "$REGISTRY")
-        [[ -n "$bundle" ]] && {
-            local cmd="${bundle,,}"
-            command -v "$cmd" &>/dev/null && "$cmd" &>/dev/null &
-        }
+        local cmd="${APP_LINUX[$app]:-}"
+        if [[ -n "$cmd" ]] && command -v "$cmd" &>/dev/null; then
+            "$cmd" &>/dev/null &
+        fi
     fi
 }
 
 run_bunch() {
     local name="$1"
     
-    local bunch_data
-    bunch_data=$(yq -r ".bunches.$name // \"\"" "$REGISTRY")
-    [[ -z "$bunch_data" ]] && log_fatal "Bunch not found: $name"
+    local apps="${BUNCH_APPS[$name]:-}"
+    [[ -z "$apps" ]] && log_fatal "Bunch not found: $name"
     
     log_info "Starting bunch: $name"
     
-    local apps focus
-    apps=$(yq -r ".bunches.$name.apps[]" "$REGISTRY" 2>/dev/null || true)
-    focus=$(yq -r ".bunches.$name.focus // \"\"" "$REGISTRY")
-    
+    # Launch all apps
     for app in $apps; do
         log_debug "Launching: $app"
         launch_app "$app"
     done
     
+    # Wait a moment for apps to start
     sleep 2
     
+    # Focus the target workspace
+    local focus="${BUNCH_FOCUS[$name]:-}"
     if [[ -n "$focus" ]]; then
         log_debug "Focusing workspace: $focus"
         wm_workspace "$focus"
@@ -59,7 +97,9 @@ run_bunch() {
 
 list_bunches() {
     echo "Available bunches:"
-    yq -r '.bunches | to_entries[] | "  \(.key): \(.value.apps | join(", "))"' "$REGISTRY" 2>/dev/null || echo "  (none defined)"
+    for bunch in "${!BUNCH_APPS[@]}"; do
+        echo "  $bunch: ${BUNCH_APPS[$bunch]}"
+    done
 }
 
 case "${1:-}" in

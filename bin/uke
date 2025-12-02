@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE - Unified Keyboard Environment CLI
+# UKE - Unified Keyboard Environment CLI v6.1
 # ==============================================================================
 set -euo pipefail
 
