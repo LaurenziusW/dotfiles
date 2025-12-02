@@ -52,7 +52,8 @@ uke/
 │   ├── uke-bunch          # Environment presets
 │   ├── uke-doctor         # Health check
 │   ├── uke-backup         # Backup utility
-│   └── uke-debug          # Diagnostics
+│   ├── uke-debug          # Diagnostics
+│   └── uke-logs           # Live log viewer
 │
 ├── bunches/
 │   ├── lib-os-detect.sh   # OS detection helpers
@@ -68,8 +69,8 @@ uke/
 │   ├── tmux/
 │   ├── zsh/
 │   ├── nvim/
-│   ├── karabiner/         # macOS only
-│   └── keyd/              # Linux only
+│   └── karabiner/         # macOS only
+│   # Note: keyd (Linux) is managed separately (requires /etc/keyd/)
 │
 ├── templates/
 │   └── bunch-template.sh  # Template for new bunches

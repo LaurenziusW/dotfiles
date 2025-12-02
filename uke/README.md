@@ -43,6 +43,7 @@ uke reload           # Restart window manager
 uke-gather           # Organize windows (Cmd+`)
 uke-bunch study      # Launch study environment (Cmd+Ctrl+1)
 uke-doctor           # Health check
+uke-logs yabai       # Live log viewer
 ```
 
 ## Essential Keybindings

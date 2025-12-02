@@ -44,7 +44,7 @@ echo "  ✓ Config symlinks removed"
 echo "Unstowing dotfiles..."
 if command -v stow &>/dev/null && [[ -d "$UKE_STOW" ]]; then
     cd "$UKE_STOW"
-    for pkg in wezterm tmux zsh nvim karabiner keyd; do
+    for pkg in wezterm tmux zsh nvim karabiner; do
         [[ -d "$pkg" ]] && stow -t "$HOME" -D "$pkg" 2>/dev/null && echo "  ✓ Unstowed: $pkg" || true
     done
 else

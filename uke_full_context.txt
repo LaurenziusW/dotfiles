@@ -32,12 +32,9 @@ uke
 │   │   └── MACOS-SIP.md
 │   └── TROUBLESHOOTING.md
 ├── gen
-│   ├── .DS_Store
 │   ├── hyprland
 │   ├── skhd
-│   │   └── skhdrc
 │   └── yabai
-│       └── yabairc
 ├── lib
 │   ├── core.sh
 │   ├── gen.sh
@@ -48,11 +45,6 @@ uke
 │   ├── uke-detect.sh
 │   └── uke-wipe.sh
 ├── stow
-│   ├── .DS_Store
-│   ├── karabiner
-│   │   └── .config
-│   │       └── karabiner
-│   │           └── karabiner.json
 │   ├── nvim
 │   │   └── .config
 │   │       └── nvim
@@ -85,7 +77,7 @@ uke
 └── templates
     └── bunch-template.sh
 
-29 directories, 53 files
+26 directories, 48 files
 
 
 
@@ -532,14 +524,7 @@ FILE PATH: uke/bin/uke-debug
 # ==============================================================================
 set -euo pipefail
 
-# Resolve symlink to find true source location
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
 source "$UKE_ROOT/lib/wm.sh"
@@ -636,14 +621,7 @@ FILE PATH: uke/bin/uke-backup
 # ==============================================================================
 set -euo pipefail
 
-# Resolve symlink to find true source location
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
 
@@ -732,14 +710,7 @@ FILE PATH: uke/bin/uke-logs
 # ==============================================================================
 set -euo pipefail
 
-# Resolve symlink to find true source location
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
 
@@ -818,14 +789,7 @@ FILE PATH: uke/bin/uke-bunch
 # ==============================================================================
 set -euo pipefail
 
-# Resolve symlink to find true source location
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
 
@@ -887,14 +851,7 @@ FILE PATH: uke/bin/uke-doctor
 # ==============================================================================
 set -euo pipefail
 
-# Resolve symlink to find true source location
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
 
@@ -960,7 +917,7 @@ check_links() {
     echo ""
     echo "Checking symlinks..."
     
-    for bin in uke uke-bunch uke-gather; do
+    for bin in uke uke-bunch uke-gather uke-logs; do
         if [[ -x "$HOME/.local/bin/$bin" ]]; then
             ok "$bin linked"
         else
@@ -1039,14 +996,7 @@ FILE PATH: uke/bin/uke
 # ==============================================================================
 set -euo pipefail
 
-# Resolve symlink to find true source location
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 
 source "$UKE_ROOT/lib/core.sh"
@@ -1136,6 +1086,7 @@ Companion commands:
   uke-doctor                 # Health check
   uke-backup                 # Backup configs
   uke-debug                  # Diagnostics
+  uke-logs [component]       # Live log viewer
 EOF
 }
 
@@ -1159,77 +1110,123 @@ FILE PATH: uke/bin/uke-gather
 ################################################################################
 
 #!/usr/bin/env bash
+# ==============================================================================
+# UKE Gather - Organize windows to correct workspaces
+# ==============================================================================
+# This script detects the current workspace and gathers all windows that
+# "belong" to it based on the app-to-workspace mapping.
+#
+# Hotkey: Cmd + ` (macOS) / Alt + ` (Linux)
+# ==============================================================================
 set -euo pipefail
-# Resolve symlink to find true source location
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
-require_cmd jq yq
+
+require_cmd jq
+
+# ==============================================================================
+# App to Workspace Mapping
+# ==============================================================================
+# This MUST match the rules in yabairc/hyprland.conf
 
 gather_macos() {
     local current_space
     current_space=$(yabai -m query --spaces --space | jq -r '.index')
-    log_info "Gathering windows for space $current_space..."
+    
+    log_info "Gathering windows for macOS Space $current_space..."
     
     case $current_space in
-        1)
+        1) # Browser
             yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser") | .id' | \
                 xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
             ;;
-        2)
+        2) # Notes
             yabai -m query --windows | jq -r '.[] | select(.app == "Obsidian") | .id' | \
                 xargs -I {} yabai -m window {} --space 2 2>/dev/null || true
             ;;
-        3)
+        3) # Terminal & Code
             yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode") | .id' | \
                 xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
             ;;
-        5)
+        5) # Documents
             yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' | \
                 xargs -I {} yabai -m window {} --space 5 2>/dev/null || true
             ;;
-        6)
+        6) # Raindrop
             yabai -m query --windows | jq -r '.[] | select(.app == "Raindrop.io") | .id' | \
                 xargs -I {} yabai -m window {} --space 6 2>/dev/null || true
             ;;
-        7)
+        7) # Media
             yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' | \
                 xargs -I {} yabai -m window {} --space 7 2>/dev/null || true
             ;;
-        8)
+        8) # Office
             yabai -m query --windows | jq -r '.[] | select(.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint") | .id' | \
                 xargs -I {} yabai -m window {} --space 8 2>/dev/null || true
             ;;
-        9)
+        9) # Communication
             yabai -m query --windows | jq -r '.[] | select(.app == "Slack" or .app == "Discord" or .app == "Mail" or .app == "Telegram" or .app == "WhatsApp") | .id' | \
                 xargs -I {} yabai -m window {} --space 9 2>/dev/null || true
             ;;
-        10)
+        10) # AI
             yabai -m query --windows | jq -r '.[] | select(.app == "Claude" or .app == "Perplexity") | .id' | \
                 xargs -I {} yabai -m window {} --space 10 2>/dev/null || true
             ;;
-        *)
-            log_info "No gather action for space $current_space"
+        *) # Space 4 (Catch-all) and others
+            log_info "No gather action defined for space $current_space"
             ;;
     esac
+    
     ok "Windows gathered for space $current_space"
 }
 
 gather_linux() {
     local current_space
     current_space=$(hyprctl activeworkspace | grep 'workspace ID' | awk '{print $3}')
+    
     log_info "Gathering windows for Linux Workspace $current_space..."
     
-    # Linux implementation logic (simplified stub for stability)
-    log_warn "Linux gather logic is currently a stub in this version."
+    case $current_space in
+        1) # Browser
+            hyprctl dispatch movetoworkspace 1,class:Safari 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 1,class:Brave-browser 2>/dev/null || true
+            ;;
+        2) # Notes
+            hyprctl dispatch movetoworkspace 2,class:obsidian 2>/dev/null || true
+            ;;
+        3) # Terminal & Code
+            hyprctl dispatch movetoworkspace 3,class:org.wezfurlong.wezterm 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 3,class:Code 2>/dev/null || true
+            ;;
+        5) # Documents
+            hyprctl dispatch movetoworkspace 5,class:org.gnome.Evince 2>/dev/null || true
+            ;;
+        6) # Raindrop
+            hyprctl dispatch movetoworkspace 6,class:Raindrop 2>/dev/null || true
+            ;;
+        7) # Media
+            hyprctl dispatch movetoworkspace 7,class:Spotify 2>/dev/null || true
+            ;;
+        8) # Office
+            hyprctl dispatch movetoworkspace 8,class:libreoffice-writer 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 8,class:libreoffice-calc 2>/dev/null || true
+            ;;
+        9) # Communication
+            hyprctl dispatch movetoworkspace 9,class:Slack 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 9,class:discord 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 9,class:thunderbird 2>/dev/null || true
+            ;;
+        *) # Catch-all
+            log_info "No gather action defined for workspace $current_space"
+            ;;
+    esac
+    
+    ok "Windows gathered for workspace $current_space"
 }
 
+# Run appropriate function based on OS
 is_macos && gather_macos || gather_linux
 
 
@@ -2857,23 +2854,23 @@ FILE PATH: uke/stow/nvim/.config/nvim/lazy-lock.json
 
 {
   "LuaSnip": { "branch": "master", "commit": "5a1e39223db9a0498024a77b8441169d260c8c25" },
-  "blink.cmp": { "branch": "main", "commit": "b19413d214068f316c78978b08264ed1c41830ec" },
-  "conform.nvim": { "branch": "master", "commit": "4993e07fac6679d0a5005aa7499e0bad2bd39f19" },
+  "blink.cmp": { "branch": "main", "commit": "327fff91fe6af358e990be7be1ec8b78037d2138" },
+  "conform.nvim": { "branch": "master", "commit": "cde4da5c1083d3527776fee69536107d98dae6c9" },
   "fidget.nvim": { "branch": "main", "commit": "e32b672d8fd343f9d6a76944fedb8c61d7d8111a" },
-  "gitsigns.nvim": { "branch": "main", "commit": "5813e4878748805f1518cee7abb50fd7205a3a48" },
+  "gitsigns.nvim": { "branch": "main", "commit": "20ad4419564d6e22b189f6738116b38871082332" },
   "guess-indent.nvim": { "branch": "main", "commit": "84a4987ff36798c2fc1169cbaff67960aed9776f" },
   "lazy.nvim": { "branch": "main", "commit": "85c7ff3711b730b4030d03144f6db6375044ae82" },
   "lazydev.nvim": { "branch": "main", "commit": "5231c62aa83c2f8dc8e7ba957aa77098cda1257d" },
-  "mason-lspconfig.nvim": { "branch": "main", "commit": "0b9bb925c000ae649ff7e7149c8cd00031f4b539" },
+  "mason-lspconfig.nvim": { "branch": "main", "commit": "b1d9a914b02ba5660f1e272a03314b31d4576fe2" },
   "mason-tool-installer.nvim": { "branch": "main", "commit": "517ef5994ef9d6b738322664d5fdd948f0fdeb46" },
-  "mason.nvim": { "branch": "main", "commit": "57e5a8addb8c71fb063ee4acda466c7cf6ad2800" },
-  "mini.nvim": { "branch": "main", "commit": "dca98843fab66d080779cd973e7139e258ff164c" },
-  "nvim-lspconfig": { "branch": "master", "commit": "effe4bf2e1afb881ea67291c648b68dd3dfc927a" },
+  "mason.nvim": { "branch": "main", "commit": "ad7146aa61dcaeb54fa900144d768f040090bff0" },
+  "mini.nvim": { "branch": "main", "commit": "f43357be022565d969795cde29b8988d082cc913" },
+  "nvim-lspconfig": { "branch": "master", "commit": "b34fbdffdcb6295c7a25df6ba375452a2e73c32e" },
   "nvim-treesitter": { "branch": "master", "commit": "42fc28ba918343ebfd5565147a42a26580579482" },
   "plenary.nvim": { "branch": "master", "commit": "b9fd5226c2f76c951fc8ed5923d85e4de065e509" },
   "telescope-fzf-native.nvim": { "branch": "main", "commit": "6fea601bd2b694c6f2ae08a6c6fab14930c60e2c" },
   "telescope-ui-select.nvim": { "branch": "master", "commit": "6e51d7da30bd139a6950adf2a47fda6df9fa06d2" },
-  "telescope.nvim": { "branch": "master", "commit": "e69b434b968a33815e2f02a5c7bd7b8dd4c7d4b2" },
+  "telescope.nvim": { "branch": "master", "commit": "3a12a853ebf21ec1cce9a92290e3013f8ae75f02" },
   "todo-comments.nvim": { "branch": "main", "commit": "31e3c38ce9b29781e4422fc0322eb0a21f4e8668" },
   "tokyonight.nvim": { "branch": "main", "commit": "5da1b76e64daf4c5d410f06bcb6b9cb640da7dfd" },
   "which-key.nvim": { "branch": "main", "commit": "3aab2147e74890957785941f0c1ad87d0a44c15a" }
@@ -3699,252 +3696,6 @@ fi
 
 
 ################################################################################
-FILE PATH: uke/stow/karabiner/.config/karabiner/karabiner.json
-################################################################################
-
-{
-    "global": {
-        "show_in_menu_bar": false
-    },
-    "profiles": [
-        {
-            "complex_modifications": {
-                "rules": [
-                    {
-                        "description": "ISO Hyper Key: CAPS › ESC, CAPS+H/J/K/L › Arrows, CAPS+Selection/Navigation",
-                        "manipulators": [
-                            {
-                                "description": "Caps Lock pressed variable (Hyper Key logic)",
-                                "from": {
-                                    "key_code": "caps_lock",
-                                    "modifiers": { "optional": ["any"] }
-                                },
-                                "to": [
-                                    {
-                                        "set_variable": {
-                                            "name": "caps_lock pressed",
-                                            "value": 1
-                                        }
-                                    }
-                                ],
-                                "to_after_key_up": [
-                                    {
-                                        "set_variable": {
-                                            "name": "caps_lock pressed",
-                                            "value": 0
-                                        }
-                                    }
-                                ],
-                                "to_if_alone": [{ "key_code": "escape" }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "delete_or_backspace", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "delete_forward" }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "j", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "down_arrow" }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "k", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "up_arrow" }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "h", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "left_arrow" }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "l", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "right_arrow" }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "u", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "page_down" }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "i", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "page_up" }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "y", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "home" }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "o", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "end" }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "quote", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "caps_lock" }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "f", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "left_arrow", "modifiers": ["option"] }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "g", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "right_arrow", "modifiers": ["option"] }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "n", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "left_arrow", "modifiers": ["option"] }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "m", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "right_arrow", "modifiers": ["option"] }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "a", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "left_arrow", "modifiers": ["shift"] }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "s", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "down_arrow", "modifiers": ["shift"] }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "d", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "right_arrow", "modifiers": ["shift"] }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "w", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "up_arrow", "modifiers": ["shift"] }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "q", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "left_arrow", "modifiers": ["option", "shift"] }],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "caps_lock pressed", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "e", "modifiers": { "optional": ["any"] } },
-                                "to": [{ "key_code": "right_arrow", "modifiers": ["option", "shift"] }],
-                                "type": "basic"
-                            }
-                        ]
-                    }
-                ]
-            },
-            "devices": [
-                {
-                    "identifiers": {
-                        "is_keyboard": true,
-                        "is_pointing_device": true,
-                        "product_id": 45914,
-                        "vendor_id": 1133
-                    },
-                    "ignore": false,
-                    "ignore_vendor_events": true,
-                    "simple_modifications": [
-                        {
-                            "from": { "key_code": "right_command" },
-                            "to": [{ "key_code": "right_option" }]
-                        }
-                    ],
-                    "treat_as_built_in_keyboard": true
-                }
-            ],
-            "name": "Default profile",
-            "selected": true,
-            "virtual_hid_keyboard": {
-                "country_code": 0,
-                "keyboard_type": "iso",
-                "keyboard_type_v2": "iso"
-            }
-        },
-        {
-            "complex_modifications": {
-                "rules": [
-                    {
-                        "description": "Lock keyboard - triple-tap Esc to unlock",
-                        "manipulators": [
-                            {
-                                "conditions": [{ "name": "esc_tap_count", "type": "variable_if", "value": 2 }],
-                                "from": { "key_code": "escape" },
-                                "to": [
-                                    { "shell_command": "/usr/bin/shortcuts run 'ToggleKeyboard'" },
-                                    { "set_variable": { "name": "esc_tap_count", "value": 0 } }
-                                ],
-                                "type": "basic"
-                            },
-                            {
-                                "conditions": [{ "name": "esc_tap_count", "type": "variable_if", "value": 1 }],
-                                "from": { "key_code": "escape" },
-                                "parameters": { "basic.to_delayed_action_delay_milliseconds": 500 },
-                                "to": [{ "set_variable": { "name": "esc_tap_count", "value": 2 } }],
-                                "to_delayed_action": {
-                                    "to_if_invoked": [{ "set_variable": { "name": "esc_tap_count", "value": 0 } }]
-                                },
-                                "type": "basic"
-                            },
-                            {
-                                "from": { "key_code": "escape" },
-                                "parameters": { "basic.to_delayed_action_delay_milliseconds": 500 },
-                                "to": [{ "set_variable": { "name": "esc_tap_count", "value": 1 } }],
-                                "to_delayed_action": {
-                                    "to_if_invoked": [{ "set_variable": { "name": "esc_tap_count", "value": 0 } }]
-                                },
-                                "type": "basic"
-                            },
-                            {
-                                "from": { "any": "key_code" },
-                                "to": [{ "key_code": "vk_none" }],
-                                "type": "basic"
-                            }
-                        ]
-                    }
-                ]
-            },
-            "name": "DisabledKeys",
-            "virtual_hid_keyboard": {
-                "country_code": 0,
-                "keyboard_type": "iso",
-                "keyboard_type_v2": "iso"
-            }
-        }
-    ]
-}
-
-
-
-################################################################################
 FILE PATH: uke/docs/ARCHITECTURE.md
 ################################################################################
 
@@ -4002,7 +3753,8 @@ uke/
 │   ├── uke-bunch          # Environment presets
 │   ├── uke-doctor         # Health check
 │   ├── uke-backup         # Backup utility
-│   └── uke-debug          # Diagnostics
+│   ├── uke-debug          # Diagnostics
+│   └── uke-logs           # Live log viewer
 │
 ├── bunches/
 │   ├── lib-os-detect.sh   # OS detection helpers
@@ -4018,8 +3770,8 @@ uke/
 │   ├── tmux/
 │   ├── zsh/
 │   ├── nvim/
-│   ├── karabiner/         # macOS only
-│   └── keyd/              # Linux only
+│   └── karabiner/         # macOS only
+│   # Note: keyd (Linux) is managed separately (requires /etc/keyd/)
 │
 ├── templates/
 │   └── bunch-template.sh  # Template for new bunches
@@ -4459,18 +4211,21 @@ echo $HYPRLAND_INSTANCE_SIGNATURE  # Linux
 ### View Logs
 
 ```bash
-# UKE logs
+# Using uke-logs (recommended)
+uke-logs uke         # UKE internal logs
+uke-logs yabai       # yabai logs (macOS)
+uke-logs skhd        # skhd logs (macOS)
+uke-logs hyprland    # Hyprland logs (Linux)
+uke-logs all         # Combined view (requires multitail)
+
+# Manual methods
 uke log tail
 uke log tail 100  # Last 100 lines
 
-# skhd logs (macOS)
-tail -f /tmp/skhd_*.err.log
-
-# yabai logs (macOS)
-tail -f /tmp/yabai_*.err.log
-
-# Hyprland logs (Linux)
-cat ~/.local/share/hyprland/hyprland.log
+# Direct file access
+tail -f /tmp/yabai_*.err.log   # macOS
+tail -f /tmp/skhd_*.err.log    # macOS
+cat ~/.local/share/hyprland/hyprland.log  # Linux
 ```
 
 ### Clear Logs
@@ -4849,6 +4604,7 @@ uke-gather            Organize windows to workspaces
 uke-doctor            Health check
 uke-backup            Backup configs
 uke-debug dump        Full diagnostics
+uke-logs <component>  Live log viewer (uke|yabai|skhd|hyprland|all)
 ```
 
 ---
@@ -5060,239 +4816,6 @@ uke reload
 
 
 ################################################################################
-FILE PATH: uke/gen/skhd/skhdrc
-################################################################################
-
-# ==============================================================================
-# SKHD CONFIG - AUTO-GENERATED BY UKE v6.1
-# ==============================================================================
-# DO NOT EDIT - Changes will be overwritten
-# Edit config/registry.yaml and run: uke gen
-# ==============================================================================
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Smart Focus & Utilities
-# ─────────────────────────────────────────────────────────────────────────────
-cmd - escape : yabai -m window --focus mouse
-alt - escape : /usr/bin/shortcuts run 'ToggleKeyboard'
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Window Focus Navigation (PRIMARY: Cmd + hjkl)
-# ─────────────────────────────────────────────────────────────────────────────
-cmd - h : yabai -m window --focus west
-cmd - j : yabai -m window --focus south
-cmd - k : yabai -m window --focus north
-cmd - l : yabai -m window --focus east
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Window Movement (PRIMARY + SHIFT: Cmd+Shift + hjkl)
-# ─────────────────────────────────────────────────────────────────────────────
-cmd + shift - h : yabai -m window --warp west
-cmd + shift - j : yabai -m window --warp south
-cmd + shift - k : yabai -m window --warp north
-cmd + shift - l : yabai -m window --warp east
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Window Resizing (TERTIARY: Alt+Shift + hjkl)
-# ─────────────────────────────────────────────────────────────────────────────
-alt + shift - h : yabai -m window --resize left:-50:0
-alt + shift - j : yabai -m window --resize bottom:0:50
-alt + shift - k : yabai -m window --resize top:0:-50
-alt + shift - l : yabai -m window --resize right:50:0
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Launch Terminal
-# ─────────────────────────────────────────────────────────────────────────────
-cmd - return : open -a WezTerm
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Window Controls
-# ─────────────────────────────────────────────────────────────────────────────
-cmd + shift - f : yabai -m window --toggle zoom-fullscreen
-cmd + shift - space : yabai -m window --toggle float
-cmd + shift - 0x2A : yabai -m window --toggle split
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Advanced Layout Controls
-# ─────────────────────────────────────────────────────────────────────────────
-cmd + ctrl - s : yabai -m window --insert stack
-cmd + shift - r : yabai -m space --rotate 90
-cmd + shift - x : yabai -m space --mirror x-axis
-cmd + shift - y : yabai -m space --mirror y-axis
-cmd + shift - b : yabai -m space --balance
-cmd + ctrl - t : yabai -m space --layout $(yabai -m query --spaces --space | jq -r 'if .type == "bsp" then "stack" else "bsp" end')
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Workspace Navigation (PRIMARY + Number)
-# ─────────────────────────────────────────────────────────────────────────────
-cmd - 1 : yabai -m space --focus 1
-cmd - 2 : yabai -m space --focus 2
-cmd - 3 : yabai -m space --focus 3
-cmd - 4 : yabai -m space --focus 4
-cmd - 5 : yabai -m space --focus 5
-cmd - 6 : yabai -m space --focus 6
-cmd - 7 : yabai -m space --focus 7
-cmd - 8 : yabai -m space --focus 8
-cmd - 9 : yabai -m space --focus 9
-cmd - 0x1D : yabai -m space --focus 10
-cmd - 0x21 : yabai -m space --focus prev
-cmd - 0x1E : yabai -m space --focus next
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Move Window to Workspace (PRIMARY + SHIFT + Number)
-# ─────────────────────────────────────────────────────────────────────────────
-cmd + shift - 1 : yabai -m window --space 1 --focus
-cmd + shift - 2 : yabai -m window --space 2 --focus
-cmd + shift - 3 : yabai -m window --space 3 --focus
-cmd + shift - 4 : yabai -m window --space 4 --focus
-cmd + shift - 5 : yabai -m window --space 5 --focus
-cmd + shift - 6 : yabai -m window --space 6 --focus
-cmd + shift - 7 : yabai -m window --space 7 --focus
-cmd + shift - 8 : yabai -m window --space 8 --focus
-cmd + shift - 9 : yabai -m window --space 9 --focus
-cmd + shift - 0x1D : yabai -m window --space 10 --focus
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Gather Windows (Cmd + `)
-# ─────────────────────────────────────────────────────────────────────────────
-cmd - 0x32 : $HOME/.local/bin/uke-gather
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Quick App Launchers (TERTIARY: Cmd+Alt)
-# ─────────────────────────────────────────────────────────────────────────────
-cmd + alt - b : open -a 'Brave Browser'
-cmd + alt - o : open -a Obsidian
-cmd + alt - c : open -a Code
-cmd + alt - r : open -a Raindrop.io
-cmd + alt - m : open -a Spotify
-cmd + alt - t : open -a WezTerm
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Bunches (BUNCH: Cmd+Ctrl)
-# ─────────────────────────────────────────────────────────────────────────────
-cmd + ctrl - 1 : $HOME/.local/bin/uke-bunch study
-cmd + ctrl - 2 : $HOME/.local/bin/uke-bunch guitar
-cmd + ctrl - 3 : $HOME/.local/bin/uke-bunch coding
-cmd + ctrl - 4 : $HOME/.local/bin/uke-bunch email
-cmd + ctrl - 5 : $HOME/.local/bin/uke-bunch reading
-
-
-
-################################################################################
-FILE PATH: uke/gen/yabai/yabairc
-################################################################################
-
-#!/usr/bin/env sh
-# ==============================================================================
-# YABAI CONFIG - AUTO-GENERATED BY UKE v6.1
-# ==============================================================================
-
-# Load Scripting Addition
-sudo yabai --load-sa
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Layout Configuration (4px padding)
-# ─────────────────────────────────────────────────────────────────────────────
-yabai -m config layout bsp
-yabai -m config window_placement second_child
-yabai -m config top_padding    4
-yabai -m config bottom_padding 4
-yabai -m config left_padding   4
-yabai -m config right_padding  4
-yabai -m config window_gap     4
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Mouse Configuration (click-to-focus)
-# ─────────────────────────────────────────────────────────────────────────────
-yabai -m config mouse_follows_focus off
-yabai -m config focus_follows_mouse off
-yabai -m config mouse_modifier alt
-yabai -m config mouse_action1 move
-yabai -m config mouse_action2 resize
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Window Behavior
-# ─────────────────────────────────────────────────────────────────────────────
-yabai -m config split_ratio 0.50
-yabai -m config auto_balance off
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Window Borders (external borders utility)
-# ─────────────────────────────────────────────────────────────────────────────
-pkill -x borders 2>/dev/null || true
-borders width=3 \
-        active_color=0xff88c0d0 \
-        inactive_color=0xff3b4252 &
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Opacity
-# ─────────────────────────────────────────────────────────────────────────────
-yabai -m config window_opacity on
-yabai -m config active_window_opacity 1.0
-yabai -m config normal_window_opacity 0.95
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Exclusions - Apps That Should Float
-# ─────────────────────────────────────────────────────────────────────────────
-yabai -m rule --add app="^System Settings$" manage=off
-yabai -m rule --add app="^System Preferences$" manage=off
-yabai -m rule --add app="^Calculator$" manage=off
-yabai -m rule --add app="^Finder$" manage=off
-yabai -m rule --add app="^App Store$" manage=off
-yabai -m rule --add app="^Karabiner" manage=off
-
-# ==============================================================================
-# WORKSPACE (SPACE) APP ASSIGNMENTS
-# ==============================================================================
-
-# Space 1: Browser
-yabai -m rule --add app="^Safari$" space=^1
-yabai -m rule --add app="^Brave Browser$" space=^1
-
-# Space 2: Notes
-yabai -m rule --add app="^Obsidian$" space=^2
-
-# Space 3: Code
-yabai -m rule --add app="^WezTerm$" space=^3
-yabai -m rule --add app="^Code$" space=^3
-yabai -m rule --add app="^Xcode$" space=^3
-
-# Space 5: Documents
-yabai -m rule --add app="^Preview$" space=^5
-yabai -m rule --add app="^PDF Expert$" space=^5
-
-# Space 6: Raindrop
-yabai -m rule --add app="^Raindrop.io$" space=^6
-
-# Space 7: Media
-yabai -m rule --add app="^Spotify$" space=^7
-
-# Space 8: Office
-yabai -m rule --add app="^Microsoft Word$" space=^8
-yabai -m rule --add app="^Microsoft Excel$" space=^8
-yabai -m rule --add app="^Microsoft PowerPoint$" space=^8
-
-# Space 9: Communication
-yabai -m rule --add app="^Slack$" space=^9
-yabai -m rule --add app="^Discord$" space=^9
-yabai -m rule --add app="^Mail$" space=^9
-yabai -m rule --add app="^Telegram$" space=^9
-yabai -m rule --add app="^WhatsApp$" space=^9
-
-# Space 10: AI
-yabai -m rule --add app="^Claude$" space=^10
-yabai -m rule --add app="^Perplexity$" space=^10
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Catch-all: Everything else goes to Space 4
-# ─────────────────────────────────────────────────────────────────────────────
-yabai -m rule --add app!="^(Safari|Brave Browser|Obsidian|WezTerm|Code|Xcode|Preview|PDF Expert|Raindrop.io|Spotify|Microsoft Word|Microsoft Excel|Microsoft PowerPoint|Slack|Discord|Mail|Telegram|WhatsApp|Claude|Perplexity)$" space=^4
-
-echo "yabai: Configuration loaded with workspace assignments"
-
-
-
-################################################################################
 FILE PATH: uke/README.md
 ################################################################################
 
@@ -5341,6 +4864,7 @@ uke reload           # Restart window manager
 uke-gather           # Organize windows (Cmd+`)
 uke-bunch study      # Launch study environment (Cmd+Ctrl+1)
 uke-doctor           # Health check
+uke-logs yabai       # Live log viewer
 ```
 
 ## Essential Keybindings
@@ -5547,10 +5071,9 @@ stow_dotfiles() {
     
     local packages=(wezterm tmux zsh nvim)
     
+    # Note: keyd is managed separately (requires sudo/system-level config)
     if [[ "$OS" == "macos" ]]; then
         packages+=(karabiner)
-    else
-        packages+=(keyd)
     fi
     
     for pkg in "${packages[@]}"; do
@@ -5770,7 +5293,7 @@ echo "  ✓ Config symlinks removed"
 echo "Unstowing dotfiles..."
 if command -v stow &>/dev/null && [[ -d "$UKE_STOW" ]]; then
     cd "$UKE_STOW"
-    for pkg in wezterm tmux zsh nvim karabiner keyd; do
+    for pkg in wezterm tmux zsh nvim karabiner; do
         [[ -d "$pkg" ]] && stow -t "$HOME" -D "$pkg" 2>/dev/null && echo "  ✓ Unstowed: $pkg" || true
     done
 else
@@ -6227,14 +5750,7 @@ gen_gather() {
     cat > "$out" << 'HEADER'
 #!/usr/bin/env bash
 set -euo pipefail
-# Resolve symlink to find true source location
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
 require_cmd jq yq

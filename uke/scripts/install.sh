@@ -118,10 +118,9 @@ stow_dotfiles() {
     
     local packages=(wezterm tmux zsh nvim)
     
+    # Note: keyd is managed separately (requires sudo/system-level config)
     if [[ "$OS" == "macos" ]]; then
         packages+=(karabiner)
-    else
-        packages+=(keyd)
     fi
     
     for pkg in "${packages[@]}"; do

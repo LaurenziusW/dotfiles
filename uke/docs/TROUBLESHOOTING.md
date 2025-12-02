@@ -253,18 +253,21 @@ echo $HYPRLAND_INSTANCE_SIGNATURE  # Linux
 ### View Logs
 
 ```bash
-# UKE logs
+# Using uke-logs (recommended)
+uke-logs uke         # UKE internal logs
+uke-logs yabai       # yabai logs (macOS)
+uke-logs skhd        # skhd logs (macOS)
+uke-logs hyprland    # Hyprland logs (Linux)
+uke-logs all         # Combined view (requires multitail)
+
+# Manual methods
 uke log tail
 uke log tail 100  # Last 100 lines
 
-# skhd logs (macOS)
-tail -f /tmp/skhd_*.err.log
-
-# yabai logs (macOS)
-tail -f /tmp/yabai_*.err.log
-
-# Hyprland logs (Linux)
-cat ~/.local/share/hyprland/hyprland.log
+# Direct file access
+tail -f /tmp/yabai_*.err.log   # macOS
+tail -f /tmp/skhd_*.err.log    # macOS
+cat ~/.local/share/hyprland/hyprland.log  # Linux
 ```
 
 ### Clear Logs

@@ -207,6 +207,7 @@ uke-gather            Organize windows to workspaces
 uke-doctor            Health check
 uke-backup            Backup configs
 uke-debug dump        Full diagnostics
+uke-logs <component>  Live log viewer (uke|yabai|skhd|hyprland|all)
 ```
 
 ---
