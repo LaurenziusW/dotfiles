@@ -1,4 +1,4 @@
-# UKE v6.2 - Complete Cheatsheet
+# UKE v6.3 - Complete Cheatsheet
 
 **Unified Keyboard Environment - One muscle memory for macOS & Linux**
 
@@ -21,260 +21,257 @@
 
 ## Workspaces
 
-| Space | Purpose | Apps |
-|:------|:--------|:-----|
-| **1** | Browser | Safari, Brave Browser |
-| **2** | Notes | Obsidian |
-| **3** | Code | WezTerm, Code, Xcode |
-| **4** | Catch-all | Everything else |
-| **5** | Documents | Preview, PDF Expert |
-| **6** | Raindrop | Raindrop.io |
-| **7** | Media | Spotify |
-| **8** | Office | Word, Excel, PowerPoint |
-| **9** | Comms | Slack, Discord, Mail, Telegram |
-| **10** | AI | Claude, Perplexity |
+| Space | Purpose | macOS Apps | Linux Apps |
+|:------|:--------|:-----------|:-----------|
+| **1** | Browser | Safari, Brave | brave, firefox |
+| **2** | Notes | Obsidian | obsidian |
+| **3** | Code | WezTerm, Code, Xcode | wezterm, code, kitty |
+| **4** | Catch-all | Everything else | Everything else |
+| **5** | Documents | Preview, PDF Expert | evince, zathura |
+| **6** | Raindrop | Raindrop.io | raindrop |
+| **7** | Media | Spotify | spotify |
+| **8** | Office | Word, Excel, PowerPoint | libreoffice |
+| **9** | Comms | Slack, Discord, Mail | slack, discord, thunderbird |
+| **10** | AI | Claude, Perplexity | claude |
 
 ---
 
 ## PRIMARY Layer: Window Management
 
 ### Focus (Cmd/Alt + hjkl)
-```
-PRIMARY + h     Focus window left
-PRIMARY + j     Focus window down
-PRIMARY + k     Focus window up
-PRIMARY + l     Focus window right
-```
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Focus left | Cmd + h | Alt + h |
+| Focus down | Cmd + j | Alt + j |
+| Focus up | Cmd + k | Alt + k |
+| Focus right | Cmd + l | Alt + l |
 
 ### Move (Cmd+Shift/Alt+Shift + hjkl)
-```
-PRIMARY+SHIFT + h     Move window left
-PRIMARY+SHIFT + j     Move window down
-PRIMARY+SHIFT + k     Move window up
-PRIMARY+SHIFT + l     Move window right
-```
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Move left | Cmd+Shift + h | Alt+Shift + h |
+| Move down | Cmd+Shift + j | Alt+Shift + j |
+| Move up | Cmd+Shift + k | Alt+Shift + k |
+| Move right | Cmd+Shift + l | Alt+Shift + l |
 
 ### Workspace Navigation
-```
-PRIMARY + 1-9         Switch to workspace 1-9
-PRIMARY + 0           Switch to workspace 10
-PRIMARY + [           Previous workspace
-PRIMARY + ]           Next workspace
-```
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Workspace 1-9 | Cmd + 1-9 | Alt + 1-9 |
+| Workspace 10 | Cmd + 0 | Alt + 0 |
+| Previous workspace | Cmd + [ | Alt + [ |
+| Next workspace | Cmd + ] | Alt + ] |
 
 ### Move to Workspace
-```
-PRIMARY+SHIFT + 1-9   Move window to workspace 1-9 (and follow)
-PRIMARY+SHIFT + 0     Move window to workspace 10
-```
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Move to WS 1-9 | Cmd+Shift + 1-9 | Alt+Shift + 1-9 |
+| Move to WS 10 | Cmd+Shift + 0 | Alt+Shift + 0 |
 
 ### Window Controls
-```
-PRIMARY + Return          Launch terminal (WezTerm)
-PRIMARY + `               Gather windows for current space
-PRIMARY + Escape          Focus window under mouse
-PRIMARY+SHIFT + f         Toggle fullscreen
-PRIMARY+SHIFT + Space     Toggle float/tile
-PRIMARY+SHIFT + \         Toggle split direction
-PRIMARY+SHIFT + r         Rotate layout 90°
-PRIMARY+SHIFT + b         Balance windows
-PRIMARY+SHIFT + x         Mirror x-axis
-PRIMARY+SHIFT + y         Mirror y-axis
-PRIMARY+CTRL + s          Insert stack
-PRIMARY+CTRL + t          Toggle BSP ↔ Stack layout
-```
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Launch terminal | Cmd + Return | Alt + Return |
+| Gather windows | Cmd + ` | Alt + ` |
+| Toggle fullscreen | Cmd+Shift + f | Alt+Shift + f |
+| Toggle float | Cmd+Shift + Space | Alt+Shift + Space |
+| Toggle split | Cmd+Shift + \\ | Alt+Shift + \\ |
+| Rotate layout | Cmd+Shift + r | Alt+Shift + r |
+| Balance windows | Cmd+Shift + b | - |
+| Kill window | - | Alt + q |
+
+---
+
+## TERTIARY Layer: Window Resizing
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Resize left | Alt+Shift + h | Super+Shift + h |
+| Resize down | Alt+Shift + j | Super+Shift + j |
+| Resize up | Alt+Shift + k | Super+Shift + k |
+| Resize right | Alt+Shift + l | Super+Shift + l |
 
 ---
 
 ## SECONDARY Layer: WezTerm Terminal
 
 ### Tabs (Alt/Super)
-```
-SECONDARY + t         New tab
-SECONDARY + w         Close tab
-SECONDARY + 1-9       Switch to tab 1-9
-SECONDARY + [         Previous tab
-SECONDARY + ]         Next tab
-```
 
-### Panes (Alt/Super)
-```
-SECONDARY + \         Split horizontal
-SECONDARY + -         Split vertical
-SECONDARY + x         Close pane
-SECONDARY + z         Toggle zoom
-```
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| New tab | Alt + t | Super + t |
+| Close pane/tab | Alt + w | Super + w |
+| Tab 1-9 | Alt + 1-9 | Super + 1-9 |
+| Previous tab | Alt + [ | Super + [ |
+| Next tab | Alt + ] | Super + ] |
 
-### Pane Navigation (Alt/Super + hjkl)
-```
-SECONDARY + h         Navigate left
-SECONDARY + j         Navigate down
-SECONDARY + k         Navigate up
-SECONDARY + l         Navigate right
-```
+### Panes
 
-### Pane Resizing (Alt+Shift/Super+Shift + hjkl)
-```
-SECONDARY+SHIFT + h   Resize left
-SECONDARY+SHIFT + j   Resize down
-SECONDARY+SHIFT + k   Resize up
-SECONDARY+SHIFT + l   Resize right
-```
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Split horizontal | Alt + \\ | Super + \\ |
+| Split vertical | Alt + - | Super + - |
+| Close pane | Alt + x | Super + x |
+| Toggle zoom | Alt + z | Super + z |
 
----
+### Pane Navigation
 
-## TERTIARY Layer: Window Resizing
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Navigate left | Alt + h | Super + h |
+| Navigate down | Alt + j | Super + j |
+| Navigate up | Alt + k | Super + k |
+| Navigate right | Alt + l | Super + l |
 
-```
-TERTIARY + h          Resize window left
-TERTIARY + j          Resize window down
-TERTIARY + k          Resize window up
-TERTIARY + l          Resize window right
-```
+### Pane Resizing
 
-> **Note:** When WezTerm has focus, TERTIARY resizes terminal panes. When other apps have focus, it resizes application windows.
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Resize left | Alt+Shift + h | Super+Shift + h |
+| Resize down | Alt+Shift + j | Super+Shift + j |
+| Resize up | Alt+Shift + k | Super+Shift + k |
+| Resize right | Alt+Shift + l | Super+Shift + l |
 
 ---
 
 ## QUATERNARY Layer: Shell Control
 
-```
-CTRL + c              Interrupt (kill) process
-CTRL + z              Suspend process
-CTRL + d              Logout (EOF)
-CTRL + l              Clear screen
-CTRL + r              Search history
-CTRL + a              Beginning of line (or tmux prefix)
-CTRL + e              End of line
-CTRL + w              Kill word backward
-```
+**Never intercepted by window manager - passed directly to terminal**
+
+| Action | Keybinding |
+|:-------|:-----------|
+| Interrupt (SIGINT) | Ctrl + c |
+| Suspend (SIGTSTP) | Ctrl + z |
+| End of input | Ctrl + d |
+| Clear screen | Ctrl + l |
+| Search history | Ctrl + r |
+| Beginning of line | Ctrl + a |
+| End of line | Ctrl + e |
 
 ---
 
-## TMUX Layer (Prefix: Ctrl+A)
-
-```
-C-a + \               Split vertical
-C-a + -               Split horizontal
-C-a + h/j/k/l         Navigate panes
-C-a + H/J/K/L         Resize panes
-C-a + c               New window
-C-a + 1-5             Switch to window 1-5
-C-a + r               Reload config
-C-a + d               Detach session
-```
-
----
-
-## App Launchers (Cmd+Alt / Alt+Super)
-
-```
-LAUNCHER + b          Brave Browser
-LAUNCHER + o          Obsidian
-LAUNCHER + c          VS Code
-LAUNCHER + r          Raindrop.io
-LAUNCHER + m          Spotify (music)
-LAUNCHER + t          WezTerm (terminal)
-```
-
----
-
-## Bunches (Cmd+Ctrl / Alt+Ctrl)
-
-```
-BUNCH + 1             Study (Obsidian, Brave, WezTerm, Preview → WS 2)
-BUNCH + 2             Guitar (Spotify, Brave → WS 7)
-BUNCH + 3             Coding (WezTerm, Code, Brave → WS 3)
-BUNCH + 4             Email (Mail, Slack, Brave → WS 9)
-BUNCH + 5             Reading (Preview, Obsidian → WS 5)
-```
-
-
----
-
-## Scratchpads (Dropdown Windows)
-
-Toggle floating windows that appear/hide with a hotkey:
+## LAUNCHER Layer: Quick App Launch
 
 | Action | macOS | Linux |
 |:-------|:------|:------|
-| Terminal scratchpad | `Cmd + \`` | `Alt + \`` |
-| Notes scratchpad | `Cmd+Alt + n` | `Alt+Super + n` |
+| Brave | Cmd+Alt + b | Alt+Super + b |
+| Obsidian | Cmd+Alt + o | Alt+Super + o |
+| Code | Cmd+Alt + c | Alt+Super + c |
+| Spotify | Cmd+Alt + m | Alt+Super + m |
+| WezTerm | Cmd+Alt + t | Alt+Super + t |
+| Raindrop | Cmd+Alt + r | Alt+Super + r |
+| File Manager | - | Alt+Super + f |
+| App Launcher | - | Alt+Super + Space |
 
-Configure in `registry.yaml`:
-```yaml
-scratchpads:
-  terminal:
-    app: wezterm
-    key: "grave"
-    size: { width: 80, height: 40 }
-    position: "top"    # top, bottom, center
-```
+---
+
+## BUNCH Layer: Environment Presets
+
+| Bunch | macOS | Linux |
+|:------|:------|:------|
+| Study | Cmd+Ctrl + 1 | Alt+Ctrl + F1 |
+| Guitar | Cmd+Ctrl + 2 | Alt+Ctrl + F2 |
+| Coding | Cmd+Ctrl + 3 | Alt+Ctrl + F3 |
+| Email | Cmd+Ctrl + 4 | Alt+Ctrl + F4 |
+| Reading | Cmd+Ctrl + 5 | Alt+Ctrl + F5 |
+
+---
+
+## Scratchpads
+
+| Action | macOS | Linux |
+|:-------|:------|:------|
+| Terminal scratchpad | Cmd+Shift + ` | Alt+Shift + ` |
+| Notes scratchpad | Cmd+Alt + n | Alt+Super + n |
 
 ---
 
 ## Session Management
 
-Save and restore window layouts:
-
 | Action | macOS | Linux |
 |:-------|:------|:------|
-| Quick save | `Cmd+Ctrl + s` | `Alt+Ctrl + s` |
-| Quick restore | `Cmd+Ctrl+Shift + s` | `Alt+Ctrl+Shift + s` |
+| Quick save | Cmd+Ctrl + s | Alt+Ctrl + s |
+| Quick restore | Cmd+Ctrl+Shift + s | Alt+Ctrl+Shift + s |
+
+---
+
+## Hyper Key (via keyd on Linux / Karabiner on macOS)
+
+**Caps Lock becomes a modifier key**
+
+| Action | Keybinding |
+|:-------|:-----------|
+| Escape | Caps (tap) |
+| Left | Caps + h |
+| Down | Caps + j |
+| Up | Caps + k |
+| Right | Caps + l |
+| Home | Caps + y |
+| Page Down | Caps + u |
+| Page Up | Caps + i |
+| End | Caps + o |
+| Delete Forward | Caps + Backspace |
+| Select Left | Caps + a |
+| Select Down | Caps + s |
+| Select Right | Caps + d |
+| Select Up | Caps + w |
+| Word Left | Caps + f |
+| Word Right | Caps + g |
+| Word Select Left | Caps + q |
+| Word Select Right | Caps + e |
+| Toggle Caps Lock | Caps + ' |
+
+---
+
+## Linux-Specific: Screenshots & Clipboard
+
+| Action | Keybinding |
+|:-------|:-----------|
+| Screenshot (region) | Print |
+| Screenshot (full) | Shift + Print |
+| Clipboard history | Alt + v |
+
+---
+
+## CLI Commands
 
 ```bash
-uke-session save deep-work      # Save current layout
-uke-session restore deep-work   # Restore layout
-uke-session list                # List all sessions
-uke-session delete <n>       # Delete a session
-```
----
+uke gen              # Generate platform configs
+uke reload           # Restart window manager
+uke status           # Show current status
+uke edit             # Edit registry.yaml
+uke-doctor           # Health check
 
-## UKE CLI Commands
-
-```bash
-uke gen               Generate configs from registry.yaml
-uke reload            Restart window manager
-uke status            Show current state
-uke validate          Check configurations
-uke edit              Edit registry.yaml
-uke edit skhd         Edit generated skhd config
-uke log tail          View recent logs
-uke-bunch list        List available bunches
-uke-bunch <name>      Run a bunch
-uke-gather            Organize windows to workspaces
-uke-scratchpad <n> Toggle dropdown windows
-uke-session <cmd>     Save/restore layouts
-uke-logs <component>  Live log viewer (uke|yabai|skhd|hyprland|all)
+uke-gather           # Organize windows by workspace
+uke-bunch study      # Launch study environment
+uke-scratchpad term  # Toggle dropdown terminal
+uke-session save     # Save window layout
+uke-session restore  # Restore window layout
+uke-logs hyprland    # View Hyprland logs
 ```
 
 ---
 
-## Quick Reference
+## Quick Reference Card
 
-| Action | macOS | Linux |
-|:-------|:------|:------|
-| Focus window | `Cmd + hjkl` | `Alt + hjkl` |
-| Move window | `Cmd+Shift + hjkl` | `Alt+Shift + hjkl` |
-| Resize window | `Alt+Shift + hjkl` | `Super+Shift + hjkl` |
-| Switch workspace | `Cmd + 1-9` | `Alt + 1-9` |
-| Move to workspace | `Cmd+Shift + 1-9` | `Alt+Shift + 1-9` |
-| Launch terminal | `Cmd + Return` | `Alt + Return` |
-| Fullscreen | `Cmd+Shift + f` | `Alt+Shift + f` |
-| Gather windows | `Cmd + \`` | `Alt + \`` |
-| Terminal scratchpad | `Cmd + \`` | `Alt + \`` |
-| Quick save session | `Cmd+Ctrl + s` | `Alt+Ctrl + s` |
-| WezTerm pane nav | `Alt + hjkl` | `Super + hjkl` |
-| WezTerm split | `Alt + \ / -` | `Super + \ / -` |
-| Shell interrupt | `Ctrl + c` | `Ctrl + c` |
-
----
-
-## Philosophy
-
-- **PRIMARY** = OS-level window management (intercepted before apps)
-- **SECONDARY** = App-internal navigation (passed to apps like WezTerm)
-- **TERTIARY** = Resizing (context-aware: windows or terminal panes)
-- **QUATERNARY** = Shell commands (never override Ctrl+C, Ctrl+Z)
-- **No conflicts** = Each layer has exclusive control of its domain
-- **Cross-platform** = Same logical keys, different physical modifiers
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     UKE QUICK REFERENCE (Linux)                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  FOCUS      Alt + hjkl          MOVE       Alt+Shift + hjkl                 │
+│  RESIZE     Super+Shift + hjkl  WORKSPACE  Alt + 1-9,0                      │
+│  TERMINAL   Alt + Return        KILL       Alt + q                          │
+│  FULLSCREEN Alt+Shift + f       FLOAT      Alt+Shift + Space                │
+│  GATHER     Alt + `             LAUNCHER   Alt+Super + Space                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  WEZTERM PANES: Super + hjkl (nav) | Super + \\ - (split) | Super + z (zoom)│
+│  WEZTERM TABS:  Super + t (new) | Super + w (close) | Super + 1-9 (switch)  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  CAPS + hjkl = Arrows | CAPS + wasd = Select | CAPS + fg = Word Jump        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```

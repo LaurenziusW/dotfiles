@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE OS Detection Library
+# UKE OS Detection Library v6.3
 # ==============================================================================
 # Provides cross-platform helpers for bunches and scripts
 # Source this in any bunch script: source "$(dirname "$0")/lib-os-detect.sh"
@@ -18,6 +18,28 @@ detect_os() {
 }
 
 OS_TYPE=$(detect_os)
+
+# ------------------------------------------------------------------------------
+# Distro Detection (Linux only)
+# ------------------------------------------------------------------------------
+detect_distro() {
+    if [[ "$OS_TYPE" != "linux" ]]; then
+        echo ""
+        return
+    fi
+    
+    if [[ -f /etc/arch-release ]]; then
+        echo "arch"
+    elif [[ -f /etc/debian_version ]]; then
+        echo "debian"
+    elif [[ -f /etc/fedora-release ]]; then
+        echo "fedora"
+    else
+        echo "unknown"
+    fi
+}
+
+DISTRO=$(detect_distro)
 
 # ------------------------------------------------------------------------------
 # Window Manager Commands (set based on OS)
@@ -47,30 +69,58 @@ get_app_command() {
             [ "$OS_TYPE" = "macos" ] && echo "Brave Browser" || echo "brave" ;;
         safari)
             [ "$OS_TYPE" = "macos" ] && echo "Safari" || echo "" ;;
+        firefox)
+            echo "firefox" ;;
+        chromium)
+            [ "$OS_TYPE" = "macos" ] && echo "Chromium" || echo "chromium" ;;
         notes|obsidian)
-            echo "Obsidian" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Obsidian" || echo "obsidian" ;;
         terminal|wezterm)
-            echo "WezTerm" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "WezTerm" || echo "wezterm" ;;
+        alacritty)
+            [ "$OS_TYPE" = "macos" ] && echo "Alacritty" || echo "alacritty" ;;
+        kitty)
+            echo "kitty" ;;
         code|vscode)
-            echo "Code" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Code" || echo "code" ;;
+        codium|vscodium)
+            [ "$OS_TYPE" = "macos" ] && echo "VSCodium" || echo "codium" ;;
         music|spotify)
-            echo "Spotify" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Spotify" || echo "spotify" ;;
         pdf|preview)
             [ "$OS_TYPE" = "macos" ] && echo "Preview" || echo "evince" ;;
+        zathura)
+            echo "zathura" ;;
+        okular)
+            echo "okular" ;;
         slack)
-            echo "Slack" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Slack" || echo "slack" ;;
         discord)
-            echo "Discord" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Discord" || echo "discord" ;;
         mail)
             [ "$OS_TYPE" = "macos" ] && echo "Mail" || echo "thunderbird" ;;
+        telegram)
+            [ "$OS_TYPE" = "macos" ] && echo "Telegram" || echo "telegram-desktop" ;;
+        signal)
+            [ "$OS_TYPE" = "macos" ] && echo "Signal" || echo "signal-desktop" ;;
         raindrop)
-            echo "Raindrop.io" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Raindrop.io" || echo "raindrop" ;;
         word)
-            [ "$OS_TYPE" = "macos" ] && echo "Microsoft Word" || echo "libreoffice-writer" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Microsoft Word" || echo "libreoffice --writer" ;;
         excel)
-            [ "$OS_TYPE" = "macos" ] && echo "Microsoft Excel" || echo "libreoffice-calc" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Microsoft Excel" || echo "libreoffice --calc" ;;
         powerpoint)
-            [ "$OS_TYPE" = "macos" ] && echo "Microsoft PowerPoint" || echo "libreoffice-impress" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Microsoft PowerPoint" || echo "libreoffice --impress" ;;
+        libreoffice)
+            echo "libreoffice" ;;
+        files|finder)
+            [ "$OS_TYPE" = "macos" ] && echo "Finder" || echo "thunar" ;;
+        nautilus)
+            echo "nautilus" ;;
+        thunar)
+            echo "thunar" ;;
+        dolphin)
+            echo "dolphin" ;;
         *)
             echo "$app_key" ;;
     esac
@@ -94,7 +144,11 @@ launch_app() {
     else
         # Linux: try to find and run the command
         local cmd="${app_name,,}"  # lowercase
-        if command -v "$cmd" &>/dev/null; then
+        
+        # Handle commands with arguments (like libreoffice --writer)
+        if [[ "$app_name" == *" "* ]]; then
+            $app_name &>/dev/null &
+        elif command -v "$cmd" &>/dev/null; then
             "$cmd" &>/dev/null &
         elif command -v "$app_name" &>/dev/null; then
             "$app_name" &>/dev/null &
@@ -114,7 +168,7 @@ get_current_workspace() {
     if [ "$OS_TYPE" = "macos" ]; then
         yabai -m query --spaces --space | jq -r '.index'
     else
-        hyprctl activeworkspace | grep 'workspace ID' | awk '{print $3}'
+        hyprctl activeworkspace -j | jq -r '.id'
     fi
 }
 
@@ -127,7 +181,54 @@ gather_app_to_space() {
         yabai -m query --windows | jq -r ".[] | select(.app == \"$app_name\") | .id" | \
             xargs -I {} yabai -m window {} --space "$target_space" 2>/dev/null
     else
-        hyprctl dispatch movetoworkspace "$target_space,class:$app_name" 2>/dev/null
+        # On Linux, use class name matching
+        hyprctl clients -j | jq -r ".[] | select(.class | test(\"$app_name\"; \"i\")) | .address" | \
+            while read -r addr; do
+                hyprctl dispatch movetoworkspacesilent "$target_space,address:$addr" 2>/dev/null
+            done
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Notification Helper
+# ------------------------------------------------------------------------------
+notify() {
+    local title="$1"
+    local message="${2:-}"
+    
+    if [ "$OS_TYPE" = "macos" ]; then
+        osascript -e "display notification \"$message\" with title \"$title\"" 2>/dev/null || true
+    else
+        if command -v notify-send &>/dev/null; then
+            notify-send "$title" "$message" 2>/dev/null || true
+        fi
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Clipboard Helper
+# ------------------------------------------------------------------------------
+clipboard_copy() {
+    if [ "$OS_TYPE" = "macos" ]; then
+        pbcopy
+    else
+        if command -v wl-copy &>/dev/null; then
+            wl-copy
+        elif command -v xclip &>/dev/null; then
+            xclip -selection clipboard
+        fi
+    fi
+}
+
+clipboard_paste() {
+    if [ "$OS_TYPE" = "macos" ]; then
+        pbpaste
+    else
+        if command -v wl-paste &>/dev/null; then
+            wl-paste
+        elif command -v xclip &>/dev/null; then
+            xclip -selection clipboard -o
+        fi
     fi
 }
 
