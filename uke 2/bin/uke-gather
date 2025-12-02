@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Gather - Organize windows to correct workspaces
+# ==============================================================================
+# This script detects the current workspace and gathers all windows that
+# "belong" to it based on the app-to-workspace mapping.
+#
+# Hotkey: Cmd + ` (macOS) / Alt + ` (Linux)
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+source "$UKE_ROOT/lib/core.sh"
+
+require_cmd jq
+
+# ==============================================================================
+# App to Workspace Mapping
+# ==============================================================================
+# This MUST match the rules in yabairc/hyprland.conf
+
+gather_macos() {
+    local current_space
+    current_space=$(yabai -m query --spaces --space | jq -r '.index')
+    
+    log_info "Gathering windows for macOS Space $current_space..."
+    
+    case $current_space in
+        1) # Browser
+            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser") | .id' | \
+                xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
+            ;;
+        2) # Notes
+            yabai -m query --windows | jq -r '.[] | select(.app == "Obsidian") | .id' | \
+                xargs -I {} yabai -m window {} --space 2 2>/dev/null || true
+            ;;
+        3) # Terminal & Code
+            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode") | .id' | \
+                xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
+            ;;
+        5) # Documents
+            yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' | \
+                xargs -I {} yabai -m window {} --space 5 2>/dev/null || true
+            ;;
+        6) # Raindrop
+            yabai -m query --windows | jq -r '.[] | select(.app == "Raindrop.io") | .id' | \
+                xargs -I {} yabai -m window {} --space 6 2>/dev/null || true
+            ;;
+        7) # Media
+            yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' | \
+                xargs -I {} yabai -m window {} --space 7 2>/dev/null || true
+            ;;
+        8) # Office
+            yabai -m query --windows | jq -r '.[] | select(.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint") | .id' | \
+                xargs -I {} yabai -m window {} --space 8 2>/dev/null || true
+            ;;
+        9) # Communication
+            yabai -m query --windows | jq -r '.[] | select(.app == "Slack" or .app == "Discord" or .app == "Mail" or .app == "Telegram" or .app == "WhatsApp") | .id' | \
+                xargs -I {} yabai -m window {} --space 9 2>/dev/null || true
+            ;;
+        10) # AI
+            yabai -m query --windows | jq -r '.[] | select(.app == "Claude" or .app == "Perplexity") | .id' | \
+                xargs -I {} yabai -m window {} --space 10 2>/dev/null || true
+            ;;
+        *) # Space 4 (Catch-all) and others
+            log_info "No gather action defined for space $current_space"
+            ;;
+    esac
+    
+    ok "Windows gathered for space $current_space"
+}
+
+gather_linux() {
+    local current_space
+    current_space=$(hyprctl activeworkspace | grep 'workspace ID' | awk '{print $3}')
+    
+    log_info "Gathering windows for Linux Workspace $current_space..."
+    
+    case $current_space in
+        1) # Browser
+            hyprctl dispatch movetoworkspace 1,class:Safari 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 1,class:Brave-browser 2>/dev/null || true
+            ;;
+        2) # Notes
+            hyprctl dispatch movetoworkspace 2,class:obsidian 2>/dev/null || true
+            ;;
+        3) # Terminal & Code
+            hyprctl dispatch movetoworkspace 3,class:org.wezfurlong.wezterm 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 3,class:Code 2>/dev/null || true
+            ;;
+        5) # Documents
+            hyprctl dispatch movetoworkspace 5,class:org.gnome.Evince 2>/dev/null || true
+            ;;
+        6) # Raindrop
+            hyprctl dispatch movetoworkspace 6,class:Raindrop 2>/dev/null || true
+            ;;
+        7) # Media
+            hyprctl dispatch movetoworkspace 7,class:Spotify 2>/dev/null || true
+            ;;
+        8) # Office
+            hyprctl dispatch movetoworkspace 8,class:libreoffice-writer 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 8,class:libreoffice-calc 2>/dev/null || true
+            ;;
+        9) # Communication
+            hyprctl dispatch movetoworkspace 9,class:Slack 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 9,class:discord 2>/dev/null || true
+            hyprctl dispatch movetoworkspace 9,class:thunderbird 2>/dev/null || true
+            ;;
+        *) # Catch-all
+            log_info "No gather action defined for workspace $current_space"
+            ;;
+    esac
+    
+    ok "Windows gathered for workspace $current_space"
+}
+
+# Run appropriate function based on OS
+is_macos && gather_macos || gather_linux

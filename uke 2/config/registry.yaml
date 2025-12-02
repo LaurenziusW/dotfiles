@@ -1,0 +1,137 @@
+# ==============================================================================
+# UKE Registry v6.1
+# ==============================================================================
+# Single source of truth for the Unified Keyboard Environment
+# Edit this file, then run: uke gen && uke reload
+# ==============================================================================
+
+version: "6.1.0"
+
+# ==============================================================================
+# Modifiers
+# ==============================================================================
+# Maps logical modifier names to physical keys per platform
+modifiers:
+  primary:        { macos: "cmd",           linux: "ALT" }
+  primary_shift:  { macos: "cmd + shift",   linux: "ALT SHIFT" }
+  secondary:      { macos: "alt",           linux: "SUPER" }
+  tertiary:       { macos: "alt + shift",   linux: "SUPER SHIFT" }
+  quaternary:     { macos: "ctrl",          linux: "CTRL" }
+  bunch:          { macos: "cmd + ctrl",    linux: "ALT CTRL" }
+  launcher:       { macos: "cmd + alt",     linux: "ALT SUPER" }
+
+# ==============================================================================
+# Applications
+# ==============================================================================
+# Maps app nicknames to actual app names per platform
+apps:
+  # Browsers
+  safari:      { macos: "Safari",           linux: "" }
+  brave:       { macos: "Brave Browser",    linux: "brave" }
+  
+  # Notes & Documents
+  obsidian:    { macos: "Obsidian",         linux: "obsidian" }
+  preview:     { macos: "Preview",          linux: "evince" }
+  pdfexpert:   { macos: "PDF Expert",       linux: "" }
+  
+  # Development
+  wezterm:     { macos: "WezTerm",          linux: "wezterm" }
+  code:        { macos: "Code",             linux: "code" }
+  xcode:       { macos: "Xcode",            linux: "" }
+  
+  # Media
+  spotify:     { macos: "Spotify",          linux: "spotify" }
+  raindrop:    { macos: "Raindrop.io",      linux: "raindrop" }
+  
+  # Office
+  word:        { macos: "Microsoft Word",       linux: "libreoffice-writer" }
+  excel:       { macos: "Microsoft Excel",      linux: "libreoffice-calc" }
+  powerpoint:  { macos: "Microsoft PowerPoint", linux: "libreoffice-impress" }
+  
+  # Communication
+  slack:       { macos: "Slack",            linux: "slack" }
+  discord:     { macos: "Discord",          linux: "discord" }
+  mail:        { macos: "Mail",             linux: "thunderbird" }
+  telegram:    { macos: "Telegram",         linux: "telegram" }
+  whatsapp:    { macos: "WhatsApp",         linux: "" }
+  
+  # AI
+  claude:      { macos: "Claude",           linux: "" }
+  perplexity:  { macos: "Perplexity",       linux: "" }
+
+# ==============================================================================
+# Workspaces
+# ==============================================================================
+# Defines what apps belong on which workspace
+workspaces:
+  1:  { name: "browser",   apps: [safari, brave] }
+  2:  { name: "notes",     apps: [obsidian] }
+  3:  { name: "code",      apps: [wezterm, code, xcode] }
+  4:  { name: "catch-all", apps: [] }
+  5:  { name: "documents", apps: [preview, pdfexpert] }
+  6:  { name: "raindrop",  apps: [raindrop] }
+  7:  { name: "media",     apps: [spotify] }
+  8:  { name: "office",    apps: [word, excel, powerpoint] }
+  9:  { name: "comms",     apps: [slack, discord, mail, telegram, whatsapp] }
+  10: { name: "ai",        apps: [claude, perplexity] }
+
+# ==============================================================================
+# Bunches
+# ==============================================================================
+# Environment presets (Cmd+Ctrl+1-5 on macOS, Alt+Ctrl+1-5 on Linux)
+bunches:
+  study:
+    focus: 2
+    apps: [obsidian, brave, wezterm, preview]
+    
+  guitar:
+    focus: 7
+    apps: [spotify, brave]
+    
+  coding:
+    focus: 3
+    apps: [wezterm, code, brave]
+    
+  email:
+    focus: 9
+    apps: [mail, slack, brave]
+    
+  reading:
+    focus: 5
+    apps: [preview, obsidian]
+
+# ==============================================================================
+# Window Manager Settings
+# ==============================================================================
+window_manager:
+  macos:
+    layout: bsp
+    padding: 4
+    gap: 4
+    mouse_follows_focus: false
+    focus_follows_mouse: false
+    borders:
+      enabled: true
+      width: 3
+      active_color: "0xff88c0d0"
+      inactive_color: "0xff3b4252"
+  linux:
+    layout: dwindle
+    gaps_in: 4
+    gaps_out: 8
+    border_size: 2
+    active_border: "rgba(88c0d0ee)"
+    inactive_border: "rgba(3b4252aa)"
+
+# ==============================================================================
+# Float Rules
+# ==============================================================================
+# Apps that should always float (not be tiled)
+float_rules:
+  - "System Settings"
+  - "System Preferences"
+  - "Calculator"
+  - "Finder"
+  - "App Store"
+  - "Karabiner-Elements"
+  - "Karabiner-EventViewer"
