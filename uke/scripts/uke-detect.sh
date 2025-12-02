@@ -3,6 +3,10 @@
 # UKE Detect - Find all UKE installations and artifacts
 # ==============================================================================
 
+# Resolve UKE_ROOT dynamically
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UKE_ROOT="${SCRIPT_DIR%/scripts}"
+
 echo "╔══════════════════════════════════════╗"
 echo "║     UKE Detection Report             ║"
 echo "╚══════════════════════════════════════╝"
@@ -50,7 +54,7 @@ elif [[ -d "$HOME/.config/nvim" ]]; then
 fi
 
 echo -e "\n[4] UKE Directories"
-for dir in "$HOME/dotfiles/uke" "$HOME/.local/state/uke" "$HOME/.uke-backups"; do
+for dir in "$UKE_ROOT" "$HOME/.local/state/uke" "$HOME/.uke-backups"; do
     if [[ -d "$dir" ]]; then
         count=$(find "$dir" -type f 2>/dev/null | wc -l)
         echo "  ✓ $dir ($count files)"

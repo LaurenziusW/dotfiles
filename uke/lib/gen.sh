@@ -431,13 +431,14 @@ HEADER
 
     # Generate cases from registry.yaml
     for ws in $(yq -r '.workspaces | keys | .[]' "$UKE_CONFIG/registry.yaml"); do
-        local apps=$(yq -r ".workspaces.${ws}.apps | .[]?" "$UKE_CONFIG/registry.yaml")
+        local apps=$(yq -r ".workspaces.${ws}.apps | .[]?" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
         [[ -z "$apps" ]] && continue
         
         # Build selector
         local selector=""
         for app_key in $apps; do
-            local app_name=$(yq -r ".apps.${app_key}.macos // empty" "$UKE_CONFIG/registry.yaml")
+            # Use select() instead of // empty for yq compatibility
+            local app_name=$(yq -r ".apps.${app_key}.macos | select(. != null)" "$UKE_CONFIG/registry.yaml" 2>/dev/null)
             [[ -z "$app_name" ]] && continue
             [[ -n "$selector" ]] && selector="$selector or "
             selector="${selector}.app == \"$app_name\""

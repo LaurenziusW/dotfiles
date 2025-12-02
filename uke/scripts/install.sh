@@ -73,7 +73,6 @@ create_dirs() {
     mkdir -p ~/.config/skhd
     mkdir -p ~/.config/yabai
     mkdir -p ~/.config/hypr
-    mkdir -p ~/.config/nvim
     ok "Directories created"
 }
 
@@ -127,7 +126,7 @@ stow_dotfiles() {
     
     for pkg in "${packages[@]}"; do
         if [[ -d "$pkg" ]]; then
-            stow -R "$pkg" 2>/dev/null && ok "Stowed: $pkg" || warn "Skipped: $pkg"
+            stow -t "$HOME" -R "$pkg" 2>/dev/null && ok "Stowed: $pkg" || warn "Skipped: $pkg"
         fi
     done
 }

@@ -4,6 +4,11 @@
 # ==============================================================================
 set -euo pipefail
 
+# Resolve UKE_ROOT dynamically
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UKE_ROOT="${SCRIPT_DIR%/scripts}"
+UKE_STOW="$UKE_ROOT/stow"
+
 RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' RESET=$'\e[0m'
 
 echo "${RED}╔══════════════════════════════════════╗${RESET}"
@@ -16,7 +21,7 @@ echo "  • Config symlinks (skhd, yabai, hyprland)"
 echo "  • Stowed dotfiles (wezterm, tmux, zsh, nvim)"
 echo "  • UKE state and backups"
 echo ""
-echo "${YELLOW}Source at ~/dotfiles/uke will NOT be deleted.${RESET}"
+echo "${YELLOW}Source at $UKE_ROOT will NOT be deleted.${RESET}"
 echo ""
 read -p "Type 'wipe' to confirm: " confirm
 [[ "$confirm" != "wipe" ]] && { echo "Aborted."; exit 1; }
@@ -37,11 +42,10 @@ echo "  ✓ Config symlinks removed"
 
 # 3. Unstow dotfiles
 echo "Unstowing dotfiles..."
-UKE_STOW="$HOME/dotfiles/uke/stow"
 if command -v stow &>/dev/null && [[ -d "$UKE_STOW" ]]; then
     cd "$UKE_STOW"
     for pkg in wezterm tmux zsh nvim karabiner keyd; do
-        [[ -d "$pkg" ]] && stow -D "$pkg" 2>/dev/null && echo "  ✓ Unstowed: $pkg" || true
+        [[ -d "$pkg" ]] && stow -t "$HOME" -D "$pkg" 2>/dev/null && echo "  ✓ Unstowed: $pkg" || true
     done
 else
     # Manual removal if stow not available
@@ -68,7 +72,7 @@ echo ""
 echo "${GREEN}✓ UKE removed successfully.${RESET}"
 echo ""
 echo "To completely remove source:"
-echo "  rm -rf ~/dotfiles/uke"
+echo "  rm -rf $UKE_ROOT"
 echo ""
 echo "To reinstall later:"
-echo "  cd ~/dotfiles/uke && ./scripts/install.sh"
+echo "  cd $UKE_ROOT && ./scripts/install.sh"
