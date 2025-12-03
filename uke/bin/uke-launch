@@ -2,134 +2,96 @@
 # ==============================================================================
 # UKE Launch - Smart App Launcher
 # ==============================================================================
-# Opens apps AND switches to their designated workspace
-# Usage: uke-launch <app>
+# Launches an app by nickname, handling platform differences.
+# If the app is already running, focuses it instead.
+#
+# Usage: uke-launch <app-name>
+# Example: uke-launch brave
 # ==============================================================================
 set -euo pipefail
 
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
 source "$UKE_ROOT/lib/core.sh"
 
-# ==============================================================================
-# App → Workspace Mapping
-# ==============================================================================
-declare -A APP_WORKSPACE=(
-    # Workspace 1: Browser
-    [brave]=1 [safari]=1 [firefox]=1 [chromium]=1 [chrome]=1
-    # Workspace 2: Notes
-    [obsidian]=2 [notion]=2 [bear]=2
-    # Workspace 3: Code
-    [wezterm]=3 [terminal]=3 [alacritty]=3 [kitty]=3
-    [code]=3 [vscode]=3 [codium]=3 [xcode]=3 [cursor]=3
-    [intellij]=3 [webstorm]=3 [pycharm]=3
-    # Workspace 4: Catch-all (no assignment)
-    # Workspace 5: Documents
-    [preview]=5 [evince]=5 [zathura]=5 [okular]=5 [pdf]=5
-    # Workspace 6: Raindrop
-    [raindrop]=6
-    # Workspace 7: Media
-    [spotify]=7 [music]=7 [apple-music]=7
-    # Workspace 8: Office
-    [word]=8 [excel]=8 [powerpoint]=8 [libreoffice]=8 [pages]=8 [numbers]=8 [keynote]=8
-    # Workspace 9: Communication
-    [slack]=9 [discord]=9 [mail]=9 [thunderbird]=9 [telegram]=9 [whatsapp]=9 [messages]=9 [teams]=9
-    # Workspace 10: AI
-    [claude]=10 [perplexity]=10 [chatgpt]=10
-)
+APP="${1:-}"
+
+if [[ -z "$APP" ]]; then
+    log_fatal "Usage: uke-launch <app-name>"
+fi
 
 # ==============================================================================
-# App Name → Launch Command
+# App Name Resolution
 # ==============================================================================
-get_launch_cmd() {
-    local app="$1"
+get_app_name() {
+    local key="$1"
+    
+    case "$key" in
+        # Browsers
+        brave)       is_macos && echo "Brave Browser" || echo "brave" ;;
+        safari)      is_macos && echo "Safari" || echo "" ;;
+        firefox)     echo "firefox" ;;
+        chrome)      is_macos && echo "Google Chrome" || echo "google-chrome-stable" ;;
+        
+        # Notes
+        obsidian)    is_macos && echo "Obsidian" || echo "obsidian" ;;
+        notion)      is_macos && echo "Notion" || echo "notion-app" ;;
+        
+        # Development
+        wezterm)     is_macos && echo "WezTerm" || echo "wezterm" ;;
+        alacritty)   echo "Alacritty" ;;
+        kitty)       echo "kitty" ;;
+        code)        is_macos && echo "Visual Studio Code" || echo "code" ;;
+        cursor)      is_macos && echo "Cursor" || echo "cursor" ;;
+        
+        # Media
+        spotify)     is_macos && echo "Spotify" || echo "spotify" ;;
+        
+        # Communication
+        slack)       is_macos && echo "Slack" || echo "slack" ;;
+        discord)     is_macos && echo "Discord" || echo "discord" ;;
+        
+        # Documents
+        preview)     is_macos && echo "Preview" || echo "evince" ;;
+        zathura)     echo "zathura" ;;
+        
+        # Bookmarks
+        raindrop)    is_macos && echo "Raindrop.io" || echo "raindrop" ;;
+        
+        # Default: use as-is
+        *)           echo "$key" ;;
+    esac
+}
+
+# ==============================================================================
+# Check if App is Running
+# ==============================================================================
+app_running() {
+    local name="$1"
     
     if is_macos; then
-        case "$app" in
-            brave)       echo "open -a 'Brave Browser'" ;;
-            safari)      echo "open -a Safari" ;;
-            firefox)     echo "open -a Firefox" ;;
-            chrome)      echo "open -a 'Google Chrome'" ;;
-            obsidian)    echo "open -a Obsidian" ;;
-            notion)      echo "open -a Notion" ;;
-            wezterm)     echo "open -a WezTerm" ;;
-            terminal)    echo "open -a Terminal" ;;
-            alacritty)   echo "open -a Alacritty" ;;
-            code)        echo "open -a 'Visual Studio Code'" ;;
-            xcode)       echo "open -a Xcode" ;;
-            cursor)      echo "open -a Cursor" ;;
-            preview)     echo "open -a Preview" ;;
-            spotify)     echo "open -a Spotify" ;;
-            music)       echo "open -a Music" ;;
-            word)        echo "open -a 'Microsoft Word'" ;;
-            excel)       echo "open -a 'Microsoft Excel'" ;;
-            powerpoint)  echo "open -a 'Microsoft PowerPoint'" ;;
-            pages)       echo "open -a Pages" ;;
-            numbers)     echo "open -a Numbers" ;;
-            keynote)     echo "open -a Keynote" ;;
-            slack)       echo "open -a Slack" ;;
-            discord)     echo "open -a Discord" ;;
-            mail)        echo "open -a Mail" ;;
-            telegram)    echo "open -a Telegram" ;;
-            whatsapp)    echo "open -a WhatsApp" ;;
-            messages)    echo "open -a Messages" ;;
-            teams)       echo "open -a 'Microsoft Teams'" ;;
-            raindrop)    echo "open -a Raindrop.io" ;;
-            claude)      echo "open -a Claude" ;;
-            perplexity)  echo "open -a Perplexity" ;;
-            *)           echo "open -a '$app'" ;;
-        esac
+        pgrep -x "$name" &>/dev/null || osascript -e "tell application \"System Events\" to (name of processes) contains \"$name\"" 2>/dev/null | grep -q "true"
     else
-        case "$app" in
-            brave)       echo "brave" ;;
-            firefox)     echo "firefox" ;;
-            chromium)    echo "chromium" ;;
-            chrome)      echo "google-chrome-stable" ;;
-            obsidian)    echo "obsidian" ;;
-            notion)      echo "notion-app" ;;
-            wezterm)     echo "wezterm" ;;
-            terminal)    echo "wezterm" ;;
-            alacritty)   echo "alacritty" ;;
-            kitty)       echo "kitty" ;;
-            code)        echo "code" ;;
-            codium)      echo "codium" ;;
-            cursor)      echo "cursor" ;;
-            evince)      echo "evince" ;;
-            zathura)     echo "zathura" ;;
-            okular)      echo "okular" ;;
-            spotify)     echo "spotify" ;;
-            libreoffice) echo "libreoffice" ;;
-            word)        echo "libreoffice --writer" ;;
-            excel)       echo "libreoffice --calc" ;;
-            powerpoint)  echo "libreoffice --impress" ;;
-            slack)       echo "slack" ;;
-            discord)     echo "discord" ;;
-            thunderbird) echo "thunderbird" ;;
-            mail)        echo "thunderbird" ;;
-            telegram)    echo "telegram-desktop" ;;
-            signal)      echo "signal-desktop" ;;
-            raindrop)    echo "raindrop" ;;
-            claude)      echo "claude" ;;
-            *)           echo "$app" ;;
-        esac
+        pgrep -i "${name,,}" &>/dev/null
     fi
 }
 
 # ==============================================================================
-# Switch Workspace
+# Focus Existing Window
 # ==============================================================================
-switch_workspace() {
-    local ws="$1"
+focus_app() {
+    local name="$1"
+    
     if is_macos; then
-        yabai -m space --focus "$ws" 2>/dev/null || true
+        osascript -e "tell application \"$name\" to activate" 2>/dev/null
     else
-        hyprctl dispatch workspace "$ws" 2>/dev/null || true
+        # Find window and focus it
+        local addr
+        addr=$(hyprctl clients -j | jq -r ".[] | select(.class | test(\"$name\"; \"i\")) | .address" | head -1)
+        if [[ -n "$addr" ]]; then
+            hyprctl dispatch focuswindow "address:$addr" 2>/dev/null
+        fi
     fi
 }
 
@@ -137,67 +99,35 @@ switch_workspace() {
 # Launch App
 # ==============================================================================
 launch_app() {
-    local app="$1"
-    local workspace="${APP_WORKSPACE[$app]:-}"
-    local cmd=$(get_launch_cmd "$app")
+    local name="$1"
     
-    # Switch to workspace first (if assigned)
-    if [[ -n "$workspace" ]]; then
-        log_info "Switching to workspace $workspace..."
-        switch_workspace "$workspace"
-        sleep 0.1
-    fi
-    
-    # Launch the app
-    log_info "Launching $app..."
     if is_macos; then
-        eval "$cmd"
+        open -a "$name" &>/dev/null &
     else
-        # Launch in background, detached
-        nohup $cmd >/dev/null 2>&1 &
-        disown
+        local cmd="${name,,}"
+        if command -v "$cmd" &>/dev/null; then
+            "$cmd" &>/dev/null &
+        elif command -v "$name" &>/dev/null; then
+            "$name" &>/dev/null &
+        else
+            log_fatal "Cannot launch: $name (command not found)"
+        fi
     fi
-    
-    ok "Launched $app" ${workspace:+"→ workspace $workspace"}
-}
-
-# ==============================================================================
-# List Apps
-# ==============================================================================
-list_apps() {
-    echo "Available apps with workspace assignments:"
-    echo ""
-    printf "%-15s %s\n" "APP" "WORKSPACE"
-    printf "%-15s %s\n" "---" "---------"
-    
-    # Sort by workspace
-    for app in $(echo "${!APP_WORKSPACE[@]}" | tr ' ' '\n' | sort); do
-        printf "%-15s %s\n" "$app" "${APP_WORKSPACE[$app]}"
-    done
 }
 
 # ==============================================================================
 # Main
 # ==============================================================================
-case "${1:-}" in
-    ""|list|ls|-l)
-        list_apps
-        ;;
-    -h|--help|help)
-        cat << 'EOF'
-UKE Launch - Smart App Launcher
+APP_NAME=$(get_app_name "$APP")
 
-Usage:
-  uke-launch <app>     Launch app and switch to its workspace
-  uke-launch list      List all apps and their workspaces
+if [[ -z "$APP_NAME" ]]; then
+    log_fatal "App '$APP' is not available on $UKE_OS"
+fi
 
-Examples:
-  uke-launch brave     → Opens Brave and switches to WS 1
-  uke-launch obsidian  → Opens Obsidian and switches to WS 2
-  uke-launch code      → Opens VS Code and switches to WS 3
-EOF
-        ;;
-    *)
-        launch_app "$1"
-        ;;
-esac
+if app_running "$APP_NAME"; then
+    log_info "Focusing: $APP_NAME"
+    focus_app "$APP_NAME"
+else
+    log_info "Launching: $APP_NAME"
+    launch_app "$APP_NAME"
+fi

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Installer v6.3 - Arch Linux Ready
+# UKE Installer v7.0 - Complete Setup with Hardware Profile
 # ==============================================================================
 set -euo pipefail
 
@@ -9,7 +9,7 @@ UKE_ROOT="${SCRIPT_DIR%/scripts}"
 
 # Colors
 RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
-BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
+CYAN=$'\e[36m' BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
 
 ok()   { echo "${GREEN}✓${RESET} $*"; }
 fail() { echo "${RED}✗${RESET} $*"; }
@@ -17,7 +17,7 @@ info() { echo "${BLUE}→${RESET} $*"; }
 warn() { echo "${YELLOW}!${RESET} $*"; }
 
 # ==============================================================================
-# OS & Distro Detection
+# OS Detection
 # ==============================================================================
 case "$(uname -s)" in
     Darwin) OS="macos" ;;
@@ -25,7 +25,6 @@ case "$(uname -s)" in
     *)      echo "Unsupported OS"; exit 1 ;;
 esac
 
-# Detect Linux distribution
 DISTRO=""
 if [[ "$OS" == "linux" ]]; then
     if [[ -f /etc/arch-release ]]; then
@@ -34,29 +33,8 @@ if [[ "$OS" == "linux" ]]; then
         DISTRO="debian"
     elif [[ -f /etc/fedora-release ]]; then
         DISTRO="fedora"
-    else
-        DISTRO="unknown"
     fi
 fi
-
-# ==============================================================================
-# Package Manager Detection
-# ==============================================================================
-get_pkg_manager() {
-    if [[ "$OS" == "macos" ]]; then
-        echo "brew"
-    elif command -v pacman &>/dev/null; then
-        echo "pacman"
-    elif command -v apt &>/dev/null; then
-        echo "apt"
-    elif command -v dnf &>/dev/null; then
-        echo "dnf"
-    else
-        echo "unknown"
-    fi
-}
-
-PKG_MANAGER=$(get_pkg_manager)
 
 # ==============================================================================
 # Dependency Check
@@ -65,7 +43,6 @@ check_deps() {
     info "Checking dependencies..."
     local missing=()
     
-    # Core dependencies (all platforms)
     for cmd in git stow jq; do
         command -v "$cmd" &>/dev/null || missing+=("$cmd")
     done
@@ -73,57 +50,25 @@ check_deps() {
     if [[ "$OS" == "macos" ]]; then
         command -v yabai &>/dev/null || missing+=("yabai")
         command -v skhd &>/dev/null || missing+=("skhd")
-        command -v yq &>/dev/null || missing+=("yq")
     else
         command -v hyprctl &>/dev/null || missing+=("hyprland")
-        command -v keyd &>/dev/null || missing+=("keyd")
     fi
     
     if [[ ${#missing[@]} -gt 0 ]]; then
-        fail "Missing dependencies: ${missing[*]}"
+        fail "Missing: ${missing[*]}"
         echo ""
         echo "Install with:"
-        case "$PKG_MANAGER" in
-            brew)
-                echo "  brew install ${missing[*]}"
-                ;;
-            pacman)
-                # Map package names for Arch
-                local arch_pkgs=""
-                for pkg in "${missing[@]}"; do
-                    case "$pkg" in
-                        hyprland) arch_pkgs+="hyprland " ;;
-                        keyd)     arch_pkgs+="keyd " ;;
-                        *)        arch_pkgs+="$pkg " ;;
-                    esac
-                done
-                echo "  sudo pacman -S $arch_pkgs"
-                echo ""
-                echo "  # For AUR packages (if needed):"
-                echo "  yay -S ${missing[*]}"
-                ;;
-            apt)
-                echo "  sudo apt install ${missing[*]}"
-                ;;
-            dnf)
-                echo "  sudo dnf install ${missing[*]}"
-                ;;
-            *)
-                echo "  Please install: ${missing[*]}"
-                ;;
-        esac
+        if [[ "$OS" == "macos" ]]; then
+            echo "  brew install ${missing[*]}"
+        elif [[ "$DISTRO" == "arch" ]]; then
+            echo "  sudo pacman -S ${missing[*]}"
+        else
+            echo "  Please install: ${missing[*]}"
+        fi
         exit 1
     fi
     
     ok "All dependencies installed"
-}
-
-# ==============================================================================
-# Generate Configs
-# ==============================================================================
-generate_configs() {
-    info "Generating configs..."
-    bash "$UKE_ROOT/lib/gen.sh" all
 }
 
 # ==============================================================================
@@ -132,12 +77,22 @@ generate_configs() {
 create_dirs() {
     info "Creating directories..."
     mkdir -p ~/.local/bin
+    mkdir -p ~/.local/state/uke
     mkdir -p ~/.config/skhd
     mkdir -p ~/.config/yabai
     mkdir -p ~/.config/hypr
-    mkdir -p ~/.config/keyd
-    mkdir -p ~/.local/state/uke
+    mkdir -p ~/.config/alacritty
+    mkdir -p ~/.config/wezterm
+    mkdir -p "$UKE_ROOT/gen"/{skhd,yabai,hyprland}
     ok "Directories created"
+}
+
+# ==============================================================================
+# Generate Configs
+# ==============================================================================
+generate_configs() {
+    info "Generating configs..."
+    bash "$UKE_ROOT/lib/gen.sh" all
 }
 
 # ==============================================================================
@@ -168,7 +123,6 @@ link_configs() {
         ln -sf "$UKE_ROOT/gen/yabai/yabairc" "$HOME/.config/yabai/yabairc"
         ok "Linked: yabairc"
     else
-        # Hyprland config
         ln -sf "$UKE_ROOT/gen/hyprland/hyprland.conf" "$HOME/.config/hypr/hyprland.conf"
         ok "Linked: hyprland.conf"
     fi
@@ -181,13 +135,8 @@ stow_dotfiles() {
     info "Stowing dotfiles..."
     cd "$UKE_ROOT/stow"
     
-    # Common packages
     local packages=(wezterm tmux zsh nvim)
-    
-    # Platform-specific packages
-    if [[ "$OS" == "macos" ]]; then
-        packages+=(karabiner)
-    fi
+    [[ "$OS" == "macos" ]] && packages+=(karabiner)
     
     for pkg in "${packages[@]}"; do
         if [[ -d "$pkg" ]]; then
@@ -197,62 +146,21 @@ stow_dotfiles() {
 }
 
 # ==============================================================================
-# Setup keyd (Linux only - requires sudo)
+# Setup Hardware Profile
 # ==============================================================================
-setup_keyd() {
-    if [[ "$OS" != "linux" ]]; then
-        return 0
-    fi
+setup_profile() {
+    info "Setting up hardware profile..."
     
-    if ! command -v keyd &>/dev/null; then
-        warn "keyd not installed, skipping keyd setup"
-        return 0
-    fi
-    
-    info "Setting up keyd..."
-    
-    local keyd_config="$UKE_ROOT/stow/keyd/.config/keyd/default.conf"
-    
-    if [[ ! -f "$keyd_config" ]]; then
-        warn "keyd config not found at $keyd_config"
-        return 1
-    fi
-    
-    # Check if we have sudo access
-    if ! sudo -n true 2>/dev/null; then
-        warn "keyd requires sudo to link to /etc/keyd/"
-        echo ""
-        echo "${YELLOW}To complete keyd setup, run:${RESET}"
-        echo "  sudo mkdir -p /etc/keyd"
-        echo "  sudo ln -sf $keyd_config /etc/keyd/default.conf"
-        echo "  sudo systemctl enable --now keyd"
-        echo ""
-        return 0
-    fi
-    
-    # We have sudo, do the setup
-    sudo mkdir -p /etc/keyd
-    sudo ln -sf "$keyd_config" /etc/keyd/default.conf
-    ok "Linked keyd config to /etc/keyd/"
-    
-    # Enable and start keyd service
-    if systemctl is-enabled keyd &>/dev/null; then
-        sudo systemctl restart keyd
-        ok "keyd service restarted"
+    if [[ -f "$HOME/.local/state/uke/machine.profile" ]]; then
+        ok "Hardware profile exists"
     else
-        sudo systemctl enable --now keyd
-        ok "keyd service enabled and started"
+        info "Creating initial hardware profile..."
+        bash "$UKE_ROOT/scripts/manage_profile.sh" --auto
     fi
-}
-
-# ==============================================================================
-# Make Bunches Executable
-# ==============================================================================
-setup_bunches() {
-    info "Setting up bunches..."
-    chmod +x "$UKE_ROOT/bunches"/*.sh 2>/dev/null || true
-    chmod +x "$UKE_ROOT/templates"/*.sh 2>/dev/null || true
-    ok "Bunches ready"
+    
+    # Generate hardware ghost files
+    info "Generating hardware configs..."
+    bash "$UKE_ROOT/scripts/apply_profile.sh"
 }
 
 # ==============================================================================
@@ -265,7 +173,6 @@ start_services() {
         yabai --restart-service 2>/dev/null && ok "yabai restarted" || warn "yabai restart failed"
         skhd --restart-service 2>/dev/null && ok "skhd restarted" || warn "skhd restart failed"
     else
-        # Hyprland reloads automatically when config changes
         if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
             hyprctl reload 2>/dev/null && ok "hyprland reloaded" || warn "hyprland reload failed"
         else
@@ -275,36 +182,13 @@ start_services() {
 }
 
 # ==============================================================================
-# Print Arch-specific Help
-# ==============================================================================
-print_arch_help() {
-    if [[ "$OS" != "linux" ]] || [[ "$DISTRO" != "arch" ]]; then
-        return 0
-    fi
-    
-    echo ""
-    echo "${BOLD}Arch Linux Notes:${RESET}"
-    echo ""
-    echo "  ${DIM}# Recommended packages:${RESET}"
-    echo "  sudo pacman -S hyprland keyd waybar dunst wofi grim slurp wl-clipboard cliphist"
-    echo "  sudo pacman -S wezterm neovim stow jq ripgrep fd"
-    echo ""
-    echo "  ${DIM}# Optional AUR packages:${RESET}"
-    echo "  yay -S brave-bin obsidian-bin spotify"
-    echo ""
-    echo "  ${DIM}# Enable keyd service:${RESET}"
-    echo "  sudo systemctl enable --now keyd"
-    echo ""
-}
-
-# ==============================================================================
 # Main
 # ==============================================================================
 main() {
     echo ""
-    echo "${BOLD}╔══════════════════════════════════════╗${RESET}"
-    echo "${BOLD}║     UKE v6.3 Installer               ║${RESET}"
-    echo "${BOLD}╚══════════════════════════════════════╝${RESET}"
+    printf "%s╔══════════════════════════════════════╗%s\n" "$CYAN" "$RESET"
+    printf "%s║%s     UKE v7.0 Installer               %s║%s\n" "$CYAN" "$BOLD" "$CYAN" "$RESET"
+    printf "%s╚══════════════════════════════════════╝%s\n" "$CYAN" "$RESET"
     echo ""
     echo "Platform: $OS"
     [[ -n "$DISTRO" ]] && echo "Distro:   $DISTRO"
@@ -325,8 +209,8 @@ main() {
         --gen)
             generate_configs
             ;;
-        --keyd)
-            setup_keyd
+        --profile)
+            setup_profile
             ;;
         full|*)
             check_deps
@@ -335,8 +219,7 @@ main() {
             link_binaries
             link_configs
             stow_dotfiles
-            setup_bunches
-            setup_keyd
+            setup_profile
             start_services
             
             echo ""
@@ -344,11 +227,13 @@ main() {
             echo "${GREEN}✓ Installation complete!${RESET}"
             echo ""
             echo "Next steps:"
-            echo "  1. Restart your terminal (or run: source ~/.zshrc)"
-            echo "  2. Test with: uke status"
-            echo "  3. See: docs/CHEATSHEET.md for keybindings"
-            
-            print_arch_help
+            echo "  1. Restart terminal (or: source ~/.zshrc)"
+            echo "  2. Customize hardware: uke profile"
+            echo "  3. Regenerate if needed: uke gen && uke reload"
+            echo ""
+            echo "Quick commands:"
+            echo "  uke status    # Show current status"
+            echo "  uke help      # Full command reference"
             ;;
     esac
 }

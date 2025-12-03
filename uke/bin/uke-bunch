@@ -1,36 +1,46 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Bunch Runner
+# UKE Bunch - Environment Preset Runner
 # ==============================================================================
-# Runs environment presets from the bunches/ directory
-# Usage: uke-bunch <n> or uke-bunch list
+# Runs a "bunch" - a preset environment that launches specific apps.
+#
+# Usage: uke-bunch <n>
+# Example: uke-bunch coding
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
 source "$UKE_ROOT/lib/core.sh"
 
-BUNCHES_DIR="$UKE_ROOT/bunches"
+BUNCH_NAME="${1:-}"
+BUNCH_DIR="$UKE_ROOT/bunches"
 
+# ==============================================================================
+# List Available Bunches
+# ==============================================================================
 list_bunches() {
     echo "Available bunches:"
-    echo ""
-    for script in "$BUNCHES_DIR"/*.sh; do
-        [[ -f "$script" ]] || continue
-        local name=$(basename "$script" .sh)
-        # Skip library files
-        [[ "$name" == "lib-os-detect" || "$name" == "bunch-manager" ]] && continue
-        echo "  • $name"
+    for f in "$BUNCH_DIR"/*.sh; do
+        [[ -f "$f" ]] || continue
+        local name
+        name=$(basename "$f" .sh)
+        [[ "$name" == "lib-os-detect" ]] && continue
+        
+        # Try to extract description
+        local desc
+        desc=$(grep -m1 "^# BUNCH:" "$f" 2>/dev/null | sed 's/# BUNCH: [^-]*- //' || echo "")
+        printf "  %-12s %s\n" "$name" "$desc"
     done
-    echo ""
-    echo "Run with: uke-bunch <n>"
-    echo "Or via hotkey: Cmd+Ctrl+1-5 (macOS) / Alt+Ctrl+1-5 (Linux)"
 }
 
+# ==============================================================================
+# Run Bunch
+# ==============================================================================
 run_bunch() {
     local name="$1"
-    local script="$BUNCHES_DIR/${name}.sh"
+    local script="$BUNCH_DIR/${name}.sh"
     
     if [[ ! -f "$script" ]]; then
         log_error "Bunch not found: $name"
@@ -39,20 +49,28 @@ run_bunch() {
         exit 1
     fi
     
-    if [[ ! -x "$script" ]]; then
-        chmod +x "$script"
-    fi
-    
-    "$script"
+    log_info "Running bunch: $name"
+    bash "$script"
 }
 
-case "${1:-}" in
-    "") list_bunches ;;
-    list|ls) list_bunches ;;
-    help|--help|-h) 
-        echo "Usage: uke-bunch <n>"
+# ==============================================================================
+# Main
+# ==============================================================================
+if [[ -z "$BUNCH_NAME" ]]; then
+    list_bunches
+    exit 0
+fi
+
+case "$BUNCH_NAME" in
+    list|--list|-l)
+        list_bunches
+        ;;
+    help|--help|-h)
+        echo "Usage: uke-bunch <name>"
         echo ""
         list_bunches
         ;;
-    *) run_bunch "$1" ;;
+    *)
+        run_bunch "$BUNCH_NAME"
+        ;;
 esac

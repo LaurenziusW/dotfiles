@@ -1,227 +1,163 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Scratchpad - Toggle dropdown/floating windows
+# UKE Scratchpad - Dropdown/Toggle Windows
 # ==============================================================================
-# Supports both macOS (yabai) and Linux (Hyprland special workspaces)
+# Toggles scratchpad windows - special floating windows that appear on demand.
+#
+# Usage: uke-scratchpad <name>
+# Names: terminal, notes, music, calc
 # ==============================================================================
 set -euo pipefail
 
-# Resolve symlink to find true source location
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
 source "$UKE_ROOT/lib/core.sh"
 
-SCRATCH_STATE="$UKE_STATE/scratchpads"
-mkdir -p "$SCRATCH_STATE"
+NAME="${1:-terminal}"
 
 # ==============================================================================
-# Scratchpad Definitions (hardcoded for reliability)
+# Scratchpad Configuration
 # ==============================================================================
-declare -A SCRATCH_APPS_MACOS=(
-    [terminal]="WezTerm"
-    [notes]="Obsidian"
-    [music]="Spotify"
-    [calc]="Calculator"
-)
+declare -A SCRATCH_APP
+declare -A SCRATCH_CLASS
 
-declare -A SCRATCH_APPS_LINUX=(
-    [terminal]="wezterm"
-    [notes]="obsidian"
-    [music]="spotify"
-    [calc]="gnome-calculator"
-)
+# macOS app names
+SCRATCH_APP[terminal_macos]="WezTerm"
+SCRATCH_APP[notes_macos]="Obsidian"
+SCRATCH_APP[music_macos]="Spotify"
+SCRATCH_APP[calc_macos]="Calculator"
 
-declare -A SCRATCH_SIZE=(
-    [terminal]="80:40:top"      # width%:height%:position
-    [notes]="70:80:center"
-    [music]="60:70:center"
-    [calc]="30:40:center"
-)
+# Linux app names
+SCRATCH_APP[terminal_linux]="wezterm"
+SCRATCH_APP[notes_linux]="obsidian"
+SCRATCH_APP[music_linux]="spotify"
+SCRATCH_APP[calc_linux]="gnome-calculator"
+
+# Window classes for matching (Linux)
+SCRATCH_CLASS[terminal]="wezterm"
+SCRATCH_CLASS[notes]="obsidian"
+SCRATCH_CLASS[music]="spotify"
+SCRATCH_CLASS[calc]="gnome-calculator"
 
 # ==============================================================================
-# macOS Implementation (yabai)
+# Get App for Platform
+# ==============================================================================
+get_scratch_app() {
+    local name="$1"
+    local key
+    is_macos && key="${name}_macos" || key="${name}_linux"
+    echo "${SCRATCH_APP[$key]:-}"
+}
+
+# ==============================================================================
+# macOS Scratchpad (using yabai)
 # ==============================================================================
 scratchpad_macos() {
     local name="$1"
-    local app_name="${SCRATCH_APPS_MACOS[$name]:-}"
+    local app
+    app=$(get_scratch_app "$name")
     
-    [[ -z "$app_name" ]] && log_fatal "Unknown scratchpad: $name"
+    if [[ -z "$app" ]]; then
+        log_fatal "Unknown scratchpad: $name"
+    fi
     
-    # Parse size config
-    IFS=':' read -r width height position <<< "${SCRATCH_SIZE[$name]:-80:40:top}"
+    # Check if app window exists
+    local window_id
+    window_id=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app\") | .id" | head -1)
     
-    local state_file="$SCRATCH_STATE/${name}.id"
-    
-    # Get display dimensions
-    local display_info=$(yabai -m query --displays --display)
-    local display_w=$(echo "$display_info" | jq -r '.frame.w | floor')
-    local display_h=$(echo "$display_info" | jq -r '.frame.h | floor')
-    local display_x=$(echo "$display_info" | jq -r '.frame.x | floor')
-    local display_y=$(echo "$display_info" | jq -r '.frame.y | floor')
-    
-    # Calculate window dimensions
-    local win_w=$((display_w * width / 100))
-    local win_h=$((display_h * height / 100))
-    local win_x=$((display_x + (display_w - win_w) / 2))
-    local win_y
-    
-    case "$position" in
-        top)    win_y=$((display_y + 40)) ;;
-        bottom) win_y=$((display_y + display_h - win_h - 20)) ;;
-        center) win_y=$((display_y + (display_h - win_h) / 2)) ;;
-        *)      win_y=$((display_y + 40)) ;;
-    esac
-    
-    local window_id=""
-    
-    # Check saved ID
-    if [[ -f "$state_file" ]]; then
-        local saved_id=$(cat "$state_file")
-        if yabai -m query --windows --window "$saved_id" &>/dev/null; then
-            window_id="$saved_id"
+    if [[ -n "$window_id" ]]; then
+        # Window exists - check if focused
+        local focused
+        focused=$(yabai -m query --windows --window | jq -r '.id' 2>/dev/null || echo "")
+        
+        if [[ "$focused" == "$window_id" ]]; then
+            # Already focused - hide it (send to scratchpad space or minimize)
+            yabai -m window "$window_id" --space 11 2>/dev/null || yabai -m window "$window_id" --minimize
+            log_info "Hidden: $app"
+        else
+            # Not focused - bring to current space and focus
+            yabai -m window "$window_id" --space mouse
+            yabai -m window "$window_id" --focus
+            yabai -m window "$window_id" --toggle float 2>/dev/null || true
+            log_info "Focused: $app"
         fi
-    fi
-    
-    # Find by app name
-    if [[ -z "$window_id" ]]; then
-        window_id=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app_name\") | .id" | head -1)
-    fi
-    
-    # Launch if needed
-    if [[ -z "$window_id" || "$window_id" == "null" ]]; then
-        log_info "Launching $app_name..."
-        open -a "$app_name"
-        
-        for i in {1..25}; do
-            sleep 0.2
-            window_id=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app_name\") | .id" | head -1)
-            [[ -n "$window_id" && "$window_id" != "null" ]] && break
-        done
-        
-        [[ -z "$window_id" ]] && log_fatal "Failed to launch $app_name"
-    fi
-    
-    echo "$window_id" > "$state_file"
-
-    # Toggle Logic
-    local window_info=$(yabai -m query --windows --window "$window_id")
-    local is_minimized=$(echo "$window_info" | jq -r '.["is-minimized"]')
-    local current_space=$(yabai -m query --spaces --space | jq -r '.index')
-    local window_space=$(echo "$window_info" | jq -r '.space')
-    local has_focus=$(echo "$window_info" | jq -r '.["has-focus"]')
-
-    if [[ "$has_focus" == "true" ]]; then
-        # Hide it
-        yabai -m window "$window_id" --minimize
     else
-        # Show it
-        if [[ "$window_space" != "$current_space" ]]; then
-            yabai -m window "$window_id" --space "$current_space"
+        # Window doesn't exist - launch app
+        open -a "$app"
+        log_info "Launched: $app"
+        
+        # Wait and configure
+        sleep 0.5
+        window_id=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app\") | .id" | head -1)
+        if [[ -n "$window_id" ]]; then
+            yabai -m window "$window_id" --toggle float
+            # Center and resize based on scratchpad type
+            case "$name" in
+                terminal)
+                    yabai -m window "$window_id" --resize abs:1200:400
+                    yabai -m window "$window_id" --move abs:100:50
+                    ;;
+                notes)
+                    yabai -m window "$window_id" --resize abs:1000:800
+                    yabai -m window "$window_id" --grid 8:8:1:1:6:6
+                    ;;
+                music)
+                    yabai -m window "$window_id" --resize abs:800:600
+                    yabai -m window "$window_id" --grid 8:8:2:2:4:4
+                    ;;
+                calc)
+                    yabai -m window "$window_id" --grid 8:8:3:3:2:2
+                    ;;
+            esac
         fi
-
-        if [[ "$is_minimized" == "true" ]]; then
-            yabai -m window "$window_id" --deminimize
-        fi
-
-        # Float and position
-        yabai -m window "$window_id" --toggle float 2>/dev/null || true
-        yabai -m window "$window_id" --move abs:${win_x}:${win_y}
-        yabai -m window "$window_id" --resize abs:${win_w}:${win_h}
-        yabai -m window "$window_id" --focus
     fi
 }
 
 # ==============================================================================
-# Linux Implementation (Hyprland Special Workspaces)
+# Linux Scratchpad (using Hyprland special workspaces)
 # ==============================================================================
 scratchpad_linux() {
     local name="$1"
-    local app_cmd="${SCRATCH_APPS_LINUX[$name]:-}"
+    local app class
+    app=$(get_scratch_app "$name")
+    class="${SCRATCH_CLASS[$name]:-}"
     
-    [[ -z "$app_cmd" ]] && log_fatal "Unknown scratchpad: $name"
-    
-    # Hyprland special workspace name
-    local special_ws="special:$name"
-    
-    # Parse size config
-    IFS=':' read -r width height position <<< "${SCRATCH_SIZE[$name]:-80:40:top}"
-    
-    # Check if window exists in special workspace
-    local existing=$(hyprctl clients -j | jq -r ".[] | select(.workspace.name == \"$special_ws\") | .address" | head -1)
-    
-    if [[ -n "$existing" ]]; then
-        # Toggle the special workspace
-        hyprctl dispatch togglespecialworkspace "$name"
-    else
-        # Check if app is running anywhere
-        local app_class="${app_cmd%% *}"  # Get first word (app name without args)
-        local running=$(hyprctl clients -j | jq -r ".[] | select(.class | test(\"$app_class\"; \"i\")) | .address" | head -1)
-        
-        if [[ -n "$running" ]]; then
-            # Move existing window to special workspace
-            hyprctl dispatch movetoworkspacesilent "$special_ws,address:$running"
-            hyprctl dispatch togglespecialworkspace "$name"
-        else
-            # Launch app in special workspace
-            # First, create a window rule for the app
-            local rule_class="$app_class"
-            
-            # Add temporary rule to send to special workspace
-            hyprctl keyword windowrulev2 "workspace $special_ws silent,class:^($rule_class)$"
-            
-            # Launch
-            $app_cmd &
-            disown
-            
-            # Wait a moment then show
-            sleep 0.5
-            hyprctl dispatch togglespecialworkspace "$name"
-            
-            # Remove the temporary rule after launch
-            sleep 1
-            hyprctl keyword windowrulev2 "unset,class:^($rule_class)$" 2>/dev/null || true
-        fi
+    if [[ -z "$app" ]]; then
+        log_fatal "Unknown scratchpad: $name"
     fi
     
-    # Apply size/position via animation settings (Hyprland handles special workspace sizing)
-    # For custom sizing, we'd need to set it in the static config
-}
-
-# ==============================================================================
-# List Available Scratchpads
-# ==============================================================================
-list_scratchpads() {
-    echo "Available scratchpads:"
-    echo ""
-    for name in "${!SCRATCH_SIZE[@]}"; do
-        IFS=':' read -r width height position <<< "${SCRATCH_SIZE[$name]}"
-        if is_macos; then
-            local app="${SCRATCH_APPS_MACOS[$name]:-unknown}"
-        else
-            local app="${SCRATCH_APPS_LINUX[$name]:-unknown}"
-        fi
-        printf "  %-12s → %-20s (%s%% x %s%%, %s)\n" "$name" "$app" "$width" "$height" "$position"
-    done
+    # Use Hyprland special workspaces
+    local special_ws="special:$name"
+    
+    # Check if window exists in special workspace
+    local window_count
+    window_count=$(hyprctl clients -j | jq "[.[] | select(.workspace.name == \"$special_ws\")] | length")
+    
+    if [[ "$window_count" -gt 0 ]]; then
+        # Toggle visibility
+        hyprctl dispatch togglespecialworkspace "$name"
+    else
+        # Launch app into special workspace
+        hyprctl dispatch exec "[workspace $special_ws] $app"
+        sleep 0.3
+        hyprctl dispatch togglespecialworkspace "$name"
+    fi
+    
+    log_info "Toggled scratchpad: $name"
 }
 
 # ==============================================================================
 # Main
 # ==============================================================================
-case "${1:-}" in
-    ""|list|ls|help|-h|--help)
-        list_scratchpads
+case "$NAME" in
+    terminal|notes|music|calc)
+        is_macos && scratchpad_macos "$NAME" || scratchpad_linux "$NAME"
+        ;;
+    list)
+        echo "Available scratchpads: terminal, notes, music, calc"
         ;;
     *)
-        if is_macos; then
-            scratchpad_macos "$1"
-        else
-            scratchpad_linux "$1"
-        fi
+        log_fatal "Unknown scratchpad: $NAME (use: terminal|notes|music|calc)"
         ;;
 esac
