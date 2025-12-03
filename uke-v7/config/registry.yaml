@@ -1,0 +1,266 @@
+# ==============================================================================
+# UKE Registry v7.0 - Single Source of Truth
+# ==============================================================================
+# This file defines all software preferences, keybindings, and app assignments.
+# Hardware-specific settings are in machine.profile (see: uke profile)
+#
+# After editing: uke gen && uke reload
+# ==============================================================================
+
+version: "7.0.0"
+
+# ==============================================================================
+# Theme / Colorscheme
+# ==============================================================================
+# Colors used across all generated configs (Nord theme)
+theme:
+  name: "nord"
+  colors:
+    accent: "#88c0d0"
+    background: "#2e3440"
+    bg_light: "#3b4252"
+    foreground: "#eceff4"
+    border_active: "88c0d0"      # Without # for yabai/hyprland
+    border_inactive: "3b4252"
+    red: "#bf616a"
+    green: "#a3be8c"
+    yellow: "#ebcb8b"
+    blue: "#5e81ac"
+
+# ==============================================================================
+# Modifiers
+# ==============================================================================
+# Maps logical modifier names to physical keys per platform
+# PRIMARY: Window manager operations (focus, move, workspaces)
+# SECONDARY: Terminal/WezTerm internals
+# TERTIARY: Window resizing
+# QUATERNARY: Shell signals (Ctrl+C, etc.) - NEVER intercepted
+modifiers:
+  primary:        { macos: "cmd",           linux: "ALT" }
+  primary_shift:  { macos: "cmd + shift",   linux: "ALT SHIFT" }
+  secondary:      { macos: "alt",           linux: "SUPER" }
+  secondary_shift: { macos: "alt + shift",  linux: "SUPER SHIFT" }
+  tertiary:       { macos: "alt + shift",   linux: "SUPER SHIFT" }
+  quaternary:     { macos: "ctrl",          linux: "CTRL" }
+  bunch:          { macos: "cmd + ctrl",    linux: "ALT CTRL" }
+  launcher:       { macos: "cmd + alt",     linux: "ALT SUPER" }
+
+# ==============================================================================
+# Applications
+# ==============================================================================
+# Maps app nicknames to actual app names per platform
+apps:
+  # Browsers
+  safari:      { macos: "Safari",           linux: "" }
+  brave:       { macos: "Brave Browser",    linux: "brave" }
+  firefox:     { macos: "Firefox",          linux: "firefox" }
+  chrome:      { macos: "Google Chrome",    linux: "google-chrome-stable" }
+  
+  # Notes & Knowledge
+  obsidian:    { macos: "Obsidian",         linux: "obsidian" }
+  notion:      { macos: "Notion",           linux: "notion-app" }
+  
+  # Documents
+  preview:     { macos: "Preview",          linux: "evince" }
+  pdfexpert:   { macos: "PDF Expert",       linux: "" }
+  zathura:     { macos: "",                 linux: "zathura" }
+  okular:      { macos: "",                 linux: "okular" }
+  
+  # Development
+  wezterm:     { macos: "WezTerm",          linux: "wezterm" }
+  alacritty:   { macos: "Alacritty",        linux: "alacritty" }
+  kitty:       { macos: "kitty",            linux: "kitty" }
+  code:        { macos: "Visual Studio Code", linux: "code" }
+  codium:      { macos: "VSCodium",         linux: "codium" }
+  xcode:       { macos: "Xcode",            linux: "" }
+  cursor:      { macos: "Cursor",           linux: "cursor" }
+  
+  # Media
+  spotify:     { macos: "Spotify",          linux: "spotify" }
+  music:       { macos: "Music",            linux: "" }
+  
+  # Bookmarks
+  raindrop:    { macos: "Raindrop.io",      linux: "raindrop" }
+  
+  # Office
+  word:        { macos: "Microsoft Word",       linux: "libreoffice-writer" }
+  excel:       { macos: "Microsoft Excel",      linux: "libreoffice-calc" }
+  powerpoint:  { macos: "Microsoft PowerPoint", linux: "libreoffice-impress" }
+  pages:       { macos: "Pages",            linux: "" }
+  numbers:     { macos: "Numbers",          linux: "" }
+  keynote:     { macos: "Keynote",          linux: "" }
+  libreoffice: { macos: "",                 linux: "libreoffice" }
+  
+  # Communication
+  slack:       { macos: "Slack",            linux: "slack" }
+  discord:     { macos: "Discord",          linux: "discord" }
+  mail:        { macos: "Mail",             linux: "thunderbird" }
+  telegram:    { macos: "Telegram",         linux: "telegram-desktop" }
+  whatsapp:    { macos: "WhatsApp",         linux: "" }
+  messages:    { macos: "Messages",         linux: "" }
+  teams:       { macos: "Microsoft Teams",  linux: "teams" }
+  
+  # AI
+  claude:      { macos: "Claude",           linux: "" }
+  perplexity:  { macos: "Perplexity",       linux: "" }
+  chatgpt:     { macos: "ChatGPT",          linux: "" }
+
+# ==============================================================================
+# Workspaces
+# ==============================================================================
+# Defines what apps belong on which workspace
+# Apps will be automatically moved to their assigned workspace
+workspaces:
+  1:  { name: "browser",   apps: [safari, brave, firefox, chrome] }
+  2:  { name: "notes",     apps: [obsidian, notion] }
+  3:  { name: "code",      apps: [wezterm, alacritty, kitty, code, codium, xcode, cursor] }
+  4:  { name: "catch-all", apps: [] }
+  5:  { name: "documents", apps: [preview, pdfexpert, zathura, okular] }
+  6:  { name: "raindrop",  apps: [raindrop] }
+  7:  { name: "media",     apps: [spotify, music] }
+  8:  { name: "office",    apps: [word, excel, powerpoint, pages, numbers, keynote, libreoffice] }
+  9:  { name: "comms",     apps: [slack, discord, mail, telegram, whatsapp, messages, teams] }
+  10: { name: "ai",        apps: [claude, perplexity, chatgpt] }
+
+# ==============================================================================
+# Scratchpads
+# ==============================================================================
+# Dropdown/toggle windows that appear on demand
+scratchpads:
+  terminal:
+    app: wezterm
+    key: "grave"           # backtick key (`)
+    size: { width: 80, height: 40 }
+    position: "top"
+    
+  notes:
+    app: obsidian
+    key: "n"
+    size: { width: 60, height: 70 }
+    position: "center"
+    modifier: "launcher"   # Cmd+Alt on macOS, Alt+Super on Linux
+    
+  music:
+    app: spotify
+    key: "m"
+    size: { width: 50, height: 60 }
+    position: "center"
+    modifier: "launcher"
+    
+  calc:
+    app_macos: "Calculator"
+    app_linux: "gnome-calculator"
+    key: "c"
+    size: { width: 30, height: 40 }
+    position: "center"
+
+# ==============================================================================
+# Float Rules
+# ==============================================================================
+# Apps that should always float (not be tiled)
+float_rules:
+  - "System Settings"
+  - "System Preferences"
+  - "Calculator"
+  - "Finder"
+  - "App Store"
+  - "Karabiner-Elements"
+  - "Karabiner-EventViewer"
+  - "Activity Monitor"
+  - "Archive Utility"
+  - "zoom.us"
+  - "FaceTime"
+  - "pavucontrol"
+  - "nm-connection-editor"
+  - "lxappearance"
+  - "blueman-manager"
+
+# ==============================================================================
+# Window Rules
+# ==============================================================================
+# Fine-grained control over window behavior
+window_rules:
+  - match: { app: "zoom.us" }
+    float: true
+    sticky: true
+    opacity: 1.0
+    
+  - match: { app: "FaceTime" }
+    float: true
+    sticky: true
+
+  - match: { title: "Picture in Picture" }
+    float: true
+    sticky: true
+    topmost: true
+    size: { width: 400, height: 225 }
+
+  - match: { title: "Preferences" }
+    float: true
+    center: true
+    
+  - match: { title: "Settings" }
+    float: true
+    center: true
+
+# ==============================================================================
+# Bunches (Environment Presets)
+# ==============================================================================
+# Pre-configured environments launched with Cmd+Ctrl+1-5 (macOS) / Alt+Ctrl+F1-F5 (Linux)
+bunches:
+  study:
+    description: "Study and note-taking environment"
+    focus: 2
+    apps: [obsidian, brave, wezterm, preview]
+    
+  guitar:
+    description: "Guitar practice with music"
+    focus: 7
+    apps: [spotify, brave]
+    
+  coding:
+    description: "Development environment"
+    focus: 3
+    apps: [wezterm, code, brave]
+    
+  email:
+    description: "Communication and admin"
+    focus: 9
+    apps: [mail, slack, brave]
+    
+  reading:
+    description: "Focused reading"
+    focus: 5
+    apps: [preview, obsidian]
+
+# ==============================================================================
+# Window Manager Base Settings
+# ==============================================================================
+# Note: These can be overridden by machine.profile via ghost files
+window_manager:
+  macos:
+    layout: bsp
+    padding: 4
+    gap: 4
+    mouse_follows_focus: false
+    focus_follows_mouse: false
+    borders:
+      enabled: true
+      width: 3
+      
+  linux:
+    layout: dwindle
+    gaps_in: 2
+    gaps_out: 4
+    border_size: 2
+    animations: true
+
+# ==============================================================================
+# Sessions
+# ==============================================================================
+sessions:
+  storage: "~/.local/state/uke/sessions"
+  autosave:
+    enabled: false
+    interval: 300
+    name: "autosave"
