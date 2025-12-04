@@ -512,60 +512,53 @@ input {
     follow_mouse = 1
     touchpad {
         natural_scroll = true
-        # tap-to-click often defaults to true, removing explicit set to avoid errors
     }
 }
-
-# GESTURES DISABLED FOR RECOVERY
-# gestures {
-#     workspace_swipe = true
-# }
-
 HYPRLAND_CORE
 
         # Get modifiers
         local MOD="${UKE_MAIN_MOD:-Super}"
         
-        # KEYBINDINGS - The critical part!
+        # KEYBINDINGS - FIXED: \$mainMod is now escaped!
         cat << KEYBINDS
 
-$mainMod = $MOD
+\$mainMod = $MOD
 
 # Focus management
-bind = $mainMod, return, exec, wezterm
-bind = $mainMod, q, killactive
-bind = $mainMod, e, exit
-bind = $mainMod, f, togglefloating
-bind = $mainMod, p, pseudo
-bind = $mainMod, j, togglesplit
+bind = \$mainMod, return, exec, wezterm
+bind = \$mainMod, q, killactive
+bind = \$mainMod, e, exit
+bind = \$mainMod, f, togglefloating
+bind = \$mainMod, p, pseudo
+bind = \$mainMod, j, togglesplit
 
 # Movement (Vim-style hjkl)
-bind = $mainMod, h, movefocus, l
-bind = $mainMod, j, movefocus, d
-bind = $mainMod, k, movefocus, u
-bind = $mainMod, l, movefocus, r
+bind = \$mainMod, h, movefocus, l
+bind = \$mainMod, j, movefocus, d
+bind = \$mainMod, k, movefocus, u
+bind = \$mainMod, l, movefocus, r
 
 # Workspaces (1-9)
-bind = $mainMod, 1, workspace, 1
-bind = $mainMod, 2, workspace, 2
-bind = $mainMod, 3, workspace, 3
-bind = $mainMod, 4, workspace, 4
-bind = $mainMod, 5, workspace, 5
-bind = $mainMod, 6, workspace, 6
-bind = $mainMod, 7, workspace, 7
-bind = $mainMod, 8, workspace, 8
-bind = $mainMod, 9, workspace, 9
+bind = \$mainMod, 1, workspace, 1
+bind = \$mainMod, 2, workspace, 2
+bind = \$mainMod, 3, workspace, 3
+bind = \$mainMod, 4, workspace, 4
+bind = \$mainMod, 5, workspace, 5
+bind = \$mainMod, 6, workspace, 6
+bind = \$mainMod, 7, workspace, 7
+bind = \$mainMod, 8, workspace, 8
+bind = \$mainMod, 9, workspace, 9
 
 # Move window to workspace
-bind = $mainMod|Shift, 1, movetoworkspace, 1
-bind = $mainMod|Shift, 2, movetoworkspace, 2
-bind = $mainMod|Shift, 3, movetoworkspace, 3
-bind = $mainMod|Shift, 4, movetoworkspace, 4
-bind = $mainMod|Shift, 5, movetoworkspace, 5
-bind = $mainMod|Shift, 6, movetoworkspace, 6
-bind = $mainMod|Shift, 7, movetoworkspace, 7
-bind = $mainMod|Shift, 8, movetoworkspace, 8
-bind = $mainMod|Shift, 9, movetoworkspace, 9
+bind = \$mainMod|Shift, 1, movetoworkspace, 1
+bind = \$mainMod|Shift, 2, movetoworkspace, 2
+bind = \$mainMod|Shift, 3, movetoworkspace, 3
+bind = \$mainMod|Shift, 4, movetoworkspace, 4
+bind = \$mainMod|Shift, 5, movetoworkspace, 5
+bind = \$mainMod|Shift, 6, movetoworkspace, 6
+bind = \$mainMod|Shift, 7, movetoworkspace, 7
+bind = \$mainMod|Shift, 8, movetoworkspace, 8
+bind = \$mainMod|Shift, 9, movetoworkspace, 9
 
 KEYBINDS
 
@@ -593,6 +586,11 @@ WINDOWRULES
     chmod 644 "$out"
     log_info "✓ Hyprland config generated (SAFE MODE)"
 }
+
+
+
+
+
 
 
 
