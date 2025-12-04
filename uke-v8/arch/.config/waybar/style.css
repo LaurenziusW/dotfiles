@@ -1,0 +1,106 @@
+/* =============================================================================
+ * UKE v8 - Waybar Style (Nord)
+ * ============================================================================= */
+
+* {
+    font-family: "JetBrains Mono", "Symbols Nerd Font", monospace;
+    font-size: 12px;
+    min-height: 0;
+}
+
+window#waybar {
+    background: rgba(46, 52, 64, 0.95);
+    color: #d8dee9;
+    border-bottom: 2px solid #3b4252;
+}
+
+window#waybar.hidden {
+    opacity: 0.2;
+}
+
+/* Workspaces */
+#workspaces button {
+    padding: 0 8px;
+    background: transparent;
+    color: #d8dee9;
+    border: none;
+    border-radius: 0;
+    margin: 2px 0;
+}
+
+#workspaces button:hover {
+    background: #4c566a;
+}
+
+#workspaces button.active {
+    background: #88c0d0;
+    color: #2e3440;
+    font-weight: bold;
+}
+
+#workspaces button.urgent {
+    background: #bf616a;
+}
+
+/* Window title */
+#window {
+    padding: 0 10px;
+    color: #81a1c1;
+}
+
+/* Clock */
+#clock {
+    padding: 0 10px;
+    color: #eceff4;
+    font-weight: bold;
+}
+
+/* System modules */
+#cpu,
+#memory,
+#battery,
+#network,
+#pulseaudio {
+    padding: 0 10px;
+    color: #d8dee9;
+}
+
+#battery.charging {
+    color: #a3be8c;
+}
+
+#battery.warning:not(.charging) {
+    color: #ebcb8b;
+}
+
+#battery.critical:not(.charging) {
+    color: #bf616a;
+    animation: blink 0.5s linear infinite alternate;
+}
+
+@keyframes blink {
+    to {
+        color: #eceff4;
+    }
+}
+
+#network.disconnected {
+    color: #bf616a;
+}
+
+#pulseaudio.muted {
+    color: #4c566a;
+}
+
+/* Tray */
+#tray {
+    padding: 0 10px;
+}
+
+#tray > .passive {
+    -gtk-icon-effect: dim;
+}
+
+#tray > .needs-attention {
+    -gtk-icon-effect: highlight;
+}

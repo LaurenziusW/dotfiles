@@ -16,6 +16,7 @@ uke
 │   ├── uke-gather
 │   ├── uke-launch
 │   ├── uke-logs
+│   ├── uke-logs-script.sh
 │   ├── uke-scratchpad
 │   ├── uke-services
 │   ├── uke-session
@@ -58,10 +59,13 @@ uke
 │   ├── uke-detect.sh
 │   └── uke-wipe.sh
 ├── stow
+│   ├── .DS_Store
 │   ├── keyd
-│   │   └── .config
-│   │       └── keyd
-│   │           └── default.conf
+│   │   ├── .config
+│   │   │   ├── .DS_Store
+│   │   │   └── keyd
+│   │   │       └── default.conf
+│   │   └── .DS_Store
 │   ├── nvim
 │   │   └── .config
 │   │       └── nvim
@@ -69,9 +73,11 @@ uke
 │   ├── tmux
 │   │   └── .tmux.conf
 │   ├── wezterm
-│   │   └── .config
-│   │       └── wezterm
-│   │           └── wezterm.lua
+│   │   ├── .config
+│   │   │   ├── .DS_Store
+│   │   │   └── wezterm
+│   │   │       └── wezterm.lua
+│   │   └── .DS_Store
 │   ├── zathura
 │   │   └── .config
 │   │       └── zathura
@@ -82,7 +88,7 @@ uke
 └── templates
     └── .gitkeep
 
-28 directories, 51 files
+28 directories, 57 files
 
 
 
@@ -1591,6 +1597,269 @@ esac
 
 
 ################################################################################
+FILE PATH: uke/bin/uke-logs-script.sh
+################################################################################
+
+#!/usr/bin/env bash
+# ==============================================================================
+# uke-logs - UKE Diagnostic Logger
+# ==============================================================================
+# Sammelt alle Fehler und Logs für Debugging
+#
+# Verwendung: uke logs
+# Speichert alle Logs in: ~/.local/state/uke/logs-$(date +%s)/
+#
+# Wird aufgerufen von: bin/uke-logs (symlink)
+# ==============================================================================
+
+set -e
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$script_dir/../lib/core.sh"
+
+log_dir="$UKE_STATE/logs-$(date +%s)"
+mkdir -p "$log_dir"
+
+log_info "🔍 Collecting UKE diagnostics..."
+log_info "📁 Logs will be saved to: $log_dir"
+
+# =============================================================================
+# 1. SYSTEM INFO
+# =============================================================================
+log_info "Collecting system info..."
+{
+    echo "=== System Info ==="
+    uname -a
+    echo ""
+    echo "=== OS Release ==="
+    cat /etc/os-release 2>/dev/null || echo "N/A"
+    echo ""
+    echo "=== UKE Environment ==="
+    env | grep -i uke || echo "No UKE vars set"
+    echo ""
+    echo "=== UKE Directories ==="
+    echo "UKE_ROOT: $UKE_ROOT"
+    echo "UKE_CONFIG: $UKE_CONFIG"
+    echo "UKE_GEN: $UKE_GEN"
+    echo "UKE_STATE: $UKE_STATE"
+} > "$log_dir/01-system.log"
+
+# =============================================================================
+# 2. HYPRLAND
+# =============================================================================
+log_info "Collecting Hyprland diagnostics..."
+{
+    echo "=== Hyprland Version ==="
+    hyprland --version 2>/dev/null || echo "Hyprland not found"
+    
+    echo ""
+    echo "=== Config Paths ==="
+    echo "XDG_CONFIG_HOME: ${XDG_CONFIG_HOME:-not set}"
+    ls -la ~/.config/hypr/hyprland.conf 2>/dev/null || echo "~/.config/hypr/hyprland.conf not found"
+    
+    echo ""
+    echo "=== Generated Config (first 60 lines) ==="
+    head -n 60 ~/.config/hypr/hyprland.conf 2>/dev/null || echo "Not found"
+    
+    echo ""
+    echo "=== Hyprland Journal Logs (last 100 lines) ==="
+    journalctl --user-unit hyprland.service --no-pager -n 100 2>/dev/null || \
+    journalctl --user --since "1 hour ago" --no-pager | grep -i hypr | tail -100 || \
+    echo "Journalctl not available"
+    
+    echo ""
+    echo "=== Active Workspace ==="
+    hyprctl activeworkspace 2>/dev/null || echo "Hyprland not running"
+    
+    echo ""
+    echo "=== Config Validation (syntax check) ==="
+    if command -v hyprctl &>/dev/null && pgrep -x hyprland >/dev/null 2>&1; then
+        echo "Hyprland is running - config is valid"
+    else
+        echo "Hyprland not running - cannot validate live"
+    fi
+} > "$log_dir/02-hyprland.log"
+
+# =============================================================================
+# 3. WEZTERM
+# =============================================================================
+log_info "Collecting WezTerm diagnostics..."
+{
+    echo "=== WezTerm Version ==="
+    wezterm --version 2>/dev/null || echo "WezTerm not installed"
+    
+    echo ""
+    echo "=== Config Path ==="
+    ls -la ~/.config/wezterm/wezterm.lua 2>/dev/null || echo "Not found"
+    
+    echo ""
+    echo "=== Lua Syntax Check ==="
+    if command -v lua &>/dev/null; then
+        lua -c ~/.config/wezterm/wezterm.lua 2>&1 && echo "✓ Lua syntax is valid" || echo "✗ Lua syntax error found"
+    else
+        echo "Lua not installed - cannot validate"
+    fi
+    
+    echo ""
+    echo "=== WezTerm Process ==="
+    ps aux | grep -i wezterm | grep -v grep || echo "WezTerm not running"
+    
+    echo ""
+    echo "=== WezTerm Config (first 50 lines) ==="
+    head -n 50 ~/.config/wezterm/wezterm.lua 2>/dev/null || echo "Not found"
+    
+    echo ""
+    echo "=== WezTerm Logs ==="
+    find ~/.local/share/wezterm -name "*.log" -mmin -120 -exec tail -20 {} \; 2>/dev/null || echo "No recent logs found"
+} > "$log_dir/03-wezterm.log"
+
+# =============================================================================
+# 4. ZSH
+# =============================================================================
+log_info "Collecting Zsh diagnostics..."
+{
+    echo "=== Zsh Version ==="
+    zsh --version
+    
+    echo ""
+    echo "=== Config Paths ==="
+    ls -la ~/.zshrc ~/.zprofile 2>/dev/null || echo "Not found"
+    
+    echo ""
+    echo "=== Zsh Startup Test (trace first 50 lines) ==="
+    timeout 5 zsh -x ~/.zshrc 2>&1 | head -50 || echo "Timeout or error"
+    
+    echo ""
+    echo "=== Zsh History ==="
+    ls -lah ~/.zsh_history 2>/dev/null || echo "Not found"
+    
+    echo ""
+    echo "=== Plugin Status ==="
+    echo "fzf: $(command -v fzf &>/dev/null && echo '✓ Found' || echo '✗ NOT FOUND')"
+    echo "zoxide: $(command -v zoxide &>/dev/null && echo '✓ Found' || echo '✗ NOT FOUND')"
+    echo "starship: $(command -v starship &>/dev/null && echo '✓ Found' || echo '✗ NOT FOUND')"
+    echo "exa/eza: $(command -v eza &>/dev/null && echo '✓ eza' || (command -v exa &>/dev/null && echo '✓ exa') || echo '✗ NOT FOUND')"
+} > "$log_dir/04-zsh.log"
+
+# =============================================================================
+# 5. UKE PROJECT
+# =============================================================================
+log_info "Collecting UKE project diagnostics..."
+{
+    echo "=== UKE Root ==="
+    echo "UKE_ROOT=$UKE_ROOT"
+    echo "Exists: $(test -d "$UKE_ROOT" && echo 'YES' || echo 'NO')"
+    
+    echo ""
+    echo "=== UKE Directory Tree (2 levels) ==="
+    if command -v tree &>/dev/null; then
+        tree -L 2 "$UKE_ROOT" 2>/dev/null || find "$UKE_ROOT" -maxdepth 2 -type f | head -30
+    else
+        find "$UKE_ROOT" -maxdepth 2 -type f | head -30
+    fi
+    
+    echo ""
+    echo "=== Registry.yaml (first 60 lines) ==="
+    head -n 60 "$UKE_CONFIG/registry.yaml" 2>/dev/null || echo "Not found at: $UKE_CONFIG/registry.yaml"
+    
+    echo ""
+    echo "=== Generated Files (recent) ==="
+    find "$UKE_GEN" -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -15 || echo "No gen files"
+    
+    echo ""
+    echo "=== Git Status ==="
+    cd "$UKE_ROOT" && git status --short 2>/dev/null || echo "Not a git repo or git not available"
+} > "$log_dir/05-uke.log"
+
+# =============================================================================
+# 6. SYSTEMD USER SERVICES
+# =============================================================================
+log_info "Collecting systemd logs..."
+{
+    echo "=== User Service Status ==="
+    systemctl --user status 2>&1 | head -10
+    
+    echo ""
+    echo "=== Recent Journal Entries (last 2 hours) ==="
+    journalctl --user --since "2 hours ago" --no-pager -n 50 2>/dev/null || echo "N/A"
+    
+    echo ""
+    echo "=== Failed Units ==="
+    systemctl --user list-units --failed --no-pager 2>/dev/null || echo "N/A"
+} > "$log_dir/06-systemd.log"
+
+# =============================================================================
+# 7. ENVIRONMENT & PATH
+# =============================================================================
+log_info "Collecting environment variables..."
+{
+    echo "=== PATH ==="
+    echo "$PATH" | tr ':' '\n' | nl
+    
+    echo ""
+    echo "=== Key Environment Variables ==="
+    env | grep -E "EDITOR|SHELL|LANG|LC_|XDG_|UKE_" | sort
+    
+    echo ""
+    echo "=== Locale ==="
+    locale
+} > "$log_dir/07-environment.log"
+
+# =============================================================================
+# 8. FILE PERMISSIONS
+# =============================================================================
+log_info "Checking file permissions..."
+{
+    echo "=== .config Ownership ==="
+    ls -ld ~/.config
+    
+    echo ""
+    echo "=== UKE State Directory ==="
+    ls -lad "$UKE_STATE"
+    
+    echo ""
+    echo "=== Config File Permissions ==="
+    echo "WezTerm:"
+    ls -la ~/.config/wezterm/wezterm.lua 2>/dev/null || echo "  Not found"
+    
+    echo ""
+    echo "Hyprland:"
+    ls -la ~/.config/hypr/hyprland.conf 2>/dev/null || echo "  Not found"
+    
+    echo ""
+    echo "Zsh:"
+    ls -la ~/.zshrc 2>/dev/null || echo "  Not found"
+} > "$log_dir/08-permissions.log"
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+echo ""
+log_ok "Diagnostics complete!"
+echo ""
+echo "📊 Generated files in: $log_dir"
+ls -lh "$log_dir"/*.log
+
+echo ""
+echo "💾 Quick review:"
+for f in "$log_dir"/*.log; do
+    echo ""
+    echo "--- $(basename "$f") (first 3 lines) ---"
+    head -3 "$f"
+done
+
+echo ""
+echo "🚀 To download via SCP:"
+echo "   scp -r $log_dir user@your-mac:/tmp/"
+echo ""
+echo "📋 Full command to view specific log:"
+echo "   cat $log_dir/02-hyprland.log"
+echo "   cat $log_dir/03-wezterm.log"
+echo "   cat $log_dir/04-zsh.log"
+
+
+
+################################################################################
 FILE PATH: uke/bin/uke-bunch
 ################################################################################
 
@@ -2994,7 +3263,7 @@ FILE PATH: uke/bin/uke-gather
 # UKE Gather - Organize windows by workspace
 # ==============================================================================
 # Source: /Users/laurenz/dotfiles/uke/config/registry.yaml
-# Generated: 2025-12-04T15:09:42+01:00
+# Generated: 2025-12-04T21:08:38+01:00
 # Platform: macos
 #
 # DO NOT EDIT DIRECTLY - Regenerate with: uke gen
@@ -4242,7 +4511,7 @@ FILE PATH: uke/stow/wezterm/.config/wezterm/wezterm.lua
 ################################################################################
 
 -- ==============================================================================
--- UKE WezTerm Configuration v7.2 - Cross-Platform
+-- UKE WezTerm Configuration v7.2 - Cross-Platform (FIXED)
 -- ==============================================================================
 -- SECONDARY Layer: Alt (macOS) / Super (Linux)
 -- Conflict-free: Cmd stays with yabai, Alt handles terminal internals
@@ -4255,12 +4524,13 @@ local act = wezterm.action
 -- ==============================================================================
 -- OS Detection
 -- ==============================================================================
+
 local function is_macos()
-    return wezterm.target_triple:find("darwin") ~= nil
+  return wezterm.target_triple:find("darwin") ~= nil
 end
 
 local function is_linux()
-    return wezterm.target_triple:find("linux") ~= nil
+  return wezterm.target_triple:find("linux") ~= nil
 end
 
 -- SECONDARY modifier: Alt on macOS, Super on Linux
@@ -4270,62 +4540,67 @@ local SECONDARY = is_macos() and "ALT" or "SUPER"
 -- Load Hardware Config (Ghost File)
 -- ==============================================================================
 -- Try multiple paths to find the generated hardware config
+
 local hw = nil
 local hw_paths = {
-    wezterm.config_dir .. '/generated_hardware.lua',
-    os.getenv("HOME") .. '/.config/wezterm/generated_hardware.lua',
-    os.getenv("HOME") .. '/.wezterm_hardware.lua',
+  wezterm.config_dir .. '/generated_hardware.lua',
+  os.getenv("HOME") .. '/.config/wezterm/generated_hardware.lua',
+  os.getenv("HOME") .. '/.wezterm_hardware.lua',
 }
 
 for _, path in ipairs(hw_paths) do
-    local ok, result = pcall(function()
-        return dofile(path)
-    end)
-    if ok and result then
-        hw = result
-        break
-    end
+  local ok, result = pcall(function()
+    return dofile(path)
+  end)
+  if ok and result then
+    hw = result
+    break
+  end
 end
 
 -- Defaults if ghost file is missing
 if not hw then
-    hw = {
-        font_size = is_macos() and 14.0 or 11.0,
-        is_macos = is_macos(),
-        is_linux = is_linux(),
-        front_end = "OpenGL",
-        gpu = "integrated",
-        keyboard = "standard",
-        monitors = 1,
-    }
+  hw = {
+    font_size = is_macos() and 14.0 or 11.0,
+    is_macos = is_macos(),
+    is_linux = is_linux(),
+    front_end = "OpenGL",
+    gpu = "integrated",
+    keyboard = "standard",
+    monitors = 1,
+  }
 end
 
 -- ==============================================================================
 -- Appearance
 -- ==============================================================================
+
 config.color_scheme = 'Catppuccin Mocha'
+
 config.font = wezterm.font_with_fallback({
-    'JetBrainsMono Nerd Font',
-    'JetBrains Mono',
-    'Fira Code',
-    'Menlo',
-    'Monaco',
-    'monospace',
+  'JetBrainsMono Nerd Font',
+  'JetBrains Mono',
+  'Fira Code',
+  'Menlo',
+  'Monaco',
+  'monospace',
 })
+
 config.font_size = hw.font_size or (is_macos() and 14.0 or 11.0)
 config.line_height = 1.2
 
 -- Window
 config.window_decorations = "RESIZE"
 config.window_padding = {
-    left = 8,
-    right = 8,
-    top = 8,
-    bottom = 8,
+  left = 8,
+  right = 8,
+  top = 8,
+  bottom = 8,
 }
+
 config.window_background_opacity = 0.95
 if is_macos() then
-    config.macos_window_background_blur = 20
+  config.macos_window_background_blur = 20
 end
 
 -- Tab bar
@@ -4341,12 +4616,14 @@ config.initial_rows = 35
 -- ==============================================================================
 -- GPU / Rendering
 -- ==============================================================================
+
 config.front_end = hw.front_end or "OpenGL"
 config.webgpu_power_preference = "HighPerformance"
 
 -- ==============================================================================
 -- Behavior
 -- ==============================================================================
+
 config.scrollback_lines = 10000
 config.enable_scroll_bar = false
 config.window_close_confirmation = "NeverPrompt"
@@ -4359,90 +4636,91 @@ config.cursor_blink_rate = 500
 -- ==============================================================================
 -- Keybindings (SECONDARY Layer)
 -- ==============================================================================
+
 config.keys = {
-    -- ─────────────────────────────────────────────────────────────────────────
-    -- Tab Management
-    -- ─────────────────────────────────────────────────────────────────────────
-    { key = "t", mods = SECONDARY, action = act.SpawnTab("CurrentPaneDomain") },
-    
-    -- Close pane (closes split first, then tab if no more panes)
-    { key = "w", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
-    { key = "x", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
-    
-    -- Tab navigation relative
-    { key = "[", mods = SECONDARY, action = act.ActivateTabRelative(-1) },
-    { key = "]", mods = SECONDARY, action = act.ActivateTabRelative(1) },
+  -- ─────────────────────────────────────────────────────────────────────────
+  -- Tab Management
+  -- ─────────────────────────────────────────────────────────────────────────
+  { key = "t", mods = SECONDARY, action = act.SpawnTab("CurrentPaneDomain") },
 
-    -- ─────────────────────────────────────────────────────────────────────────
-    -- Pane Splitting
-    -- ─────────────────────────────────────────────────────────────────────────
-    { key = "\\", mods = SECONDARY, action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
-    { key = "-", mods = SECONDARY, action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
-    { key = "d", mods = SECONDARY, action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
-    { key = "D", mods = SECONDARY .. "|SHIFT", action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
+  -- Close pane (closes split first, then tab if no more panes)
+  { key = "w", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
+  { key = "x", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
 
-    -- ─────────────────────────────────────────────────────────────────────────
-    -- Pane Navigation (Vim-style)
-    -- ─────────────────────────────────────────────────────────────────────────
-    { key = "h", mods = SECONDARY, action = act.ActivatePaneDirection("Left") },
-    { key = "j", mods = SECONDARY, action = act.ActivatePaneDirection("Down") },
-    { key = "k", mods = SECONDARY, action = act.ActivatePaneDirection("Up") },
-    { key = "l", mods = SECONDARY, action = act.ActivatePaneDirection("Right") },
+  -- Tab navigation relative
+  { key = "[", mods = SECONDARY, action = act.ActivateTabRelative(-1) },
+  { key = "]", mods = SECONDARY, action = act.ActivateTabRelative(1) },
 
-    -- ─────────────────────────────────────────────────────────────────────────
-    -- Pane Resizing (SECONDARY + Shift)
-    -- ─────────────────────────────────────────────────────────────────────────
-    { key = "H", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Left", 5 }) },
-    { key = "J", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Down", 5 }) },
-    { key = "K", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Up", 5 }) },
-    { key = "L", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Right", 5 }) },
+  -- ─────────────────────────────────────────────────────────────────────────
+  -- Pane Splitting
+  -- ─────────────────────────────────────────────────────────────────────────
+  { key = "\\", mods = SECONDARY, action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
+  { key = "-", mods = SECONDARY, action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
+  { key = "d", mods = SECONDARY, action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
+  { key = "D", mods = SECONDARY .. "|SHIFT", action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
 
-    -- ─────────────────────────────────────────────────────────────────────────
-    -- Utilities
-    -- ─────────────────────────────────────────────────────────────────────────
-    { key = "z", mods = SECONDARY, action = act.TogglePaneZoomState },
-    { key = "f", mods = SECONDARY, action = act.Search({ CaseInSensitiveString = "" }) },
-    { key = "r", mods = SECONDARY, action = act.ReloadConfiguration },
-    { key = "p", mods = SECONDARY, action = act.ActivateCommandPalette },
-    
-    -- Copy mode
-    { key = "c", mods = SECONDARY .. "|SHIFT", action = act.ActivateCopyMode },
-    
-    -- Quick select (like tmux fingers)
-    { key = "Space", mods = SECONDARY, action = act.QuickSelect },
-    
-    -- Font size
-    { key = "=", mods = SECONDARY, action = act.IncreaseFontSize },
-    { key = "+", mods = SECONDARY .. "|SHIFT", action = act.IncreaseFontSize },
-    { key = "0", mods = SECONDARY, action = act.ResetFontSize },
+  -- ─────────────────────────────────────────────────────────────────────────
+  -- Pane Navigation (Vim-style)
+  -- ─────────────────────────────────────────────────────────────────────────
+  { key = "h", mods = SECONDARY, action = act.ActivatePaneDirection("Left") },
+  { key = "j", mods = SECONDARY, action = act.ActivatePaneDirection("Down") },
+  { key = "k", mods = SECONDARY, action = act.ActivatePaneDirection("Up") },
+  { key = "l", mods = SECONDARY, action = act.ActivatePaneDirection("Right") },
+
+  -- ─────────────────────────────────────────────────────────────────────────
+  -- Pane Resizing (SECONDARY + Shift)
+  -- ─────────────────────────────────────────────────────────────────────────
+  { key = "H", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Left", 5 }) },
+  { key = "J", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Down", 5 }) },
+  { key = "K", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Up", 5 }) },
+  { key = "L", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Right", 5 }) },
+
+  -- ─────────────────────────────────────────────────────────────────────────
+  -- Utilities
+  -- ─────────────────────────────────────────────────────────────────────────
+  { key = "z", mods = SECONDARY, action = act.TogglePaneZoomState },
+  { key = "f", mods = SECONDARY, action = act.Search({ CaseInSensitiveString = "" }) },
+  { key = "r", mods = SECONDARY, action = act.ReloadConfiguration },
+  { key = "p", mods = SECONDARY, action = act.ActivateCommandPalette },
+
+  -- Copy mode
+  { key = "c", mods = SECONDARY .. "|SHIFT", action = act.ActivateCopyMode },
+
+  -- Quick select (like tmux fingers)
+  { key = "Space", mods = SECONDARY, action = act.QuickSelect },
+
+  -- Font size
+  { key = "=", mods = SECONDARY, action = act.IncreaseFontSize },
+  { key = "+", mods = SECONDARY .. "|SHIFT", action = act.IncreaseFontSize },
+  { key = "0", mods = SECONDARY, action = act.ResetFontSize },
 }
 
 -- Tab navigation with numbers (1-9)
 for i = 1, 9 do
-    table.insert(config.keys, {
-        key = tostring(i),
-        mods = SECONDARY,
-        action = act.ActivateTab(i - 1),
-    })
+  table.insert(config.keys, {
+    key = tostring(i),
+    mods = SECONDARY,
+    action = act.ActivateTab(i - 1),
+  })
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Mouse Bindings
 -- ─────────────────────────────────────────────────────────────────────────────
+
 config.mouse_bindings = {
-    -- Right click to paste
-    {
-        event = { Down = { streak = 1, button = "Right" } },
-        mods = "NONE",
-        action = act.PasteFrom("Clipboard"),
-    },
+  -- Right click to paste
+  {
+    event = { Down = { streak = 1, button = "Right" } },
+    mods = "NONE",
+    action = act.PasteFrom("Clipboard"),
+  },
 }
 
 -- Keep default keybindings for system copy/paste
 config.disable_default_key_bindings = false
 
 return config
-
 
 
 ################################################################################
@@ -5792,7 +6070,7 @@ FILE PATH: uke/gen/skhd/skhdrc
 # SKHD CONFIG - Keyboard Shortcuts (macOS)
 # ==============================================================================
 # Source: /Users/laurenz/dotfiles/uke/config/registry.yaml
-# Generated: 2025-12-04T15:09:42+01:00
+# Generated: 2025-12-04T21:08:37+01:00
 # Platform: macos
 #
 # DO NOT EDIT DIRECTLY - Regenerate with: uke gen
@@ -5931,7 +6209,7 @@ FILE PATH: uke/gen/yabai/yabairc
 # YABAI CONFIG - Window Manager (macOS)
 # ==============================================================================
 # Source: /Users/laurenz/dotfiles/uke/config/registry.yaml
-# Generated: 2025-12-04T15:09:42+01:00
+# Generated: 2025-12-04T21:08:37+01:00
 # Platform: macos
 #
 # DO NOT EDIT DIRECTLY - Regenerate with: uke gen
@@ -8431,38 +8709,31 @@ HARDWARE_INCLUDE
 # ==============================================================================
 # Generate Hyprland config (Linux)
 # ==============================================================================
+
+
 gen_hyprland() {
     local out="$UKE_GEN/hyprland/hyprland.conf"
     mkdir -p "$(dirname "$out")"
     
-    log_info "Generating Hyprland config..."
+    log_info "Generating Hyprland config (RECOVERY MODE)..."
     
     {
         gen_header "conf" "HYPRLAND CONFIG - Window Manager (Linux)"
         
-        cat << EOF
-# ==============================================================================
-# MONITORS
-# ==============================================================================
-# Default: auto-detect. Override in generated_hardware.conf for multi-monitor.
+        # 1. CORE SETTINGS (Quoted Heredoc - Variables are safe here)
+        cat << 'HYPRLAND_CORE'
 monitor=,preferred,auto,1
 
-# ==============================================================================
-# GENERAL SETTINGS (Nord colorscheme)
-# ==============================================================================
 general {
     gaps_in = 2
     gaps_out = 4
     border_size = 2
-    col.active_border = rgba(${COLOR_BORDER_ACTIVE}ff)
-    col.inactive_border = rgba(${COLOR_BORDER_INACTIVE}ff)
+    col.active_border = rgba(88c0d0ff)
+    col.inactive_border = rgba(3b4252ff)
     layout = dwindle
     resize_on_border = true
 }
 
-# ==============================================================================
-# DECORATION
-# ==============================================================================
 decoration {
     rounding = 4
     blur {
@@ -8477,9 +8748,6 @@ decoration {
     }
 }
 
-# ==============================================================================
-# ANIMATIONS
-# ==============================================================================
 animations {
     enabled = true
     bezier = easeOutQuint, 0.22, 1, 0.36, 1
@@ -8487,230 +8755,88 @@ animations {
     animation = border, 1, 10, default
     animation = fade, 1, 5, default
     animation = workspaces, 1, 4, easeOutQuint, slide
-    animation = specialWorkspace, 1, 4, easeOutQuint, slidevert
 }
 
-# ==============================================================================
-# INPUT
-# ==============================================================================
 input {
     kb_layout = us
     follow_mouse = 1
     touchpad {
         natural_scroll = true
-        tap-to-click = true
     }
 }
 
+# GESTURES (Disabled for stability)
 gestures {
-    workspace_swipe = true
-    workspace_swipe_fingers = 3
+    workspace_swipe = false
 }
+HYPRLAND_CORE
 
-dwindle {
-    pseudotile = true
-    preserve_split = true
-}
+        # 2. KEYBINDINGS (Unquoted Heredoc - Variables expanded)
+        # CRITICAL FIX: We use \$mainMod to escape the variable for Bash!
+        
+        local MOD="${UKE_MAIN_MOD:-Super}"
+        
+        cat << KEYBINDS
 
-misc {
-    disable_hyprland_logo = true
-    disable_splash_rendering = true
-}
+# Define the mod key variable for Hyprland
+\$mainMod = $MOD
 
-# ==============================================================================
-# AUTOSTART
-# ==============================================================================
-exec-once = waybar
-exec-once = dunst
-exec-once = hyprpaper
-exec-once = nm-applet --indicator
-exec-once = /usr/lib/polkit-kde-authentication-agent-1
-exec-once = wl-paste --type text --watch cliphist store
-exec-once = wl-paste --type image --watch cliphist store
+# App shortcuts
+bind = \$mainMod, return, exec, wezterm
+bind = \$mainMod, q, killactive
+bind = \$mainMod, e, exit
+bind = \$mainMod, f, togglefloating
+bind = \$mainMod, p, pseudo
+bind = \$mainMod, j, togglesplit
 
-# ==============================================================================
-# QUALITY OF LIFE
-# ==============================================================================
-bind = ALT SUPER, space, exec, wofi --show drun --allow-images
-bind = ALT SUPER, equal, exec, hyprctl keyword cursor:zoom_factor 2.0
-bind = ALT SUPER, minus, exec, hyprctl keyword cursor:zoom_factor 1.0
-bind = ALT, v, exec, cliphist list | wofi --dmenu | cliphist decode | wl-copy
-bind = ALT SUPER, f, exec, thunar
-bind = ALT SUPER, s, exec, lxappearance
+# Vim-style focus movement
+bind = \$mainMod, h, movefocus, l
+bind = \$mainMod, j, movefocus, d
+bind = \$mainMod, k, movefocus, u
+bind = \$mainMod, l, movefocus, r
 
-# ==============================================================================
-# WINDOW MANAGEMENT
-# ==============================================================================
-bind = ALT, return, exec, wezterm
-bind = ALT, q, killactive
-bind = ALT, escape, focuscurrentorlast
-bind = ALT SHIFT, escape, focusurgentorlast
+# Workspaces 1-9
+bind = \$mainMod, 1, workspace, 1
+bind = \$mainMod, 2, workspace, 2
+bind = \$mainMod, 3, workspace, 3
+bind = \$mainMod, 4, workspace, 4
+bind = \$mainMod, 5, workspace, 5
+bind = \$mainMod, 6, workspace, 6
+bind = \$mainMod, 7, workspace, 7
+bind = \$mainMod, 8, workspace, 8
+bind = \$mainMod, 9, workspace, 9
 
-# Window Controls
-bind = ALT SHIFT, f, fullscreen, 0
-bind = ALT SHIFT, space, togglefloating
-bind = ALT SHIFT, backslash, togglesplit
+# Move active window to workspace
+bind = \$mainMod SHIFT, 1, movetoworkspace, 1
+bind = \$mainMod SHIFT, 2, movetoworkspace, 2
+bind = \$mainMod SHIFT, 3, movetoworkspace, 3
+bind = \$mainMod SHIFT, 4, movetoworkspace, 4
+bind = \$mainMod SHIFT, 5, movetoworkspace, 5
+bind = \$mainMod SHIFT, 6, movetoworkspace, 6
+bind = \$mainMod SHIFT, 7, movetoworkspace, 7
+bind = \$mainMod SHIFT, 8, movetoworkspace, 8
+bind = \$mainMod SHIFT, 9, movetoworkspace, 9
 
-# Focus (Alt + hjkl)
-bind = ALT, h, movefocus, l
-bind = ALT, j, movefocus, d
-bind = ALT, k, movefocus, u
-bind = ALT, l, movefocus, r
+KEYBINDS
 
-# Move (Alt + Shift + hjkl)
-bind = ALT SHIFT, h, movewindow, l
-bind = ALT SHIFT, j, movewindow, d
-bind = ALT SHIFT, k, movewindow, u
-bind = ALT SHIFT, l, movewindow, r
+        # 3. RULES & HARDWARE
+        cat << 'WINDOWRULES'
+windowrulev2 = workspace 1, class:^(brave-browser|firefox|chromium)$
+windowrulev2 = workspace 3, class:^(wezterm|code|Code|Alacritty|kitty)$
 
-# Resize (Super + Shift + hjkl)
-bind = SUPER SHIFT, h, resizeactive, -50 0
-bind = SUPER SHIFT, j, resizeactive, 0 50
-bind = SUPER SHIFT, k, resizeactive, 0 -50
-bind = SUPER SHIFT, l, resizeactive, 50 0
-
-# ==============================================================================
-# WORKSPACE NAVIGATION
-# ==============================================================================
-bind = ALT, 1, workspace, 1
-bind = ALT, 2, workspace, 2
-bind = ALT, 3, workspace, 3
-bind = ALT, 4, workspace, 4
-bind = ALT, 5, workspace, 5
-bind = ALT, 6, workspace, 6
-bind = ALT, 7, workspace, 7
-bind = ALT, 8, workspace, 8
-bind = ALT, 9, workspace, 9
-bind = ALT, 0, workspace, 10
-bind = ALT, bracketleft, workspace, e-1
-bind = ALT, bracketright, workspace, e+1
-
-# Move to Workspace
-bind = ALT SHIFT, 1, movetoworkspace, 1
-bind = ALT SHIFT, 2, movetoworkspace, 2
-bind = ALT SHIFT, 3, movetoworkspace, 3
-bind = ALT SHIFT, 4, movetoworkspace, 4
-bind = ALT SHIFT, 5, movetoworkspace, 5
-bind = ALT SHIFT, 6, movetoworkspace, 6
-bind = ALT SHIFT, 7, movetoworkspace, 7
-bind = ALT SHIFT, 8, movetoworkspace, 8
-bind = ALT SHIFT, 9, movetoworkspace, 9
-bind = ALT SHIFT, 0, movetoworkspace, 10
-
-# ==============================================================================
-# SCRATCHPADS
-# ==============================================================================
-bind = ALT, grave, togglespecialworkspace, terminal
-bind = ALT SHIFT, grave, exec, \$HOME/.local/bin/uke-scratchpad terminal
-bind = ALT SUPER, n, togglespecialworkspace, notes
-bind = ALT SUPER, m, togglespecialworkspace, music
-
-windowrulev2 = float, onworkspace:special:terminal
-windowrulev2 = size 80% 40%, onworkspace:special:terminal
-windowrulev2 = move 10% 5%, onworkspace:special:terminal
-windowrulev2 = float, onworkspace:special:notes
-windowrulev2 = size 70% 80%, onworkspace:special:notes
-windowrulev2 = center, onworkspace:special:notes
-windowrulev2 = float, onworkspace:special:music
-windowrulev2 = size 60% 70%, onworkspace:special:music
-windowrulev2 = center, onworkspace:special:music
-
-# ==============================================================================
-# UKE TOOLS
-# ==============================================================================
-# Sticky window (floating + pinned + always-on-top)
-bind = ALT SHIFT, s, exec, \$HOME/.local/bin/uke-sticky toggle
-# Quick fix
-bind = ALT SHIFT, f, exec, \$HOME/.local/bin/uke-fix
-
-bind = ALT, grave, exec, \$HOME/.local/bin/uke-gather
-bind = ALT SUPER, b, exec, \$HOME/.local/bin/uke-launch brave
-bind = ALT SUPER, o, exec, \$HOME/.local/bin/uke-launch obsidian
-bind = ALT SUPER, c, exec, \$HOME/.local/bin/uke-launch code
-bind = ALT SUPER, t, exec, \$HOME/.local/bin/uke-launch wezterm
-
-# Bunches
-bind = ALT CTRL, F1, exec, \$HOME/.local/bin/uke-bunch study
-bind = ALT CTRL, F2, exec, \$HOME/.local/bin/uke-bunch guitar
-bind = ALT CTRL, F3, exec, \$HOME/.local/bin/uke-bunch coding
-bind = ALT CTRL, F4, exec, \$HOME/.local/bin/uke-bunch email
-bind = ALT CTRL, F5, exec, \$HOME/.local/bin/uke-bunch reading
-
-# Session
-bind = ALT CTRL, s, exec, \$HOME/.local/bin/uke-session save quick
-bind = ALT CTRL SHIFT, s, exec, \$HOME/.local/bin/uke-session restore quick
-
-# ==============================================================================
-# SCREENSHOT
-# ==============================================================================
-bind = , Print, exec, grim -g "\$(slurp)" - | wl-copy
-bind = SHIFT, Print, exec, grim - | wl-copy
-
-# ==============================================================================
-# MOUSE
-# ==============================================================================
-bindm = ALT, mouse:272, movewindow
-bindm = ALT, mouse:273, resizewindow
-
-# ==============================================================================
-# FLOAT RULES
-# ==============================================================================
-windowrulev2 = float, class:^(pavucontrol)\$
-windowrulev2 = float, class:^(nm-connection-editor)\$
-windowrulev2 = float, class:^(lxappearance)\$
-windowrulev2 = float, class:^(blueman-manager)\$
-windowrulev2 = float, class:^(org.gnome.Calculator)\$
-windowrulev2 = float, class:^(gnome-calculator)\$
-windowrulev2 = float, class:^(thunar)\$,title:^(File Operation Progress)\$
-windowrulev2 = float, title:^(Picture-in-Picture)\$
-windowrulev2 = pin, title:^(Picture-in-Picture)\$
-
-# Terminal opacity
-windowrulev2 = opacity 0.92 0.88, class:^(wezterm)\$
-windowrulev2 = opacity 0.92 0.88, class:^(Alacritty)\$
-windowrulev2 = opacity 0.92 0.88, class:^(kitty)\$
-
-# ==============================================================================
-# WORKSPACE ASSIGNMENTS
-# ==============================================================================
-windowrulev2 = workspace 1, class:^(brave-browser)\$
-windowrulev2 = workspace 1, class:^(firefox)\$
-windowrulev2 = workspace 1, class:^(chromium)\$
-windowrulev2 = workspace 2, class:^(obsidian)\$
-windowrulev2 = workspace 3, class:^(wezterm)\$
-windowrulev2 = workspace 3, class:^(code)\$
-windowrulev2 = workspace 3, class:^(Code)\$
-windowrulev2 = workspace 3, class:^(Alacritty)\$
-windowrulev2 = workspace 3, class:^(kitty)\$
-windowrulev2 = workspace 5, class:^(evince)\$
-windowrulev2 = workspace 5, class:^(zathura)\$
-windowrulev2 = workspace 5, class:^(okular)\$
-windowrulev2 = workspace 6, class:^(raindrop)\$
-windowrulev2 = workspace 7, class:^(spotify)\$
-windowrulev2 = workspace 7, class:^(Spotify)\$
-windowrulev2 = workspace 8, class:^(libreoffice)\$
-windowrulev2 = workspace 8, class:^(soffice)\$
-windowrulev2 = workspace 9, class:^(slack)\$
-windowrulev2 = workspace 9, class:^(Slack)\$
-windowrulev2 = workspace 9, class:^(discord)\$
-windowrulev2 = workspace 9, class:^(thunderbird)\$
-windowrulev2 = workspace 9, class:^(telegram-desktop)\$
-windowrulev2 = workspace 10, class:^(claude)\$
-
-# ==============================================================================
-# HARDWARE SPECIFIC INCLUDES (Ghost Files)
-# ==============================================================================
-# Loads GPU/Monitor/Form Factor settings generated by: uke profile
-# These settings override defaults based on machine.profile
+# Load hardware specific settings (monitors, etc)
 source = ~/.config/hypr/generated_hardware.conf
-
-EOF
+WINDOWRULES
 
     } > "$out"
     
-    chmod +x "$out"
-    ok "Generated: $out"
+    chmod 644 "$out"
+    log_info "✓ Hyprland config generated (RECOVERY MODE)"
 }
+
+
+
+
 
 # ==============================================================================
 # Generate uke-gather script

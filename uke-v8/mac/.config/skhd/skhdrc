@@ -1,0 +1,144 @@
+# =============================================================================
+# UKE v8 - skhd Configuration
+# macOS Hotkey Daemon
+# =============================================================================
+# Modifier Hierarchy:
+#   PRIMARY (Cmd)         - Window management (focus, workspace switch)
+#   PRIMARY+SHIFT         - Move windows
+#   TERTIARY (Alt+Shift)  - Resize windows
+#   BUNCH (Cmd+Ctrl)      - Environment presets
+#   LAUNCHER (Cmd+Alt)    - Quick app launch
+# =============================================================================
+
+# =============================================================================
+# PRIMARY: Focus Windows (Cmd + hjkl)
+# =============================================================================
+cmd - h : yabai -m window --focus west
+cmd - j : yabai -m window --focus south
+cmd - k : yabai -m window --focus north
+cmd - l : yabai -m window --focus east
+
+# =============================================================================
+# PRIMARY+SHIFT: Move Windows (Cmd + Shift + hjkl)
+# =============================================================================
+cmd + shift - h : yabai -m window --swap west
+cmd + shift - j : yabai -m window --swap south
+cmd + shift - k : yabai -m window --swap north
+cmd + shift - l : yabai -m window --swap east
+
+# =============================================================================
+# TERTIARY: Resize Windows (Alt + Shift + hjkl)
+# =============================================================================
+alt + shift - h : yabai -m window --resize left:-50:0 ; yabai -m window --resize right:-50:0
+alt + shift - j : yabai -m window --resize bottom:0:50 ; yabai -m window --resize top:0:50
+alt + shift - k : yabai -m window --resize top:0:-50 ; yabai -m window --resize bottom:0:-50
+alt + shift - l : yabai -m window --resize right:50:0 ; yabai -m window --resize left:50:0
+
+# =============================================================================
+# Workspace Navigation (Cmd + 1-9, 0)
+# =============================================================================
+cmd - 1 : yabai -m space --focus 1
+cmd - 2 : yabai -m space --focus 2
+cmd - 3 : yabai -m space --focus 3
+cmd - 4 : yabai -m space --focus 4
+cmd - 5 : yabai -m space --focus 5
+cmd - 6 : yabai -m space --focus 6
+cmd - 7 : yabai -m space --focus 7
+cmd - 8 : yabai -m space --focus 8
+cmd - 9 : yabai -m space --focus 9
+cmd - 0 : yabai -m space --focus 10
+
+# Workspace previous/next
+cmd - 0x21 : yabai -m space --focus prev  # [ key
+cmd - 0x1E : yabai -m space --focus next  # ] key
+
+# =============================================================================
+# Move to Workspace (Cmd + Shift + 1-9, 0)
+# =============================================================================
+cmd + shift - 1 : yabai -m window --space 1 ; yabai -m space --focus 1
+cmd + shift - 2 : yabai -m window --space 2 ; yabai -m space --focus 2
+cmd + shift - 3 : yabai -m window --space 3 ; yabai -m space --focus 3
+cmd + shift - 4 : yabai -m window --space 4 ; yabai -m space --focus 4
+cmd + shift - 5 : yabai -m window --space 5 ; yabai -m space --focus 5
+cmd + shift - 6 : yabai -m window --space 6 ; yabai -m space --focus 6
+cmd + shift - 7 : yabai -m window --space 7 ; yabai -m space --focus 7
+cmd + shift - 8 : yabai -m window --space 8 ; yabai -m space --focus 8
+cmd + shift - 9 : yabai -m window --space 9 ; yabai -m space --focus 9
+cmd + shift - 0 : yabai -m window --space 10 ; yabai -m space --focus 10
+
+# =============================================================================
+# Window Controls
+# =============================================================================
+# Launch terminal
+cmd - return : open -na WezTerm
+
+# Gather windows to workspaces
+cmd - 0x32 : $HOME/.local/bin/uke-gather  # ` key
+
+# Smart focus (focus window under mouse)
+cmd - escape : yabai -m window --focus mouse
+
+# Toggle fullscreen
+cmd + shift - f : yabai -m window --toggle zoom-fullscreen
+
+# Toggle float/tile
+cmd + shift - space : yabai -m window --toggle float ; \
+                      yabai -m window --grid 4:4:1:1:2:2
+
+# Toggle sticky window (floating + pinned + always-on-top)
+cmd + shift - s : $HOME/.local/bin/uke-sticky toggle
+
+# Toggle split direction
+cmd + shift - 0x2A : yabai -m window --toggle split  # \ key
+
+# Rotate layout 90°
+cmd + shift - r : yabai -m space --rotate 90
+
+# Balance windows
+cmd + shift - b : yabai -m space --balance
+
+# Mirror x/y axis
+cmd + shift - x : yabai -m space --mirror x-axis
+cmd + shift - y : yabai -m space --mirror y-axis
+
+# Stack mode
+cmd + ctrl - s : yabai -m window --insert stack
+
+# Toggle BSP <-> Stack layout
+cmd + ctrl - t : yabai -m space --layout "$(yabai -m query --spaces --space | jq -r 'if .type == "bsp" then "stack" else "bsp" end')"
+
+# =============================================================================
+# Bunches (Cmd + Ctrl + 1-5)
+# =============================================================================
+cmd + ctrl - 1 : $HOME/.local/bin/uke-bunch study
+cmd + ctrl - 2 : $HOME/.local/bin/uke-bunch guitar
+cmd + ctrl - 3 : $HOME/.local/bin/uke-bunch coding
+cmd + ctrl - 4 : $HOME/.local/bin/uke-bunch email
+cmd + ctrl - 5 : $HOME/.local/bin/uke-bunch reading
+
+# =============================================================================
+# Scratchpads
+# =============================================================================
+# Terminal scratchpad (same as gather key - context dependent)
+cmd + alt - n : $HOME/.local/bin/uke-scratchpad notes
+cmd + alt - space : $HOME/.local/bin/uke-scratchpad terminal
+
+# =============================================================================
+# Quick App Launchers (Cmd + Alt + key)
+# =============================================================================
+cmd + alt - b : open -a "Brave Browser"
+cmd + alt - o : open -a "Obsidian"
+cmd + alt - c : open -a "Visual Studio Code"
+cmd + alt - r : open -a "Raindrop.io"
+cmd + alt - m : open -a "Spotify"
+cmd + alt - t : open -na "WezTerm"
+cmd + alt - f : open -a "Finder"
+
+# =============================================================================
+# Service Management
+# =============================================================================
+# Reload skhd config
+cmd + alt - s : skhd --reload
+
+# Restart yabai
+cmd + alt - y : yabai --restart-service
