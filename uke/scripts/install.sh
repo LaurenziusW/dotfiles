@@ -1,21 +1,47 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Installer v7.1 - Complete Setup with Hardware Profile & Auto-start
+# UKE Installer v7.3 - DO NOT RUN WITH SUDO
 # ==============================================================================
-set -euo pipefail
+# Run as normal user: ./scripts/install.sh
+# Only specific operations (services, hooks) will prompt for sudo
+# ==============================================================================
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UKE_ROOT="${SCRIPT_DIR%/scripts}"
 
-# Colors
 RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
 CYAN=$'\e[36m' BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
 
-# [FIX] Logging functions redirect to stderr for cleaner output
 ok()   { echo "${GREEN}✓${RESET} $*" >&2; }
 fail() { echo "${RED}✗${RESET} $*" >&2; }
 info() { echo "${BLUE}→${RESET} $*" >&2; }
 warn() { echo "${YELLOW}!${RESET} $*" >&2; }
+
+# ==============================================================================
+# Check if running as root (BAD)
+# ==============================================================================
+if [[ $EUID -eq 0 ]]; then
+    fail "Do NOT run this script as root/sudo!"
+    echo "Run as normal user: ./scripts/install.sh"
+    exit 1
+fi
+
+# ==============================================================================
+# Fix ownership if needed
+# ==============================================================================
+fix_ownership() {
+    # Check if UKE files are owned by root (common after unzip as root)
+    local owner
+    owner=$(ls -ld "$UKE_ROOT/bin/uke" 2>/dev/null | awk '{print $3}')
+    
+    if [[ "$owner" == "root" ]]; then
+        warn "UKE files are owned by root (probably extracted with sudo)"
+        info "Fixing ownership (requires sudo)..."
+        sudo chown -R "$USER:$USER" "$UKE_ROOT"
+        ok "Ownership fixed"
+    fi
+}
 
 # ==============================================================================
 # OS Detection
@@ -28,13 +54,8 @@ esac
 
 DISTRO=""
 if [[ "$OS" == "linux" ]]; then
-    if [[ -f /etc/arch-release ]]; then
-        DISTRO="arch"
-    elif [[ -f /etc/debian_version ]]; then
-        DISTRO="debian"
-    elif [[ -f /etc/fedora-release ]]; then
-        DISTRO="fedora"
-    fi
+    [[ -f /etc/arch-release ]] && DISTRO="arch"
+    [[ -f /etc/debian_version ]] && DISTRO="debian"
 fi
 
 # ==============================================================================
@@ -219,22 +240,40 @@ stow_dotfiles() {
 # Setup Hardware Profile
 # ==============================================================================
 setup_profile() {
-    if [[ -f "$HOME/.local/state/uke/machine.profile" ]]; then
-        ok "Hardware profile exists"
-        # Generate hardware ghost files
+    local profile_dir="${XDG_STATE_HOME:-$HOME/.local/state}/uke"
+    local profile_file="$profile_dir/machine.profile"
+    
+    info "Checking for hardware profile at: $profile_file"
+    
+    if [[ -f "$profile_file" ]]; then
+        ok "Hardware profile found"
         info "Generating hardware configs..."
-        bash "$UKE_ROOT/scripts/apply_profile.sh" 2>/dev/null || warn "Could not apply profile"
-    else
-        warn "No hardware profile found!"
-        info "Run 'uke profile' to configure machine-specific settings"
-        info "Then run 'uke apply' to generate hardware configs"
         
-        # Create a placeholder hardware config to prevent Hyprland errors
+        # Run apply_profile.sh with proper error handling
+        if bash "$UKE_ROOT/scripts/apply_profile.sh"; then
+            ok "Hardware configs generated"
+        else
+            warn "apply_profile.sh had errors (this is usually fine for first install)"
+        fi
+    else
+        warn "No hardware profile found"
+        echo ""
+        echo "  ${BOLD}Create one now with:${RESET}"
+        echo "    uke profile"
+        echo ""
+        echo "  ${BOLD}Then apply it:${RESET}"
+        echo "    uke apply"
+        echo ""
+        
+        # Create placeholder for Hyprland so it doesn't crash
         if [[ "$OS" == "linux" ]]; then
-            if [[ ! -f "$HOME/.config/hypr/generated_hardware.conf" ]]; then
-                mkdir -p "$HOME/.config/hypr"
-                cat > "$HOME/.config/hypr/generated_hardware.conf" << 'EOF'
+            local hypr_dir="$HOME/.config/hypr"
+            local hypr_hw="$hypr_dir/generated_hardware.conf"
+            if [[ ! -f "$hypr_hw" ]]; then
+                mkdir -p "$hypr_dir"
+                cat > "$hypr_hw" << 'EOF'
 # Placeholder - run 'uke profile' then 'uke apply' to configure
+monitor=,preferred,auto,1
 general {
     gaps_in = 2
     gaps_out = 4
@@ -304,13 +343,16 @@ start_services() {
 main() {
     echo ""
     printf "%s╔══════════════════════════════════════╗%s\n" "$CYAN" "$RESET"
-    printf "%s║%s     UKE v7.1 Installer               %s║%s\n" "$CYAN" "$BOLD" "$CYAN" "$RESET"
+    printf "%s║%s     UKE v7.3 Installer               %s║%s\n" "$CYAN" "$BOLD" "$CYAN" "$RESET"
     printf "%s╚══════════════════════════════════════╝%s\n" "$CYAN" "$RESET"
     echo ""
     echo "Platform: $OS"
     [[ -n "$DISTRO" ]] && echo "Distro:   $DISTRO"
     echo "UKE Root: $UKE_ROOT"
     echo ""
+    
+    # Always fix ownership first
+    fix_ownership
     
     case "${1:-full}" in
         --check)
