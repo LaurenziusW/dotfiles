@@ -463,15 +463,13 @@ gen_hyprland() {
     local out="$UKE_GEN/hyprland/hyprland.conf"
     mkdir -p "$(dirname "$out")"
     
-    log_info "Generating Hyprland config (SAFE MODE - NO GESTURES)..."
+    log_info "Generating Hyprland config (RECOVERY MODE)..."
     
     {
         gen_header "conf" "HYPRLAND CONFIG - Window Manager (Linux)"
         
+        # 1. CORE SETTINGS (Quoted Heredoc - Variables are safe here)
         cat << 'HYPRLAND_CORE'
-# ==============================================================================
-# MONITORS & GENERAL
-# ==============================================================================
 monitor=,preferred,auto,1
 
 general {
@@ -514,17 +512,24 @@ input {
         natural_scroll = true
     }
 }
+
+# GESTURES (Disabled for stability)
+gestures {
+    workspace_swipe = false
+}
 HYPRLAND_CORE
 
-        # Get modifiers
+        # 2. KEYBINDINGS (Unquoted Heredoc - Variables expanded)
+        # CRITICAL FIX: We use \$mainMod to escape the variable for Bash!
+        
         local MOD="${UKE_MAIN_MOD:-Super}"
         
-        # KEYBINDINGS - FIXED: \$mainMod is now escaped!
         cat << KEYBINDS
 
+# Define the mod key variable for Hyprland
 \$mainMod = $MOD
 
-# Focus management
+# App shortcuts
 bind = \$mainMod, return, exec, wezterm
 bind = \$mainMod, q, killactive
 bind = \$mainMod, e, exit
@@ -532,13 +537,13 @@ bind = \$mainMod, f, togglefloating
 bind = \$mainMod, p, pseudo
 bind = \$mainMod, j, togglesplit
 
-# Movement (Vim-style hjkl)
+# Vim-style focus movement
 bind = \$mainMod, h, movefocus, l
 bind = \$mainMod, j, movefocus, d
 bind = \$mainMod, k, movefocus, u
 bind = \$mainMod, l, movefocus, r
 
-# Workspaces (1-9)
+# Workspaces 1-9
 bind = \$mainMod, 1, workspace, 1
 bind = \$mainMod, 2, workspace, 2
 bind = \$mainMod, 3, workspace, 3
@@ -549,48 +554,33 @@ bind = \$mainMod, 7, workspace, 7
 bind = \$mainMod, 8, workspace, 8
 bind = \$mainMod, 9, workspace, 9
 
-# Move window to workspace
-bind = \$mainMod|Shift, 1, movetoworkspace, 1
-bind = \$mainMod|Shift, 2, movetoworkspace, 2
-bind = \$mainMod|Shift, 3, movetoworkspace, 3
-bind = \$mainMod|Shift, 4, movetoworkspace, 4
-bind = \$mainMod|Shift, 5, movetoworkspace, 5
-bind = \$mainMod|Shift, 6, movetoworkspace, 6
-bind = \$mainMod|Shift, 7, movetoworkspace, 7
-bind = \$mainMod|Shift, 8, movetoworkspace, 8
-bind = \$mainMod|Shift, 9, movetoworkspace, 9
+# Move active window to workspace
+bind = \$mainMod SHIFT, 1, movetoworkspace, 1
+bind = \$mainMod SHIFT, 2, movetoworkspace, 2
+bind = \$mainMod SHIFT, 3, movetoworkspace, 3
+bind = \$mainMod SHIFT, 4, movetoworkspace, 4
+bind = \$mainMod SHIFT, 5, movetoworkspace, 5
+bind = \$mainMod SHIFT, 6, movetoworkspace, 6
+bind = \$mainMod SHIFT, 7, movetoworkspace, 7
+bind = \$mainMod SHIFT, 8, movetoworkspace, 8
+bind = \$mainMod SHIFT, 9, movetoworkspace, 9
 
 KEYBINDS
 
+        # 3. RULES & HARDWARE
         cat << 'WINDOWRULES'
-
-# ==============================================================================
-# WORKSPACE ASSIGNMENTS
-# ==============================================================================
 windowrulev2 = workspace 1, class:^(brave-browser|firefox|chromium)$
-windowrulev2 = workspace 2, class:^(obsidian)$
 windowrulev2 = workspace 3, class:^(wezterm|code|Code|Alacritty|kitty)$
-windowrulev2 = workspace 5, class:^(evince|zathura|okular)$
-windowrulev2 = workspace 6, class:^(raindrop)$
-windowrulev2 = workspace 7, class:^(spotify|Spotify)$
-windowrulev2 = workspace 8, class:^(libreoffice|soffice)$
-windowrulev2 = workspace 9, class:^(slack|Slack|discord|thunderbird|telegram-desktop)$
-windowrulev2 = workspace 10, class:^(claude)$
 
-# Hardware Includes
+# Load hardware specific settings (monitors, etc)
 source = ~/.config/hypr/generated_hardware.conf
-
 WINDOWRULES
+
     } > "$out"
     
     chmod 644 "$out"
-    log_info "✓ Hyprland config generated (SAFE MODE)"
+    log_info "✓ Hyprland config generated (RECOVERY MODE)"
 }
-
-
-
-
-
 
 
 
