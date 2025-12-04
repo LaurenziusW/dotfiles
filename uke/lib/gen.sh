@@ -457,16 +457,20 @@ HARDWARE_INCLUDE
 # ==============================================================================
 # Generate Hyprland config (Linux)
 # ==============================================================================
+
+
+
+
 gen_hyprland() {
     local out="$UKE_GEN/hyprland/hyprland.conf"
     mkdir -p "$(dirname "$out")"
     
-    log_info "Generating Hyprland config..."
+    log_info "Generating Hyprland config (v0.51+ compatible)..."
     
     {
         gen_header "conf" "HYPRLAND CONFIG - Window Manager (Linux)"
         
-        cat << EOF
+        cat << 'HYPRLAND_CORE'
 # ==============================================================================
 # MONITORS
 # ==============================================================================
@@ -480,8 +484,8 @@ general {
     gaps_in = 2
     gaps_out = 4
     border_size = 2
-    col.active_border = rgba(${COLOR_BORDER_ACTIVE}ff)
-    col.inactive_border = rgba(${COLOR_BORDER_INACTIVE}ff)
+    col.active_border = rgba(88c0d0ff)
+    col.inactive_border = rgba(3b4252ff)
     layout = dwindle
     resize_on_border = true
 }
@@ -528,200 +532,86 @@ input {
     }
 }
 
+# ==============================================================================
+# GESTURES (Hyprland 0.51+ - NEW SYNTAX)
+# ==============================================================================
+# NOTE: Old syntax (gestures:workspace_swipe, etc.) removed in 0.51
+# New syntax: gesture = fingers, direction, workspace/action
 gestures {
-    workspace_swipe = true
-    workspace_swipe_fingers = 3
-}
-
-dwindle {
-    pseudotile = true
-    preserve_split = true
-}
-
-misc {
-    disable_hyprland_logo = true
-    disable_splash_rendering = true
+    # 3-finger horizontal swipe for workspace switching (left = prev, right = next)
+    gesture = 3, left, workspace, r+1
+    gesture = 3, right, workspace, r-1
+    
+    # Optional: vertical swipe (can use for other actions)
+    gesture = 3, up, exec, hyprctl dispatch fullscreen 0
+    gesture = 3, down, exec, notify-send "3-finger swipe down detected"
 }
 
 # ==============================================================================
-# AUTOSTART
+# KEYBINDINGS
 # ==============================================================================
-exec-once = waybar
-exec-once = dunst
-exec-once = hyprpaper
-exec-once = nm-applet --indicator
-exec-once = /usr/lib/polkit-kde-authentication-agent-1
-exec-once = wl-paste --type text --watch cliphist store
-exec-once = wl-paste --type image --watch cliphist store
+HYPRLAND_CORE
 
-# ==============================================================================
-# QUALITY OF LIFE
-# ==============================================================================
-bind = ALT SUPER, space, exec, wofi --show drun --allow-images
-bind = ALT SUPER, equal, exec, hyprctl keyword cursor:zoom_factor 2.0
-bind = ALT SUPER, minus, exec, hyprctl keyword cursor:zoom_factor 1.0
-bind = ALT, v, exec, cliphist list | wofi --dmenu | cliphist decode | wl-copy
-bind = ALT SUPER, f, exec, thunar
-bind = ALT SUPER, s, exec, lxappearance
+        # Get modifiers from registry or use defaults
+        local MOD="${UKE_MAIN_MOD:-Super}"
+        local SHIFT="${UKE_MAIN_SHIFT:-Super_L|Shift_L}"
+        
+        cat << KEYBINDS
 
-# ==============================================================================
-# WINDOW MANAGEMENT
-# ==============================================================================
-bind = ALT, return, exec, wezterm
-bind = ALT, q, killactive
-bind = ALT, escape, focuscurrentorlast
-bind = ALT SHIFT, escape, focusurgentorlast
+$mainMod = $MOD
 
-# Window Controls
-bind = ALT SHIFT, f, fullscreen, 0
-bind = ALT SHIFT, space, togglefloating
-bind = ALT SHIFT, backslash, togglesplit
+# Focus management
+bind = $mainMod, return, exec, wezterm
+bind = $mainMod, q, killactive
+bind = $mainMod, e, exit
+bind = $mainMod, f, togglefloating
+bind = $mainMod, p, pseudo
+bind = $mainMod, j, togglesplit
 
-# Focus (Alt + hjkl)
-bind = ALT, h, movefocus, l
-bind = ALT, j, movefocus, d
-bind = ALT, k, movefocus, u
-bind = ALT, l, movefocus, r
+# Movement (Vim-style hjkl)
+bind = $mainMod, h, movefocus, l
+bind = $mainMod, j, movefocus, d
+bind = $mainMod, k, movefocus, u
+bind = $mainMod, l, movefocus, r
 
-# Move (Alt + Shift + hjkl)
-bind = ALT SHIFT, h, movewindow, l
-bind = ALT SHIFT, j, movewindow, d
-bind = ALT SHIFT, k, movewindow, u
-bind = ALT SHIFT, l, movewindow, r
+# Workspaces (1-9)
+bind = $mainMod, 1, workspace, 1
+bind = $mainMod, 2, workspace, 2
+bind = $mainMod, 3, workspace, 3
+bind = $mainMod, 4, workspace, 4
+bind = $mainMod, 5, workspace, 5
+bind = $mainMod, 6, workspace, 6
+bind = $mainMod, 7, workspace, 7
+bind = $mainMod, 8, workspace, 8
+bind = $mainMod, 9, workspace, 9
 
-# Resize (Super + Shift + hjkl)
-bind = SUPER SHIFT, h, resizeactive, -50 0
-bind = SUPER SHIFT, j, resizeactive, 0 50
-bind = SUPER SHIFT, k, resizeactive, 0 -50
-bind = SUPER SHIFT, l, resizeactive, 50 0
+# Move window to workspace
+bind = $mainMod|Shift, 1, movetoworkspace, 1
+bind = $mainMod|Shift, 2, movetoworkspace, 2
+bind = $mainMod|Shift, 3, movetoworkspace, 3
+bind = $mainMod|Shift, 4, movetoworkspace, 4
+bind = $mainMod|Shift, 5, movetoworkspace, 5
+bind = $mainMod|Shift, 6, movetoworkspace, 6
+bind = $mainMod|Shift, 7, movetoworkspace, 7
+bind = $mainMod|Shift, 8, movetoworkspace, 8
+bind = $mainMod|Shift, 9, movetoworkspace, 9
 
-# ==============================================================================
-# WORKSPACE NAVIGATION
-# ==============================================================================
-bind = ALT, 1, workspace, 1
-bind = ALT, 2, workspace, 2
-bind = ALT, 3, workspace, 3
-bind = ALT, 4, workspace, 4
-bind = ALT, 5, workspace, 5
-bind = ALT, 6, workspace, 6
-bind = ALT, 7, workspace, 7
-bind = ALT, 8, workspace, 8
-bind = ALT, 9, workspace, 9
-bind = ALT, 0, workspace, 10
-bind = ALT, bracketleft, workspace, e-1
-bind = ALT, bracketright, workspace, e+1
+KEYBINDS
 
-# Move to Workspace
-bind = ALT SHIFT, 1, movetoworkspace, 1
-bind = ALT SHIFT, 2, movetoworkspace, 2
-bind = ALT SHIFT, 3, movetoworkspace, 3
-bind = ALT SHIFT, 4, movetoworkspace, 4
-bind = ALT SHIFT, 5, movetoworkspace, 5
-bind = ALT SHIFT, 6, movetoworkspace, 6
-bind = ALT SHIFT, 7, movetoworkspace, 7
-bind = ALT SHIFT, 8, movetoworkspace, 8
-bind = ALT SHIFT, 9, movetoworkspace, 9
-bind = ALT SHIFT, 0, movetoworkspace, 10
-
-# ==============================================================================
-# SCRATCHPADS
-# ==============================================================================
-bind = ALT, grave, togglespecialworkspace, terminal
-bind = ALT SHIFT, grave, exec, \$HOME/.local/bin/uke-scratchpad terminal
-bind = ALT SUPER, n, togglespecialworkspace, notes
-bind = ALT SUPER, m, togglespecialworkspace, music
-
-windowrulev2 = float, onworkspace:special:terminal
-windowrulev2 = size 80% 40%, onworkspace:special:terminal
-windowrulev2 = move 10% 5%, onworkspace:special:terminal
-windowrulev2 = float, onworkspace:special:notes
-windowrulev2 = size 70% 80%, onworkspace:special:notes
-windowrulev2 = center, onworkspace:special:notes
-windowrulev2 = float, onworkspace:special:music
-windowrulev2 = size 60% 70%, onworkspace:special:music
-windowrulev2 = center, onworkspace:special:music
-
-# ==============================================================================
-# UKE TOOLS
-# ==============================================================================
-# Sticky window (floating + pinned + always-on-top)
-bind = ALT SHIFT, s, exec, \$HOME/.local/bin/uke-sticky toggle
-# Quick fix
-bind = ALT SHIFT, f, exec, \$HOME/.local/bin/uke-fix
-
-bind = ALT, grave, exec, \$HOME/.local/bin/uke-gather
-bind = ALT SUPER, b, exec, \$HOME/.local/bin/uke-launch brave
-bind = ALT SUPER, o, exec, \$HOME/.local/bin/uke-launch obsidian
-bind = ALT SUPER, c, exec, \$HOME/.local/bin/uke-launch code
-bind = ALT SUPER, t, exec, \$HOME/.local/bin/uke-launch wezterm
-
-# Bunches
-bind = ALT CTRL, F1, exec, \$HOME/.local/bin/uke-bunch study
-bind = ALT CTRL, F2, exec, \$HOME/.local/bin/uke-bunch guitar
-bind = ALT CTRL, F3, exec, \$HOME/.local/bin/uke-bunch coding
-bind = ALT CTRL, F4, exec, \$HOME/.local/bin/uke-bunch email
-bind = ALT CTRL, F5, exec, \$HOME/.local/bin/uke-bunch reading
-
-# Session
-bind = ALT CTRL, s, exec, \$HOME/.local/bin/uke-session save quick
-bind = ALT CTRL SHIFT, s, exec, \$HOME/.local/bin/uke-session restore quick
-
-# ==============================================================================
-# SCREENSHOT
-# ==============================================================================
-bind = , Print, exec, grim -g "\$(slurp)" - | wl-copy
-bind = SHIFT, Print, exec, grim - | wl-copy
-
-# ==============================================================================
-# MOUSE
-# ==============================================================================
-bindm = ALT, mouse:272, movewindow
-bindm = ALT, mouse:273, resizewindow
-
-# ==============================================================================
-# FLOAT RULES
-# ==============================================================================
-windowrulev2 = float, class:^(pavucontrol)\$
-windowrulev2 = float, class:^(nm-connection-editor)\$
-windowrulev2 = float, class:^(lxappearance)\$
-windowrulev2 = float, class:^(blueman-manager)\$
-windowrulev2 = float, class:^(org.gnome.Calculator)\$
-windowrulev2 = float, class:^(gnome-calculator)\$
-windowrulev2 = float, class:^(thunar)\$,title:^(File Operation Progress)\$
-windowrulev2 = float, title:^(Picture-in-Picture)\$
-windowrulev2 = pin, title:^(Picture-in-Picture)\$
-
-# Terminal opacity
-windowrulev2 = opacity 0.92 0.88, class:^(wezterm)\$
-windowrulev2 = opacity 0.92 0.88, class:^(Alacritty)\$
-windowrulev2 = opacity 0.92 0.88, class:^(kitty)\$
+        cat << 'WINDOWRULES'
 
 # ==============================================================================
 # WORKSPACE ASSIGNMENTS
 # ==============================================================================
-windowrulev2 = workspace 1, class:^(brave-browser)\$
-windowrulev2 = workspace 1, class:^(firefox)\$
-windowrulev2 = workspace 1, class:^(chromium)\$
-windowrulev2 = workspace 2, class:^(obsidian)\$
-windowrulev2 = workspace 3, class:^(wezterm)\$
-windowrulev2 = workspace 3, class:^(code)\$
-windowrulev2 = workspace 3, class:^(Code)\$
-windowrulev2 = workspace 3, class:^(Alacritty)\$
-windowrulev2 = workspace 3, class:^(kitty)\$
-windowrulev2 = workspace 5, class:^(evince)\$
-windowrulev2 = workspace 5, class:^(zathura)\$
-windowrulev2 = workspace 5, class:^(okular)\$
-windowrulev2 = workspace 6, class:^(raindrop)\$
-windowrulev2 = workspace 7, class:^(spotify)\$
-windowrulev2 = workspace 7, class:^(Spotify)\$
-windowrulev2 = workspace 8, class:^(libreoffice)\$
-windowrulev2 = workspace 8, class:^(soffice)\$
-windowrulev2 = workspace 9, class:^(slack)\$
-windowrulev2 = workspace 9, class:^(Slack)\$
-windowrulev2 = workspace 9, class:^(discord)\$
-windowrulev2 = workspace 9, class:^(thunderbird)\$
-windowrulev2 = workspace 9, class:^(telegram-desktop)\$
-windowrulev2 = workspace 10, class:^(claude)\$
+windowrulev2 = workspace 1, class:^(brave-browser|firefox|chromium)$
+windowrulev2 = workspace 2, class:^(obsidian)$
+windowrulev2 = workspace 3, class:^(wezterm|code|Code|Alacritty|kitty)$
+windowrulev2 = workspace 5, class:^(evince|zathura|okular)$
+windowrulev2 = workspace 6, class:^(raindrop)$
+windowrulev2 = workspace 7, class:^(spotify|Spotify)$
+windowrulev2 = workspace 8, class:^(libreoffice|soffice)$
+windowrulev2 = workspace 9, class:^(slack|Slack|discord|thunderbird|telegram-desktop)$
+windowrulev2 = workspace 10, class:^(claude)$
 
 # ==============================================================================
 # HARDWARE SPECIFIC INCLUDES (Ghost Files)
@@ -730,13 +620,15 @@ windowrulev2 = workspace 10, class:^(claude)\$
 # These settings override defaults based on machine.profile
 source = ~/.config/hypr/generated_hardware.conf
 
-EOF
-
+WINDOWRULES
     } > "$out"
     
-    chmod +x "$out"
-    ok "Generated: $out"
+    chmod 644 "$out"
+    log_ok "✓ Hyprland config generated: $out"
 }
+
+
+
 
 # ==============================================================================
 # Generate uke-gather script
