@@ -1,0 +1,267 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Doctor - Health Check and Diagnostics
+# ==============================================================================
+# Performs comprehensive health checks on the UKE installation.
+#
+# Usage: uke-doctor [--fix]
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
+source "$UKE_ROOT/lib/core.sh"
+
+FIX_MODE="${1:-}"
+ERRORS=0
+WARNINGS=0
+
+# ==============================================================================
+# Check Functions
+# ==============================================================================
+check() {
+    local name="$1"
+    local result="$2"
+    local fix_hint="${3:-}"
+    
+    if [[ "$result" == "ok" ]]; then
+        ok "$name"
+        return 0
+    elif [[ "$result" == "warn" ]]; then
+        warn "$name"
+        [[ -n "$fix_hint" ]] && echo "    → $fix_hint"
+        ((WARNINGS++))
+        return 0
+    else
+        fail "$name"
+        [[ -n "$fix_hint" ]] && echo "    → $fix_hint"
+        ((ERRORS++))
+        return 1
+    fi
+}
+
+# ==============================================================================
+# Core Checks
+# ==============================================================================
+check_core() {
+    echo ""
+    printf "%s=== Core Installation ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    # UKE root exists
+    [[ -d "$UKE_ROOT" ]] && check "UKE_ROOT exists" "ok" || check "UKE_ROOT exists" "fail" "Clone UKE repo to ~/dotfiles/uke"
+    
+    # Core libraries
+    [[ -f "$UKE_ROOT/lib/core.sh" ]] && check "lib/core.sh" "ok" || check "lib/core.sh" "fail"
+    [[ -f "$UKE_ROOT/lib/wm.sh" ]] && check "lib/wm.sh" "ok" || check "lib/wm.sh" "fail"
+    [[ -f "$UKE_ROOT/lib/gen.sh" ]] && check "lib/gen.sh" "ok" || check "lib/gen.sh" "fail"
+    
+    # Main CLI
+    [[ -x "$UKE_ROOT/bin/uke" ]] && check "bin/uke executable" "ok" || check "bin/uke executable" "fail" "chmod +x bin/uke"
+    
+    # Registry
+    [[ -f "$UKE_CONFIG/registry.yaml" ]] && check "registry.yaml" "ok" || check "registry.yaml" "fail" "Create config/registry.yaml"
+}
+
+# ==============================================================================
+# Dependencies
+# ==============================================================================
+check_deps() {
+    echo ""
+    printf "%s=== Dependencies ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    # Required
+    command -v bash &>/dev/null && check "bash" "ok" || check "bash" "fail"
+    command -v jq &>/dev/null && check "jq" "ok" || check "jq" "fail" "Install: brew/pacman install jq"
+    command -v stow &>/dev/null && check "stow" "ok" || check "stow" "warn" "Install for dotfiles: brew/pacman install stow"
+    
+    # Optional but recommended
+    command -v yq &>/dev/null && check "yq (YAML parser)" "ok" || check "yq (YAML parser)" "warn" "Install for dynamic generation: brew/pacman install yq"
+    
+    # Platform specific
+    if is_macos; then
+        command -v yabai &>/dev/null && check "yabai" "ok" || check "yabai" "fail" "Install: brew install koekeishiya/formulae/yabai"
+        command -v skhd &>/dev/null && check "skhd" "ok" || check "skhd" "fail" "Install: brew install koekeishiya/formulae/skhd"
+    else
+        command -v hyprctl &>/dev/null && check "hyprland" "ok" || check "hyprland" "fail" "Install: pacman -S hyprland"
+    fi
+}
+
+# ==============================================================================
+# Hardware Profile
+# ==============================================================================
+check_profile() {
+    echo ""
+    printf "%s=== Hardware Profile ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    if [[ -f "$UKE_PROFILE_FILE" ]]; then
+        check "machine.profile exists" "ok"
+        
+        # Validate profile content
+        source "$UKE_PROFILE_FILE"
+        
+        [[ -n "${UKE_OS:-}" ]] && check "  UKE_OS=$UKE_OS" "ok" || check "  UKE_OS" "fail"
+        [[ -n "${UKE_FORM_FACTOR:-}" ]] && check "  UKE_FORM_FACTOR=$UKE_FORM_FACTOR" "ok" || check "  UKE_FORM_FACTOR" "fail"
+        [[ -n "${UKE_MONITORS:-}" ]] && check "  UKE_MONITORS=$UKE_MONITORS" "ok" || check "  UKE_MONITORS" "fail"
+        [[ -n "${UKE_GPU:-}" ]] && check "  UKE_GPU=$UKE_GPU" "ok" || check "  UKE_GPU" "fail"
+        [[ -n "${UKE_KEYBOARD:-}" ]] && check "  UKE_KEYBOARD=$UKE_KEYBOARD" "ok" || check "  UKE_KEYBOARD" "fail"
+    else
+        check "machine.profile exists" "warn" "Run: uke profile"
+    fi
+}
+
+# ==============================================================================
+# Ghost Files
+# ==============================================================================
+check_ghost_files() {
+    echo ""
+    printf "%s=== Ghost Files (Generated Hardware Configs) ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    if is_macos; then
+        [[ -f "$HOME/.config/yabai/generated_hardware.conf" ]] && \
+            check "yabai ghost file" "ok" || \
+            check "yabai ghost file" "warn" "Run: uke apply"
+    else
+        [[ -f "$HOME/.config/hypr/generated_hardware.conf" ]] && \
+            check "hyprland ghost file" "ok" || \
+            check "hyprland ghost file" "warn" "Run: uke apply"
+    fi
+    
+    [[ -f "$HOME/.config/alacritty/generated_font.toml" ]] && \
+        check "alacritty ghost file" "ok" || \
+        check "alacritty ghost file" "warn" "Run: uke apply"
+    
+    [[ -f "$HOME/.config/wezterm/generated_hardware.lua" ]] && \
+        check "wezterm ghost file" "ok" || \
+        check "wezterm ghost file" "warn" "Run: uke apply"
+}
+
+# ==============================================================================
+# Generated Configs
+# ==============================================================================
+check_generated() {
+    echo ""
+    printf "%s=== Generated Configs ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    if is_macos; then
+        [[ -f "$UKE_GEN/skhd/skhdrc" ]] && check "skhd config" "ok" || check "skhd config" "warn" "Run: uke gen"
+        [[ -f "$UKE_GEN/yabai/yabairc" ]] && check "yabai config" "ok" || check "yabai config" "warn" "Run: uke gen"
+    else
+        [[ -f "$UKE_GEN/hyprland/hyprland.conf" ]] && check "hyprland config" "ok" || check "hyprland config" "warn" "Run: uke gen"
+    fi
+}
+
+# ==============================================================================
+# Symlinks
+# ==============================================================================
+check_symlinks() {
+    echo ""
+    printf "%s=== Symlinks ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    # Check if uke is in PATH
+    if command -v uke &>/dev/null; then
+        check "uke in PATH" "ok"
+    else
+        check "uke in PATH" "warn" "Add ~/.local/bin to PATH or run installer"
+    fi
+    
+    # Check config symlinks
+    if is_macos; then
+        [[ -L "$HOME/.config/skhd/skhdrc" ]] || [[ -f "$HOME/.config/skhd/skhdrc" ]] && \
+            check "skhd config linked" "ok" || \
+            check "skhd config linked" "warn" "Run: uke install --link"
+    else
+        [[ -L "$HOME/.config/hypr/hyprland.conf" ]] || [[ -f "$HOME/.config/hypr/hyprland.conf" ]] && \
+            check "hyprland config linked" "ok" || \
+            check "hyprland config linked" "warn" "Run: uke install --link"
+    fi
+}
+
+# ==============================================================================
+# Service Status
+# ==============================================================================
+check_services() {
+    echo ""
+    printf "%s=== Services ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    if is_linux; then
+        systemctl is-active keyd &>/dev/null && check "keyd service" "ok" || check "keyd service" "warn" "sudo systemctl start keyd"
+        systemctl --user is-active pipewire &>/dev/null && check "pipewire" "ok" || check "pipewire" "warn" "Audio may not work"
+    fi
+}
+
+# ==============================================================================
+# Update Status
+# ==============================================================================
+check_updates() {
+    echo ""
+    printf "%s=== Updates ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    if command -v checkupdates &>/dev/null; then
+        local count=$(checkupdates 2>/dev/null | wc -l)
+        if [[ $count -gt 0 ]]; then
+            check "$count update(s) available" "warn" "Run: uke-update"
+        else
+            check "System up to date" "ok"
+        fi
+    fi
+}
+
+# ==============================================================================
+# Window Manager Status
+# ==============================================================================
+check_wm() {
+    echo ""
+    printf "%s=== Window Manager ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    if is_macos; then
+        pgrep -q yabai && check "yabai running" "ok" || check "yabai running" "warn" "Start: yabai --start-service"
+        pgrep -q skhd && check "skhd running" "ok" || check "skhd running" "warn" "Start: skhd --start-service"
+    else
+        [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && check "hyprland running" "ok" || check "hyprland running" "warn" "Start Hyprland"
+    fi
+}
+
+# ==============================================================================
+# Summary
+# ==============================================================================
+print_summary() {
+    echo ""
+    printf "%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n" "$C_DIM" "$C_RESET"
+    echo ""
+    
+    if [[ $ERRORS -eq 0 ]] && [[ $WARNINGS -eq 0 ]]; then
+        printf "%s✓ All checks passed!%s\n" "$C_GREEN$C_BOLD" "$C_RESET"
+    elif [[ $ERRORS -eq 0 ]]; then
+        printf "%s! %d warning(s), 0 errors%s\n" "$C_YELLOW$C_BOLD" "$WARNINGS" "$C_RESET"
+    else
+        printf "%s✗ %d error(s), %d warning(s)%s\n" "$C_RED$C_BOLD" "$ERRORS" "$WARNINGS" "$C_RESET"
+    fi
+    
+    echo ""
+    echo "Quick fixes:"
+    echo "  uke profile          # Configure hardware"
+    echo "  uke apply            # Generate ghost files"
+    echo "  uke gen && uke reload   # Regenerate and apply"
+}
+
+# ==============================================================================
+# Main
+# ==============================================================================
+echo ""
+printf "%s╔══════════════════════════════════════╗%s\n" "$C_CYAN" "$C_RESET"
+printf "%s║%s       UKE Doctor v$UKE_VERSION             %s║%s\n" "$C_CYAN" "$C_BOLD" "$C_CYAN" "$C_RESET"
+printf "%s╚══════════════════════════════════════╝%s\n" "$C_CYAN" "$C_RESET"
+
+check_core
+check_deps
+check_profile
+check_ghost_files
+check_generated
+check_symlinks
+check_services
+check_updates
+check_wm
+print_summary
+
+exit $ERRORS

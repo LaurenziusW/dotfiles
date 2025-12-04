@@ -11,11 +11,10 @@ UKE_ROOT="${SCRIPT_DIR%/scripts}"
 RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
 CYAN=$'\e[36m' BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
 
-# [FIX] Logging functions redirect to stderr for cleaner output
-ok()   { echo "${GREEN}✓${RESET} $*" >&2; }
-fail() { echo "${RED}✗${RESET} $*" >&2; }
-info() { echo "${BLUE}→${RESET} $*" >&2; }
-warn() { echo "${YELLOW}!${RESET} $*" >&2; }
+ok()   { echo "${GREEN}✓${RESET} $*"; }
+fail() { echo "${RED}✗${RESET} $*"; }
+info() { echo "${BLUE}→${RESET} $*"; }
+warn() { echo "${YELLOW}!${RESET} $*"; }
 
 # ==============================================================================
 # OS Detection
@@ -113,36 +112,6 @@ link_binaries() {
         ln -sf "$bin" "$HOME/.local/bin/$name"
         ok "Linked: $name"
     done
-}
-
-# ==============================================================================
-# Setup Pacman Hook (Arch Linux only)
-# ==============================================================================
-setup_pacman_hook() {
-    if [[ "$DISTRO" != "arch" ]]; then
-        return 0
-    fi
-    
-    info "Setting up pacman hook for system snapshots..."
-    
-    # Create symlink for uke-snapshot in system path (required for pacman hooks)
-    if [[ -f "$HOME/.local/bin/uke-snapshot" ]]; then
-        info "Creating system symlink for uke-snapshot (requires sudo)..."
-        sudo ln -sf "$HOME/.local/bin/uke-snapshot" /usr/local/bin/uke-snapshot 2>/dev/null && \
-            ok "Created /usr/local/bin/uke-snapshot symlink" || \
-            warn "Could not create system symlink (run manually: sudo ln -sf ~/.local/bin/uke-snapshot /usr/local/bin/uke-snapshot)"
-    fi
-    
-    # Install the pacman hook
-    local hook_src="$UKE_ROOT/scripts/pacman-hooks/uke-snapshot.hook"
-    local hook_dest="/etc/pacman.d/hooks/uke-snapshot.hook"
-    
-    if [[ -f "$hook_src" ]]; then
-        sudo mkdir -p /etc/pacman.d/hooks 2>/dev/null
-        sudo cp "$hook_src" "$hook_dest" 2>/dev/null && \
-            ok "Installed pacman hook" || \
-            warn "Could not install pacman hook (run manually: sudo cp $hook_src $hook_dest)"
-    fi
 }
 
 # ==============================================================================
@@ -341,7 +310,6 @@ main() {
             stow_dotfiles
             setup_profile
             setup_autostart
-            setup_pacman_hook
             start_services
             
             echo ""

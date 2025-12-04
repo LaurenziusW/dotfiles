@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Snapshot v7.2 - System Snapshot & Rollback
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+source "$UKE_ROOT/lib/core.sh"
+
+# Detect backend
+detect_backend() {
+    if findmnt -n -o FSTYPE / 2>/dev/null | grep -q btrfs; then
+        if command -v snapper &>/dev/null; then
+            echo "snapper"
+        else
+            echo "btrfs"
+        fi
+    elif command -v timeshift &>/dev/null; then
+        echo "timeshift"
+    else
+        echo "uke-backup"
+    fi
+}
+
+BACKEND=$(detect_backend)
+
+create_snapshot() {
+    local desc="${1:-UKE snapshot}"
+    
+    echo ""
+    printf "%s╔══════════════════════════════════════╗%s\n" "$C_CYAN" "$C_RESET"
+    printf "%s║%s        UKE Snapshot                  %s║%s\n" "$C_CYAN" "$C_BOLD" "$C_CYAN" "$C_RESET"
+    printf "%s╚══════════════════════════════════════╝%s\n" "$C_CYAN" "$C_RESET"
+    echo ""
+    info "Backend: $BACKEND"
+    info "Description: $desc"
+    echo ""
+    
+    case "$BACKEND" in
+        snapper)
+            sudo snapper create -d "$desc" -c timeline
+            ok "Snapper snapshot created"
+            ;;
+        btrfs)
+            local snap_dir="/.snapshots/uke-$(date +%Y%m%d-%H%M%S)"
+            sudo btrfs subvolume snapshot / "$snap_dir"
+            echo "$desc" | sudo tee "$snap_dir/.description" >/dev/null
+            ok "Btrfs snapshot: $snap_dir"
+            ;;
+        timeshift)
+            sudo timeshift --create --comments "$desc" --scripted
+            ok "Timeshift snapshot created"
+            ;;
+        uke-backup)
+            info "No btrfs/snapper/timeshift - using uke-backup"
+            "$UKE_ROOT/bin/uke-backup" --full
+            ;;
+    esac
+}
+
+list_snapshots() {
+    echo ""
+    printf "%s=== System Snapshots (%s) ===%s\n" "$C_BOLD" "$BACKEND" "$C_RESET"
+    echo ""
+    
+    case "$BACKEND" in
+        snapper)
+            snapper list
+            ;;
+        btrfs)
+            if [[ -d /.snapshots ]]; then
+                ls -la /.snapshots/ 2>/dev/null | grep uke- || warn "No UKE snapshots"
+            else
+                warn "No snapshots directory"
+            fi
+            ;;
+        timeshift)
+            sudo timeshift --list
+            ;;
+        uke-backup)
+            "$UKE_ROOT/bin/uke-backup" --list
+            ;;
+    esac
+}
+
+restore_snapshot() {
+    local id="$1"
+    
+    warn "Snapshot restore requires manual intervention for safety"
+    echo ""
+    
+    case "$BACKEND" in
+        snapper)
+            info "To restore snapper snapshot $id:"
+            echo "  sudo snapper rollback $id"
+            echo "  reboot"
+            ;;
+        btrfs)
+            info "To restore btrfs snapshot:"
+            echo "  1. Boot from live USB"
+            echo "  2. Mount btrfs: mount /dev/sdX /mnt"
+            echo "  3. mv /mnt/@ /mnt/@.broken"
+            echo "  4. btrfs subvol snapshot /mnt/.snapshots/$id /mnt/@"
+            echo "  5. reboot"
+            ;;
+        timeshift)
+            info "To restore timeshift snapshot:"
+            echo "  sudo timeshift --restore --snapshot '$id'"
+            ;;
+        uke-backup)
+            "$UKE_ROOT/bin/uke-backup" --restore "$id"
+            ;;
+    esac
+}
+
+delete_snapshot() {
+    local id="$1"
+    
+    case "$BACKEND" in
+        snapper)
+            sudo snapper delete "$id"
+            ok "Deleted snapshot $id"
+            ;;
+        btrfs)
+            sudo btrfs subvolume delete "/.snapshots/$id"
+            ok "Deleted snapshot $id"
+            ;;
+        timeshift)
+            sudo timeshift --delete --snapshot "$id"
+            ok "Deleted snapshot $id"
+            ;;
+        uke-backup)
+            rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/uke/backups/$id"
+            ok "Deleted backup $id"
+            ;;
+    esac
+}
+
+auto_snapshot() {
+    # For pacman hook - quiet mode
+    create_snapshot "Pre-update $(date +%Y-%m-%d)" >/dev/null 2>&1
+}
+
+case "${1:-}" in
+    create)       create_snapshot "${2:-Manual snapshot}" ;;
+    list)         list_snapshots ;;
+    restore)      restore_snapshot "${2:?Snapshot ID required}" ;;
+    delete)       delete_snapshot "${2:?Snapshot ID required}" ;;
+    auto)         auto_snapshot ;;
+    backend)      echo "$BACKEND" ;;
+    -h|--help)
+        echo "Usage: uke-snapshot [command]"
+        echo "Commands:"
+        echo "  create [desc]   Create snapshot"
+        echo "  list            List snapshots"
+        echo "  restore <id>    Restore snapshot"
+        echo "  delete <id>     Delete snapshot"
+        echo "  auto            Auto-snapshot (for hooks)"
+        echo "  backend         Show detected backend"
+        echo ""
+        echo "Detected backend: $BACKEND"
+        ;;
+    *)
+        if [[ -n "$1" ]]; then
+            # Assume it's a description
+            create_snapshot "$1"
+        else
+            list_snapshots
+        fi
+        ;;
+esac

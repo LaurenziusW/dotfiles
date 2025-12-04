@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Update v7.2 - Unified System Update Manager
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+source "$UKE_ROOT/lib/core.sh"
+
+AUR_HELPER=""
+[[ -x "$(command -v yay)" ]] && AUR_HELPER="yay"
+[[ -x "$(command -v paru)" ]] && AUR_HELPER="paru"
+
+show_news() {
+    info "Fetching Arch Linux news..."
+    if command -v curl &>/dev/null; then
+        curl -s "https://archlinux.org/feeds/news/" 2>/dev/null | \
+            grep -oP '(?<=<title>).*?(?=</title>)' | head -5 | tail -4 | \
+            while read -r title; do echo "  • $title"; done
+    else
+        warn "curl not installed, skipping news"
+    fi
+    echo ""
+}
+
+check_updates() {
+    info "Checking for updates..."
+    echo ""
+    
+    printf "%s=== Official Packages ===%s\n" "$C_BOLD" "$C_RESET"
+    local official=$(checkupdates 2>/dev/null | wc -l)
+    if [[ $official -gt 0 ]]; then
+        checkupdates 2>/dev/null | head -10
+        [[ $official -gt 10 ]] && echo "  ... and $((official - 10)) more"
+        echo ""
+        info "$official package(s) available"
+    else
+        ok "System is up to date"
+    fi
+    
+    if [[ -n "$AUR_HELPER" ]]; then
+        echo ""
+        printf "%s=== AUR Packages ===%s\n" "$C_BOLD" "$C_RESET"
+        local aur=$("$AUR_HELPER" -Qua 2>/dev/null | wc -l)
+        if [[ $aur -gt 0 ]]; then
+            "$AUR_HELPER" -Qua 2>/dev/null | head -10
+            [[ $aur -gt 10 ]] && echo "  ... and $((aur - 10)) more"
+            echo ""
+            info "$aur AUR package(s) available"
+        else
+            ok "AUR packages up to date"
+        fi
+    fi
+    
+    echo ""
+    printf "%s=== UKE ===%s\n" "$C_BOLD" "$C_RESET"
+    if [[ -d "$UKE_ROOT/.git" ]]; then
+        cd "$UKE_ROOT"
+        git fetch origin 2>/dev/null
+        local behind=$(git rev-list HEAD..origin/main --count 2>/dev/null || echo "0")
+        if [[ $behind -gt 0 ]]; then
+            info "UKE is $behind commit(s) behind"
+        else
+            ok "UKE is up to date"
+        fi
+    else
+        warn "UKE not a git repo"
+    fi
+}
+
+refresh_mirrors() {
+    if ! command -v reflector &>/dev/null; then
+        warn "reflector not installed, skipping mirror refresh"
+        return 0
+    fi
+    
+    info "Refreshing mirrors (this may take a moment)..."
+    sudo reflector --latest 20 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
+    ok "Mirrors refreshed"
+}
+
+clean_cache() {
+    info "Cleaning package cache..."
+    
+    # Clean with paccache if available
+    if command -v paccache &>/dev/null; then
+        sudo paccache -rk2  # Keep only last 2 versions
+        ok "Package cache cleaned (kept last 2 versions)"
+    else
+        warn "pacman-contrib not installed, skipping cache cleanup"
+    fi
+}
+
+clean_orphans() {
+    info "Checking for orphaned packages..."
+    
+    local orphans=$(pacman -Qtdq 2>/dev/null | wc -l)
+    if [[ $orphans -gt 0 ]]; then
+        echo ""
+        pacman -Qtdq 2>/dev/null
+        echo ""
+        read -p "Remove $orphans orphaned package(s)? [y/N] " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            sudo pacman -Rns $(pacman -Qtdq) --noconfirm
+            ok "Orphans removed"
+        fi
+    else
+        ok "No orphaned packages"
+    fi
+}
+
+update_system() {
+    info "Updating official packages..."
+    sudo pacman -Syu --noconfirm
+    ok "System packages updated"
+}
+
+update_aur() {
+    if [[ -z "$AUR_HELPER" ]]; then
+        warn "No AUR helper found (yay/paru)"
+        return 1
+    fi
+    info "Updating AUR packages..."
+    "$AUR_HELPER" -Sua --noconfirm
+    ok "AUR packages updated"
+}
+
+update_uke() {
+    if [[ ! -d "$UKE_ROOT/.git" ]]; then
+        warn "UKE is not a git repository"
+        return 1
+    fi
+    info "Updating UKE..."
+    cd "$UKE_ROOT"
+    git pull origin main 2>/dev/null || git pull
+    info "Regenerating configs..."
+    "$UKE_ROOT/lib/gen.sh" all
+    ok "UKE updated"
+}
+
+update_all() {
+    echo ""
+    printf "%s╔══════════════════════════════════════╗%s\n" "$C_CYAN" "$C_RESET"
+    printf "%s║%s        UKE Update Manager            %s║%s\n" "$C_CYAN" "$C_BOLD" "$C_CYAN" "$C_RESET"
+    printf "%s╚══════════════════════════════════════╝%s\n" "$C_CYAN" "$C_RESET"
+    echo ""
+    
+    show_news
+    
+    # Check disk space
+    local free=$(df -BG / | awk 'NR==2 {print $4}' | tr -d 'G')
+    if [[ $free -lt 2 ]]; then
+        fail "Low disk space: ${free}GB free. Need at least 2GB."
+        info "Run: uke-update --clean"
+        exit 1
+    fi
+    
+    # Refresh mirrors first (for faster downloads)
+    refresh_mirrors
+    echo ""
+    
+    update_system
+    echo ""
+    [[ -n "$AUR_HELPER" ]] && update_aur
+    echo ""
+    update_uke
+    
+    # Check if kernel was updated
+    local current_kernel=$(uname -r | sed 's/-arch.*//')
+    local installed_kernel=$(pacman -Q linux 2>/dev/null | awk '{print $2}' | sed 's/\.arch.*//')
+    if [[ "$current_kernel" != "$installed_kernel" ]]; then
+        echo ""
+        warn "Kernel updated ($current_kernel → $installed_kernel). Reboot recommended!"
+    fi
+    
+    echo ""
+    ok "All updates complete!"
+}
+
+case "${1:---all}" in
+    --check)    check_updates ;;
+    --news)     show_news ;;
+    --system)   update_system ;;
+    --aur)      update_aur ;;
+    --uke)      update_uke ;;
+    --mirrors)  refresh_mirrors ;;
+    --clean)    clean_cache; clean_orphans ;;
+    --orphans)  clean_orphans ;;
+    --all)      update_all ;;
+    -h|--help)
+        echo "Usage: uke-update [option]"
+        echo "Options:"
+        echo "  --check    Show pending updates"
+        echo "  --news     Show Arch Linux news"
+        echo "  --system   Update official packages only"
+        echo "  --aur      Update AUR packages only"
+        echo "  --uke      Update UKE only"
+        echo "  --mirrors  Refresh mirror list (reflector)"
+        echo "  --clean    Clean package cache & orphans"
+        echo "  --orphans  Remove orphaned packages"
+        echo "  --all      Update everything (default)"
+        ;;
+    *)          fail "Unknown option: $1" ;;
+esac

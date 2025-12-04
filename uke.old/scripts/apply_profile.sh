@@ -189,14 +189,6 @@ get_padding() {
     esac
 }
 
-# [FIX] Add scaling for small screens
-get_scaling() {
-    case "${UKE_FORM_FACTOR}" in
-        laptop_10)  echo "1.25" ;;  # 10" laptops need scaling
-        *)          echo "1" ;;     # Others use native resolution
-    esac
-}
-
 # ==============================================================================
 # Generate Hyprland Hardware Config
 # ==============================================================================
@@ -251,35 +243,15 @@ general {
 EOF
         echo ""
         
-        # [FIX] Get scaling factor for small screens
-        local scaling
-        scaling=$(get_scaling)
-        
-        echo "# Monitor Configuration (${UKE_MONITORS} monitors, scale=${scaling})"
+        echo "# Monitor Configuration (${UKE_MONITORS} monitors)"
         case "${UKE_MONITORS}" in
             1)
-                # Single monitor with scaling
-                echo "# Single monitor - auto-detect with scaling"
-                echo "monitor=,preferred,auto,${scaling}"
+                echo "# Single monitor - using defaults"
                 ;;
             2)
-                # Dual monitors
-                cat << EOF
+                cat << 'DUAL'
 # Dual monitor workspace assignment
-# NOTE: Monitor names may vary! Check yours with: hyprctl monitors
-# Common names: eDP-1, eDP-2 (laptop), HDMI-A-1, DP-1, DP-2 (external)
-# Adjust the names below to match your setup
-
-# Primary monitor (usually laptop screen)
-monitor=eDP-1,preferred,0x0,${scaling}
-monitor=eDP-2,preferred,0x0,${scaling}
-
-# Secondary monitor (external)
-monitor=HDMI-A-1,preferred,auto,1
-monitor=DP-1,preferred,auto,1
-monitor=DP-2,preferred,auto,1
-
-# Workspace assignment
+# Adjust monitor names to match your setup (use: hyprctl monitors)
 workspace = 1, monitor:eDP-1, default:true
 workspace = 2, monitor:eDP-1
 workspace = 3, monitor:eDP-1
@@ -290,16 +262,12 @@ workspace = 7, monitor:HDMI-A-1
 workspace = 8, monitor:HDMI-A-1
 workspace = 9, monitor:HDMI-A-1
 workspace = 10, monitor:HDMI-A-1
-EOF
+DUAL
                 ;;
             3)
-                cat << EOF
+                cat << 'TRIPLE'
 # Triple monitor workspace assignment
-# NOTE: Monitor names may vary! Check yours with: hyprctl monitors
-monitor=eDP-1,preferred,0x0,${scaling}
-monitor=DP-1,preferred,auto,1
-monitor=HDMI-A-1,preferred,auto,1
-
+# Adjust monitor names to match your setup (use: hyprctl monitors)
 workspace = 1, monitor:eDP-1, default:true
 workspace = 2, monitor:eDP-1
 workspace = 3, monitor:eDP-1
@@ -310,7 +278,7 @@ workspace = 7, monitor:HDMI-A-1, default:true
 workspace = 8, monitor:HDMI-A-1
 workspace = 9, monitor:HDMI-A-1
 workspace = 10, monitor:HDMI-A-1
-EOF
+TRIPLE
                 ;;
         esac
         echo ""

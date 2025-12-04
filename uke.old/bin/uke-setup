@@ -11,11 +11,10 @@ export UKE_ROOT="${SCRIPT_DIR%/bin}"
 RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
 CYAN=$'\e[36m' BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
 
-# [FIX] Logging functions redirect to stderr so they don't corrupt captured output
-ok()   { printf "%s✓%s %s\n" "$GREEN" "$RESET" "$*" >&2; }
-fail() { printf "%s✗%s %s\n" "$RED" "$RESET" "$*" >&2; }
-info() { printf "%s→%s %s\n" "$BLUE" "$RESET" "$*" >&2; }
-warn() { printf "%s!%s %s\n" "$YELLOW" "$RESET" "$*" >&2; }
+ok()   { printf "%s✓%s %s\n" "$GREEN" "$RESET" "$*"; }
+fail() { printf "%s✗%s %s\n" "$RED" "$RESET" "$*"; }
+info() { printf "%s→%s %s\n" "$BLUE" "$RESET" "$*"; }
+warn() { printf "%s!%s %s\n" "$YELLOW" "$RESET" "$*"; }
 
 STATE_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/uke/setup-state"
 HEADLESS="${HEADLESS:-false}"

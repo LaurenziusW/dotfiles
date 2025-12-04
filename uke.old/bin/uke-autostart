@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Auto-start v7.1 - Hyprland Launcher with Fallback
+# ==============================================================================
+# Starts Hyprland with proper error handling and fallback to terminal.
+# This script is called from .zprofile on TTY1 login.
+#
+# Features:
+#   - Pre-flight checks for Hyprland
+#   - Hardware config generation if missing
+#   - Crash recovery with terminal fallback
+#   - Logging for troubleshooting
+#
+# Usage:
+#   uke-autostart          # Normal start
+#   uke-autostart --debug  # Start with extra logging
+#   uke-autostart --skip   # Skip to terminal
+# ==============================================================================
+set -euo pipefail
+
+# ==============================================================================
+# Configuration
+# ==============================================================================
+LOG_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/uke/autostart.log"
+CRASH_COUNT_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/uke/crash_count"
+MAX_CRASHES=3
+CRASH_RESET_HOURS=1
+
+UKE_ROOT="${UKE_ROOT:-$HOME/dotfiles/uke}"
+
+# Colors (for terminal output before Hyprland)
+RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
+BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
+
+# ==============================================================================
+# Logging
+# ==============================================================================
+log() {
+    local level="$1"
+    shift
+    local msg="[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+    echo "$msg" >> "$LOG_FILE"
+    [[ "$level" == "ERROR" ]] && echo "${RED}$msg${RESET}" >&2
+    [[ "$level" == "INFO" ]] && echo "${BLUE}$msg${RESET}"
+    [[ "$level" == "WARN" ]] && echo "${YELLOW}$msg${RESET}"
+}
+
+# ==============================================================================
+# Pre-flight Checks
+# ==============================================================================
+preflight_checks() {
+    log "INFO" "Running pre-flight checks..."
+    
+    # Check if Hyprland is installed
+    if ! command -v Hyprland &>/dev/null; then
+        log "ERROR" "Hyprland not found! Install with: sudo pacman -S hyprland"
+        return 1
+    fi
+    
+    # Check for required directories
+    mkdir -p "$HOME/.config/hypr"
+    mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/uke"
+    
+    # Check for Hyprland config
+    if [[ ! -f "$HOME/.config/hypr/hyprland.conf" ]]; then
+        log "WARN" "Hyprland config not found, checking UKE..."
+        
+        if [[ -f "$UKE_ROOT/gen/hyprland/hyprland.conf" ]]; then
+            ln -sf "$UKE_ROOT/gen/hyprland/hyprland.conf" "$HOME/.config/hypr/hyprland.conf"
+            log "INFO" "Linked UKE hyprland.conf"
+        else
+            log "ERROR" "No Hyprland config found! Run: uke gen"
+            return 1
+        fi
+    fi
+    
+    # Check/create hardware ghost file
+    if [[ ! -f "$HOME/.config/hypr/generated_hardware.conf" ]]; then
+        log "WARN" "Hardware config missing, creating placeholder..."
+        cat > "$HOME/.config/hypr/generated_hardware.conf" << 'EOF'
+# Placeholder - run 'uke profile' then 'uke apply' to generate real config
+general {
+    gaps_in = 2
+    gaps_out = 4
+    border_size = 2
+}
+EOF
+        log "INFO" "Created placeholder hardware config"
+    fi
+    
+    log "INFO" "Pre-flight checks passed"
+    return 0
+}
+
+# ==============================================================================
+# Crash Counter
+# ==============================================================================
+check_crash_count() {
+    local count=0
+    local last_crash=0
+    
+    if [[ -f "$CRASH_COUNT_FILE" ]]; then
+        read -r count last_crash < "$CRASH_COUNT_FILE" 2>/dev/null || true
+        
+        # Reset counter if enough time has passed
+        local now=$(date +%s)
+        local hours_ago=$((now - 3600 * CRASH_RESET_HOURS))
+        
+        if [[ "$last_crash" -lt "$hours_ago" ]]; then
+            count=0
+            log "INFO" "Crash counter reset (more than $CRASH_RESET_HOURS hour since last crash)"
+        fi
+    fi
+    
+    echo "$count"
+}
+
+increment_crash_count() {
+    local count
+    count=$(check_crash_count)
+    count=$((count + 1))
+    echo "$count $(date +%s)" > "$CRASH_COUNT_FILE"
+    log "WARN" "Crash count: $count"
+    echo "$count"
+}
+
+reset_crash_count() {
+    echo "0 $(date +%s)" > "$CRASH_COUNT_FILE"
+}
+
+# ==============================================================================
+# Terminal Fallback
+# ==============================================================================
+fallback_terminal() {
+    local reason="${1:-Unknown error}"
+    
+    clear
+    echo ""
+    echo "${RED}╔══════════════════════════════════════════════════════════════╗${RESET}"
+    echo "${RED}║${RESET}${BOLD}           UKE Hyprland Auto-start Failed                    ${RESET}${RED}║${RESET}"
+    echo "${RED}╚══════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+    echo "${YELLOW}Reason:${RESET} $reason"
+    echo ""
+    echo "${BLUE}Options:${RESET}"
+    echo "  1. Try starting Hyprland manually:  ${DIM}Hyprland${RESET}"
+    echo "  2. Check logs:                      ${DIM}cat $LOG_FILE${RESET}"
+    echo "  3. Run diagnostics:                 ${DIM}uke doctor${RESET}"
+    echo "  4. Reset crash counter:             ${DIM}rm $CRASH_COUNT_FILE${RESET}"
+    echo "  5. Regenerate configs:              ${DIM}uke gen && uke apply${RESET}"
+    echo ""
+    echo "${DIM}You are now in a terminal. Type 'exit' to logout.${RESET}"
+    echo ""
+    
+    log "INFO" "Dropped to fallback terminal"
+    
+    # Start a shell
+    exec "${SHELL:-/bin/bash}"
+}
+
+# ==============================================================================
+# Start Hyprland
+# ==============================================================================
+start_hyprland() {
+    local debug_mode="${1:-false}"
+    
+    log "INFO" "Starting Hyprland..."
+    
+    # Set environment variables
+    export XDG_CURRENT_DESKTOP=Hyprland
+    export XDG_SESSION_TYPE=wayland
+    export XDG_SESSION_DESKTOP=Hyprland
+    
+    # QT Wayland
+    export QT_QPA_PLATFORM=wayland
+    export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+    
+    # GTK
+    export GDK_BACKEND=wayland
+    export MOZ_ENABLE_WAYLAND=1
+    
+    # Cursor
+    export XCURSOR_SIZE=24
+    
+    if [[ "$debug_mode" == "true" ]]; then
+        log "INFO" "Debug mode enabled"
+        Hyprland 2>&1 | tee -a "$LOG_FILE"
+        local exit_code=$?
+    else
+        Hyprland >> "$LOG_FILE" 2>&1
+        local exit_code=$?
+    fi
+    
+    return $exit_code
+}
+
+# ==============================================================================
+# Main
+# ==============================================================================
+main() {
+    local mode="${1:-normal}"
+    
+    # Create log directory
+    mkdir -p "$(dirname "$LOG_FILE")"
+    
+    log "INFO" "=== UKE Auto-start initiated ==="
+    log "INFO" "Mode: $mode"
+    
+    # Handle skip mode
+    if [[ "$mode" == "--skip" ]]; then
+        fallback_terminal "Skipped by user request"
+        exit 0
+    fi
+    
+    # Check crash count
+    local crashes
+    crashes=$(check_crash_count)
+    
+    if [[ "$crashes" -ge "$MAX_CRASHES" ]]; then
+        log "ERROR" "Too many crashes ($crashes >= $MAX_CRASHES)"
+        fallback_terminal "Too many consecutive crashes. Hyprland may be misconfigured."
+        exit 1
+    fi
+    
+    # Run pre-flight checks
+    if ! preflight_checks; then
+        fallback_terminal "Pre-flight checks failed"
+        exit 1
+    fi
+    
+    # Attempt to start Hyprland
+    local debug_mode=false
+    [[ "$mode" == "--debug" ]] && debug_mode=true
+    
+    if start_hyprland "$debug_mode"; then
+        # Clean exit
+        log "INFO" "Hyprland exited cleanly"
+        reset_crash_count
+    else
+        # Crashed
+        local new_count
+        new_count=$(increment_crash_count)
+        log "ERROR" "Hyprland crashed (exit code: $?)"
+        
+        if [[ "$new_count" -ge "$MAX_CRASHES" ]]; then
+            fallback_terminal "Hyprland crashed $new_count times consecutively"
+        else
+            log "INFO" "Attempting restart ($new_count/$MAX_CRASHES)..."
+            sleep 2
+            exec "$0" "$mode"  # Restart
+        fi
+    fi
+}
+
+main "$@"

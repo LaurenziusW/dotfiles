@@ -11,5 +11,4 @@ Target = mesa
 [Action]
 Description = Creating UKE pre-update snapshot...
 When = PreTransaction
-# NOTE: This requires a symlink: sudo ln -sf ~/.local/bin/uke-snapshot /usr/local/bin/uke-snapshot
-Exec = /usr/local/bin/uke-snapshot auto
+Exec = /usr/bin/uke-snapshot auto

@@ -1,0 +1,18 @@
+# Generated files
+gen/
+!gen/.gitkeep
+
+# State files (machine-specific)
+*.profile
+
+# MacOS
+.DS_Store
+*.swp
+
+# Logs
+*.log
+
+# Ghost files (these are generated per-machine)
+generated_*.conf
+generated_*.lua
+generated_*.toml

@@ -20,11 +20,10 @@ UKE_ROOT="${SCRIPT_DIR%/scripts}"
 RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
 CYAN=$'\e[36m' BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
 
-# [FIX] Logging functions redirect to stderr so they don't corrupt captured output
-ok()   { printf "%s✓%s %s\n" "$GREEN" "$RESET" "$*" >&2; }
-fail() { printf "%s✗%s %s\n" "$RED" "$RESET" "$*" >&2; }
-info() { printf "%s→%s %s\n" "$BLUE" "$RESET" "$*" >&2; }
-warn() { printf "%s!%s %s\n" "$YELLOW" "$RESET" "$*" >&2; }
+ok()   { printf "%s✓%s %s\n" "$GREEN" "$RESET" "$*"; }
+fail() { printf "%s✗%s %s\n" "$RED" "$RESET" "$*"; }
+info() { printf "%s→%s %s\n" "$BLUE" "$RESET" "$*"; }
+warn() { printf "%s!%s %s\n" "$YELLOW" "$RESET" "$*"; }
 
 # ==============================================================================
 # Package Lists
@@ -129,21 +128,19 @@ check_group() {
     local missing=()
     local installed=()
     
-    # [FIX] All visual output goes to stderr so count capture works
-    echo "" >&2
-    printf "%s%s:%s\n" "$BOLD" "$group_name" "$RESET" >&2
+    echo ""
+    printf "%s%s:%s\n" "$BOLD" "$group_name" "$RESET"
     
     for pkg in "${packages[@]}"; do
         if check_package "$pkg"; then
             installed+=("$pkg")
-            printf "  %s✓%s %s\n" "$GREEN" "$RESET" "$pkg" >&2
+            printf "  %s✓%s %s\n" "$GREEN" "$RESET" "$pkg"
         else
             missing+=("$pkg")
-            printf "  %s✗%s %s (missing)\n" "$RED" "$RESET" "$pkg" >&2
+            printf "  %s✗%s %s (missing)\n" "$RED" "$RESET" "$pkg"
         fi
     done
     
-    # Only the count goes to stdout
     echo "${#missing[@]}"
 }
 
