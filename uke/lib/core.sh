@@ -62,6 +62,7 @@ export UKE_GEN="$UKE_ROOT/gen"
 
 # State (always local, machine-specific)
 export UKE_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/uke"
+[[ -d "$UKE_STATE" ]] || mkdir -p "$UKE_STATE" 2>/dev/null
 export UKE_LOG_FILE="$UKE_STATE/uke.log"
 
 # Hardware profile (the "ghost file")
@@ -227,3 +228,10 @@ yaml_array() {
         yq -r "$path | .[]" "$file" 2>/dev/null || true
     fi
 }
+
+# ==============================================================================
+# Permission Fix - Ensure state dir is user-owned
+# ==============================================================================
+if [[ -d "$UKE_STATE" ]] && [[ ! -w "$UKE_STATE" ]]; then
+    sudo chown -R "$USER" "$UKE_STATE" 2>/dev/null || true
+fi
