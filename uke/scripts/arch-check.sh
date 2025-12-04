@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Arch Linux Package Checker & Installer v7.1
+# UKE Arch Linux Package Checker & Installer v7.3
 # ==============================================================================
-# Comprehensive package verification and installation for Arch Linux.
-# Checks all dependencies, optional packages, and sets up services.
+# Interactive package installation with conflict handling
 #
 # Usage:
-#   ./arch-check.sh           # Check and optionally install missing packages
-#   ./arch-check.sh --check   # Check only, don't install
-#   ./arch-check.sh --install # Install without prompts
-#   ./arch-check.sh --aur     # Also check/install AUR packages
+#   ./arch-check.sh              # Interactive mode (recommended)
+#   ./arch-check.sh --check      # Check only, don't install
+#   ./arch-check.sh --install    # Install all without prompts
+#   ./arch-check.sh --minimal    # Install only core packages
 # ==============================================================================
 set -euo pipefail
 
@@ -20,160 +19,347 @@ UKE_ROOT="${SCRIPT_DIR%/scripts}"
 RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
 CYAN=$'\e[36m' BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
 
-# [FIX] Logging functions redirect to stderr so they don't corrupt captured output
+# [FIX] All logging to stderr so captured output isn't corrupted
 ok()   { printf "%s✓%s %s\n" "$GREEN" "$RESET" "$*" >&2; }
 fail() { printf "%s✗%s %s\n" "$RED" "$RESET" "$*" >&2; }
 info() { printf "%s→%s %s\n" "$BLUE" "$RESET" "$*" >&2; }
 warn() { printf "%s!%s %s\n" "$YELLOW" "$RESET" "$*" >&2; }
 
 # ==============================================================================
-# Package Lists
+# Package Groups - Each can be selected individually
 # ==============================================================================
 
-# Core UKE dependencies (REQUIRED)
-CORE_PACKAGES=(
-    "hyprland"        # Window manager
-    "stow"            # Dotfile manager
-    "jq"              # JSON processor
-    "git"             # Version control
-    "wezterm"         # Terminal emulator
+# Group 1: Core (REQUIRED - UKE won't work without these)
+declare -A GROUP_CORE=(
+    [name]="Core Dependencies"
+    [required]=true
+    [packages]="hyprland stow jq git wezterm"
 )
 
-# Window manager ecosystem (REQUIRED for full UKE experience)
-WM_PACKAGES=(
-    "wofi"            # Application launcher
-    "waybar"          # Status bar
-    "dunst"           # Notification daemon
-    "hyprpaper"       # Wallpaper
-    "hypridle"        # Idle manager
-    "hyprlock"        # Screen locker
+# Group 2: Window Manager Ecosystem
+declare -A GROUP_WM=(
+    [name]="Window Manager Ecosystem"
+    [required]=false
+    [packages]="wofi waybar dunst hyprpaper hypridle hyprlock"
 )
 
-# Clipboard and screenshots (REQUIRED)
-UTIL_PACKAGES=(
-    "wl-clipboard"    # Wayland clipboard
-    "cliphist"        # Clipboard history
-    "grim"            # Screenshot
-    "slurp"           # Region selection
-    "zathura"         # PDF viewer (vim-like)
-    "zathura-pdf-mupdf" # PDF plugin
+# Group 3: Clipboard & Screenshots
+declare -A GROUP_UTILS=(
+    [name]="Clipboard & Screenshots"
+    [required]=false
+    [packages]="wl-clipboard cliphist grim slurp zathura zathura-pdf-mupdf"
 )
 
-# System tray and settings (RECOMMENDED)
-SYSTEM_PACKAGES=(
-    "pavucontrol"           # Audio settings
-    "network-manager-applet" # Network tray icon
-    "blueman"               # Bluetooth manager
-    "lxappearance"          # GTK theme settings
-    "polkit-kde-agent"      # Privileged operations
-    "thunar"                # File manager
+# Group 4: System Utilities
+declare -A GROUP_SYSTEM=(
+    [name]="System Utilities"
+    [required]=false
+    [packages]="pavucontrol network-manager-applet blueman thunar polkit-kde-agent"
 )
 
-# Development tools (RECOMMENDED)
-DEV_PACKAGES=(
-    "neovim"          # Text editor
-    "ripgrep"         # Fast grep
-    "fd"              # Fast find
-    "eza"             # Modern ls
-    "bat"             # Better cat
-    "htop"            # Process viewer
-    "tmux"            # Terminal multiplexer
-    "go-yq"           # YAML processor
-    "reflector"       # Mirror optimization
-    "pacman-contrib"  # paccache, checkupdates
-    "fzf"             # Fuzzy finder
-    "zsh-autosuggestions"    # Shell suggestions
-    "zsh-syntax-highlighting" # Shell syntax colors
+# Group 5: Development Tools
+declare -A GROUP_DEV=(
+    [name]="Development Tools"
+    [required]=false
+    [packages]="neovim ripgrep fd eza bat htop tmux fzf zsh-autosuggestions zsh-syntax-highlighting"
 )
 
-# Keyboard remapping (OPTIONAL but recommended)
-KEYBOARD_PACKAGES=(
-    "keyd"            # Key remapping daemon
+# Group 6: YAML Processor (special handling for conflict)
+declare -A GROUP_YAML=(
+    [name]="YAML Processor (go-yq)"
+    [required]=false
+    [packages]="go-yq"
+    [conflicts]="yq"
 )
 
-# Fonts (RECOMMENDED)
-FONT_PACKAGES=(
-    "ttf-jetbrains-mono-nerd"  # Terminal font with icons
-    "noto-fonts-emoji"         # Emoji support
+# Group 7: System Tools
+declare -A GROUP_SYSADMIN=(
+    [name]="System Admin Tools"
+    [required]=false
+    [packages]="reflector pacman-contrib"
 )
 
-# AUR packages (OPTIONAL, require AUR helper)
-AUR_PACKAGES=(
-    "brave-bin"       # Brave browser
-    "spotify"         # Music
-    "visual-studio-code-bin"  # VS Code
-    "obsidian"        # Note-taking
+# Group 8: Keyboard
+declare -A GROUP_KEYBOARD=(
+    [name]="Keyboard Remapping"
+    [required]=false
+    [packages]="keyd"
 )
+
+# Group 9: Fonts
+declare -A GROUP_FONTS=(
+    [name]="Fonts"
+    [required]=false
+    [packages]="ttf-jetbrains-mono-nerd noto-fonts-emoji"
+)
+
+# All groups in order
+GROUPS=(GROUP_CORE GROUP_WM GROUP_UTILS GROUP_SYSTEM GROUP_DEV GROUP_YAML GROUP_SYSADMIN GROUP_KEYBOARD GROUP_FONTS)
 
 # ==============================================================================
 # Helper Functions
 # ==============================================================================
 check_package() {
-    local pkg="$1"
-    pacman -Qi "$pkg" &>/dev/null
+    pacman -Qi "$1" &>/dev/null
 }
 
-check_aur_helper() {
-    command -v yay &>/dev/null && echo "yay" && return 0
-    command -v paru &>/dev/null && echo "paru" && return 0
-    return 1
-}
-
-# ==============================================================================
-# Check Package Group
-# ==============================================================================
-check_group() {
-    local group_name="$1"
-    shift
-    local packages=("$@")
-    local missing=()
-    local installed=()
+get_missing_from_group() {
+    local -n group=$1
+    local packages="${group[packages]}"
+    local missing=""
     
-    # [FIX] All visual output goes to stderr so count capture works
-    echo "" >&2
-    printf "%s%s:%s\n" "$BOLD" "$group_name" "$RESET" >&2
-    
-    for pkg in "${packages[@]}"; do
-        if check_package "$pkg"; then
-            installed+=("$pkg")
-            printf "  %s✓%s %s\n" "$GREEN" "$RESET" "$pkg" >&2
-        else
-            missing+=("$pkg")
-            printf "  %s✗%s %s (missing)\n" "$RED" "$RESET" "$pkg" >&2
+    for pkg in $packages; do
+        if ! check_package "$pkg"; then
+            missing="$missing $pkg"
         fi
     done
     
-    # Only the count goes to stdout
-    echo "${#missing[@]}"
+    echo "$missing"
+}
+
+count_missing() {
+    local missing="$1"
+    if [[ -z "$missing" ]]; then
+        echo 0
+    else
+        echo "$missing" | wc -w
+    fi
 }
 
 # ==============================================================================
-# Install Packages
+# Check for Package Conflicts
 # ==============================================================================
-install_packages() {
-    local packages=("$@")
+check_conflicts() {
+    local pkg="$1"
     
-    if [[ ${#packages[@]} -eq 0 ]]; then
-        return 0
-    fi
+    case "$pkg" in
+        go-yq)
+            # Check if old yq (python) is installed
+            if check_package "yq"; then
+                return 1  # Conflict exists
+            fi
+            ;;
+    esac
     
-    info "Installing: ${packages[*]}"
-    sudo pacman -S --noconfirm --needed "${packages[@]}"
+    return 0  # No conflict
 }
 
-install_aur_packages() {
-    local helper="$1"
-    shift
-    local packages=("$@")
+resolve_conflict() {
+    local pkg="$1"
     
-    if [[ ${#packages[@]} -eq 0 ]]; then
+    case "$pkg" in
+        go-yq)
+            if check_package "yq"; then
+                echo "" >&2
+                warn "Conflict detected: 'yq' (Python) conflicts with 'go-yq' (Go)"
+                echo "" >&2
+                echo "  go-yq is the recommended version (newer, faster, actively maintained)" >&2
+                echo "" >&2
+                read -p "  Remove 'yq' and install 'go-yq'? [Y/n] " -r response
+                if [[ "$response" =~ ^[Nn] ]]; then
+                    warn "Skipping go-yq installation"
+                    return 1
+                else
+                    info "Removing conflicting 'yq' package..."
+                    sudo pacman -Rns --noconfirm yq 2>/dev/null || true
+                    ok "Removed 'yq'"
+                    return 0
+                fi
+            fi
+            ;;
+    esac
+    
+    return 0
+}
+
+# ==============================================================================
+# Display Package Group Status
+# ==============================================================================
+display_group_status() {
+    local -n group=$1
+    local group_num=$2
+    local name="${group[name]}"
+    local packages="${group[packages]}"
+    local required="${group[required]:-false}"
+    
+    local missing=$(get_missing_from_group "$1")
+    local missing_count=$(count_missing "$missing")
+    local total=$(echo "$packages" | wc -w)
+    local installed=$((total - missing_count))
+    
+    # Status indicator
+    local status_color="$GREEN"
+    local status_icon="✓"
+    if [[ $missing_count -gt 0 ]]; then
+        if [[ "$required" == "true" ]]; then
+            status_color="$RED"
+            status_icon="✗"
+        else
+            status_color="$YELLOW"
+            status_icon="○"
+        fi
+    fi
+    
+    # Required badge
+    local badge=""
+    [[ "$required" == "true" ]] && badge="${RED}[REQUIRED]${RESET} "
+    
+    printf "  %s[%d]%s %s%-25s%s %s%s%s (%d/%d installed)\n" \
+        "$DIM" "$group_num" "$RESET" \
+        "$badge" "$name" "$RESET" \
+        "$status_color" "$status_icon" "$RESET" \
+        "$installed" "$total" >&2
+    
+    # Show missing packages
+    if [[ $missing_count -gt 0 ]]; then
+        printf "      ${DIM}Missing:${RESET}%s\n" "$missing" >&2
+    fi
+}
+
+# ==============================================================================
+# Interactive Group Selection
+# ==============================================================================
+select_groups_interactive() {
+    local selected=()
+    
+    echo "" >&2
+    printf "%s╔══════════════════════════════════════════════════════════════╗%s\n" "$CYAN" "$RESET" >&2
+    printf "%s║%s          UKE Package Group Selection                         %s║%s\n" "$CYAN" "$BOLD" "$CYAN" "$RESET" >&2
+    printf "%s╚══════════════════════════════════════════════════════════════╝%s\n" "$CYAN" "$RESET" >&2
+    echo "" >&2
+    echo "  Select which package groups to install:" >&2
+    echo "" >&2
+    
+    local i=1
+    for group_name in "${GROUPS[@]}"; do
+        display_group_status "$group_name" "$i"
+        ((i++))
+    done
+    
+    echo "" >&2
+    echo "  ${BOLD}Options:${RESET}" >&2
+    echo "    ${CYAN}a${RESET} = Install ALL groups" >&2
+    echo "    ${CYAN}r${RESET} = Install REQUIRED only (minimal)" >&2
+    echo "    ${CYAN}1,2,5${RESET} = Install specific groups (comma-separated)" >&2
+    echo "    ${CYAN}q${RESET} = Quit without installing" >&2
+    echo "" >&2
+    
+    read -p "  Your choice: " -r choice
+    
+    case "$choice" in
+        a|A|all)
+            # All groups
+            for group_name in "${GROUPS[@]}"; do
+                selected+=("$group_name")
+            done
+            ;;
+        r|R|required)
+            # Required only
+            for group_name in "${GROUPS[@]}"; do
+                local -n grp=$group_name
+                if [[ "${grp[required]:-false}" == "true" ]]; then
+                    selected+=("$group_name")
+                fi
+            done
+            ;;
+        q|Q|quit)
+            echo "Cancelled." >&2
+            exit 0
+            ;;
+        *)
+            # Parse comma-separated numbers
+            IFS=',' read -ra nums <<< "$choice"
+            for num in "${nums[@]}"; do
+                num=$(echo "$num" | tr -d ' ')
+                if [[ "$num" =~ ^[0-9]+$ ]] && [[ $num -ge 1 ]] && [[ $num -le ${#GROUPS[@]} ]]; then
+                    selected+=("${GROUPS[$((num-1))]}")
+                fi
+            done
+            ;;
+    esac
+    
+    # Always include required groups
+    for group_name in "${GROUPS[@]}"; do
+        local -n grp=$group_name
+        if [[ "${grp[required]:-false}" == "true" ]]; then
+            if [[ ! " ${selected[*]} " =~ " ${group_name} " ]]; then
+                selected+=("$group_name")
+                info "Auto-adding required group: ${grp[name]}"
+            fi
+        fi
+    done
+    
+    echo "${selected[@]}"
+}
+
+# ==============================================================================
+# Install Selected Groups
+# ==============================================================================
+install_selected_groups() {
+    local groups=("$@")
+    local all_packages=""
+    local skipped=""
+    
+    info "Preparing installation..."
+    
+    for group_name in "${groups[@]}"; do
+        local -n group=$group_name
+        local missing=$(get_missing_from_group "$group_name")
+        
+        if [[ -n "$missing" ]]; then
+            for pkg in $missing; do
+                # Check for conflicts
+                if ! check_conflicts "$pkg"; then
+                    if resolve_conflict "$pkg"; then
+                        all_packages="$all_packages $pkg"
+                    else
+                        skipped="$skipped $pkg"
+                    fi
+                else
+                    all_packages="$all_packages $pkg"
+                fi
+            done
+        fi
+    done
+    
+    # Remove leading/trailing whitespace
+    all_packages=$(echo "$all_packages" | xargs)
+    
+    if [[ -z "$all_packages" ]]; then
+        ok "All selected packages are already installed!"
         return 0
     fi
     
-    info "Installing from AUR: ${packages[*]}"
-    "$helper" -S --noconfirm --needed "${packages[@]}" 2>/dev/null || {
-        warn "Some AUR packages failed to install"
+    echo "" >&2
+    info "Packages to install: $all_packages"
+    
+    if [[ -n "$skipped" ]]; then
+        warn "Skipped due to conflicts:$skipped"
+    fi
+    
+    echo "" >&2
+    read -p "  Proceed with installation? [Y/n] " -r response
+    if [[ "$response" =~ ^[Nn] ]]; then
+        warn "Installation cancelled"
+        return 1
+    fi
+    
+    # Update system first
+    info "Updating system..."
+    sudo pacman -Syu --noconfirm
+    
+    # Install packages
+    info "Installing packages..."
+    # shellcheck disable=SC2086
+    sudo pacman -S --needed --noconfirm $all_packages || {
+        fail "Some packages failed to install"
+        echo "" >&2
+        echo "Try installing manually:" >&2
+        echo "  sudo pacman -S $all_packages" >&2
+        return 1
     }
+    
+    ok "Packages installed successfully!"
 }
 
 # ==============================================================================
@@ -182,58 +368,41 @@ install_aur_packages() {
 setup_services() {
     info "Setting up services..."
     
-    # keyd service
+    # keyd (keyboard remapping)
     if check_package "keyd"; then
         if ! systemctl is-enabled keyd &>/dev/null; then
+            info "Enabling keyd service..."
             sudo systemctl enable keyd
-            ok "keyd service enabled"
-        fi
-        if ! systemctl is-active keyd &>/dev/null; then
             sudo systemctl start keyd
-            ok "keyd service started"
+            ok "keyd service enabled"
         else
-            ok "keyd service running"
-        fi
-    fi
-    
-    # Bluetooth
-    if check_package "bluez"; then
-        if ! systemctl is-enabled bluetooth &>/dev/null; then
-            sudo systemctl enable bluetooth
-            ok "bluetooth service enabled"
+            ok "keyd already enabled"
         fi
     fi
     
     # NetworkManager
     if check_package "networkmanager"; then
         if ! systemctl is-enabled NetworkManager &>/dev/null; then
+            info "Enabling NetworkManager..."
             sudo systemctl enable NetworkManager
-            ok "NetworkManager service enabled"
+            sudo systemctl start NetworkManager
+            ok "NetworkManager enabled"
+        fi
+    fi
+    
+    # Bluetooth
+    if check_package "bluez"; then
+        if ! systemctl is-enabled bluetooth &>/dev/null; then
+            info "Enabling Bluetooth..."
+            sudo systemctl enable bluetooth
+            sudo systemctl start bluetooth
+            ok "Bluetooth enabled"
         fi
     fi
 }
 
 # ==============================================================================
-# Verify Sudo
-# ==============================================================================
-verify_sudo() {
-    if ! sudo -n true 2>/dev/null; then
-        if ! sudo true; then
-            echo "${RED}Error: Cannot run sudo. Fix permissions first:${RESET}"
-            echo ""
-            echo "  1. Switch to TTY: Ctrl + Alt + F3"
-            echo "  2. Login as root"
-            echo "  3. Run: usermod -aG wheel \$USER"
-            echo "  4. Run: EDITOR=nano visudo"
-            echo "     → Uncomment: %wheel ALL=(ALL:ALL) ALL"
-            echo "  5. Reboot"
-            exit 1
-        fi
-    fi
-}
-
-# ==============================================================================
-# Create Hardware Ghost File (if missing)
+# Create Placeholder Ghost File
 # ==============================================================================
 create_hardware_ghost() {
     local hypr_hardware="$HOME/.config/hypr/generated_hardware.conf"
@@ -244,10 +413,9 @@ create_hardware_ghost() {
 # ==============================================================================
 # PLACEHOLDER - Run 'uke profile' then 'uke apply' to generate real config
 # ==============================================================================
-# This file exists to prevent Hyprland errors on first boot
-# ==============================================================================
+# Default monitor (with scaling for small screens)
+monitor=,preferred,auto,1
 
-# Default gaps (will be overridden by hardware profile)
 general {
     gaps_in = 2
     gaps_out = 4
@@ -259,162 +427,107 @@ EOF
 }
 
 # ==============================================================================
+# Verify Sudo Access
+# ==============================================================================
+verify_sudo() {
+    if ! sudo -v; then
+        fail "sudo access required"
+        exit 1
+    fi
+}
+
+# ==============================================================================
+# Quick Status Check
+# ==============================================================================
+quick_status() {
+    echo "" >&2
+    printf "%s╔══════════════════════════════════════╗%s\n" "$CYAN" "$RESET" >&2
+    printf "%s║%s  UKE Package Status                  %s║%s\n" "$CYAN" "$BOLD" "$CYAN" "$RESET" >&2
+    printf "%s╚══════════════════════════════════════╝%s\n" "$CYAN" "$RESET" >&2
+    echo "" >&2
+    
+    local i=1
+    for group_name in "${GROUPS[@]}"; do
+        display_group_status "$group_name" "$i"
+        ((i++))
+    done
+    
+    echo "" >&2
+}
+
+# ==============================================================================
 # Main
 # ==============================================================================
 main() {
-    local mode="${1:---interactive}"
-    local check_aur=false
+    local mode="${1:-}"
     
-    # Parse arguments
-    for arg in "$@"; do
-        case "$arg" in
-            --aur) check_aur=true ;;
-        esac
-    done
-    
-    echo ""
-    printf "%s╔══════════════════════════════════════╗%s\n" "$CYAN" "$RESET"
-    printf "%s║%s  UKE Arch Linux Package Checker     %s║%s\n" "$CYAN" "$BOLD" "$CYAN" "$RESET"
-    printf "%s╚══════════════════════════════════════╝%s\n" "$CYAN" "$RESET"
-    echo ""
-    
-    # Collect all missing packages
-    local all_missing=()
-    local aur_missing=()
-    
-    # Check each group
-    local missing_count
-    
-    missing_count=$(check_group "Core Dependencies (REQUIRED)" "${CORE_PACKAGES[@]}")
-    [[ "$missing_count" -gt 0 ]] && for pkg in "${CORE_PACKAGES[@]}"; do
-        check_package "$pkg" || all_missing+=("$pkg")
-    done
-    
-    missing_count=$(check_group "Window Manager Ecosystem" "${WM_PACKAGES[@]}")
-    [[ "$missing_count" -gt 0 ]] && for pkg in "${WM_PACKAGES[@]}"; do
-        check_package "$pkg" || all_missing+=("$pkg")
-    done
-    
-    missing_count=$(check_group "Clipboard & Screenshots" "${UTIL_PACKAGES[@]}")
-    [[ "$missing_count" -gt 0 ]] && for pkg in "${UTIL_PACKAGES[@]}"; do
-        check_package "$pkg" || all_missing+=("$pkg")
-    done
-    
-    missing_count=$(check_group "System Utilities" "${SYSTEM_PACKAGES[@]}")
-    [[ "$missing_count" -gt 0 ]] && for pkg in "${SYSTEM_PACKAGES[@]}"; do
-        check_package "$pkg" || all_missing+=("$pkg")
-    done
-    
-    missing_count=$(check_group "Development Tools" "${DEV_PACKAGES[@]}")
-    [[ "$missing_count" -gt 0 ]] && for pkg in "${DEV_PACKAGES[@]}"; do
-        check_package "$pkg" || all_missing+=("$pkg")
-    done
-    
-    missing_count=$(check_group "Keyboard Remapping" "${KEYBOARD_PACKAGES[@]}")
-    [[ "$missing_count" -gt 0 ]] && for pkg in "${KEYBOARD_PACKAGES[@]}"; do
-        check_package "$pkg" || all_missing+=("$pkg")
-    done
-    
-    missing_count=$(check_group "Fonts" "${FONT_PACKAGES[@]}")
-    [[ "$missing_count" -gt 0 ]] && for pkg in "${FONT_PACKAGES[@]}"; do
-        check_package "$pkg" || all_missing+=("$pkg")
-    done
-    
-    # Check AUR packages if requested
-    if [[ "$check_aur" == "true" ]]; then
-        local aur_helper
-        if aur_helper=$(check_aur_helper); then
-            echo ""
-            printf "%s%s:%s\n" "$BOLD" "AUR Packages (using $aur_helper)" "$RESET"
-            for pkg in "${AUR_PACKAGES[@]}"; do
-                if check_package "$pkg"; then
-                    printf "  %s✓%s %s\n" "$GREEN" "$RESET" "$pkg"
-                else
-                    printf "  %s✗%s %s (missing)\n" "$RED" "$RESET" "$pkg"
-                    aur_missing+=("$pkg")
-                fi
-            done
-        else
-            echo ""
-            warn "No AUR helper found (yay/paru). Skipping AUR packages."
-            info "Install yay: git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si"
-        fi
-    fi
-    
-    # Summary
-    echo ""
-    echo "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-    
-    if [[ ${#all_missing[@]} -eq 0 ]] && [[ ${#aur_missing[@]} -eq 0 ]]; then
-        echo "${GREEN}✓ All packages installed!${RESET}"
-        echo ""
-        setup_services
-        create_hardware_ghost
-        echo ""
-        echo "Next steps:"
-        echo "  1. Run: cd $UKE_ROOT && ./scripts/install.sh"
-        echo "  2. Configure hardware: uke profile"
-        echo "  3. Apply profile: uke apply"
-        echo "  4. Reload: uke reload"
-        exit 0
-    fi
-    
-    echo "${YELLOW}Missing ${#all_missing[@]} official + ${#aur_missing[@]} AUR packages${RESET}"
-    
-    if [[ "$mode" == "--check" ]]; then
-        echo ""
-        echo "Install with:"
-        [[ ${#all_missing[@]} -gt 0 ]] && echo "  sudo pacman -S ${all_missing[*]}"
-        [[ ${#aur_missing[@]} -gt 0 ]] && echo "  yay -S ${aur_missing[*]}"
-        exit 1
-    fi
-    
-    if [[ "$mode" == "--install" ]]; then
-        verify_sudo
-        info "Updating system..."
-        sudo pacman -Syu --noconfirm
-        install_packages "${all_missing[@]}"
-        
-        if [[ ${#aur_missing[@]} -gt 0 ]] && aur_helper=$(check_aur_helper); then
-            install_aur_packages "$aur_helper" "${aur_missing[@]}"
-        fi
-        
-        setup_services
-        create_hardware_ghost
-        ok "All packages installed!"
-    else
-        # Interactive mode
-        echo ""
-        read -p "Install missing packages? [Y/n] " -n 1 -r
-        echo ""
-        
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+    case "$mode" in
+        --check|-c)
+            quick_status
+            ;;
+        --install|-i)
             verify_sudo
-            info "Updating system..."
-            sudo pacman -Syu --noconfirm
-            install_packages "${all_missing[@]}"
-            
-            if [[ ${#aur_missing[@]} -gt 0 ]]; then
-                if aur_helper=$(check_aur_helper); then
-                    read -p "Install AUR packages? [Y/n] " -n 1 -r
-                    echo ""
-                    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-                        install_aur_packages "$aur_helper" "${aur_missing[@]}"
-                    fi
-                fi
-            fi
-            
+            quick_status
+            echo "" >&2
+            info "Installing ALL packages..."
+            local all_groups=("${GROUPS[@]}")
+            install_selected_groups "${all_groups[@]}"
             setup_services
             create_hardware_ghost
-            ok "Installation complete!"
-        fi
-    fi
+            ;;
+        --minimal|-m)
+            verify_sudo
+            quick_status
+            echo "" >&2
+            info "Installing REQUIRED packages only..."
+            local required_groups=()
+            for group_name in "${GROUPS[@]}"; do
+                local -n grp=$group_name
+                if [[ "${grp[required]:-false}" == "true" ]]; then
+                    required_groups+=("$group_name")
+                fi
+            done
+            install_selected_groups "${required_groups[@]}"
+            setup_services
+            create_hardware_ghost
+            ;;
+        --help|-h)
+            echo "Usage: $0 [option]" >&2
+            echo "" >&2
+            echo "Options:" >&2
+            echo "  (none)      Interactive mode - choose packages" >&2
+            echo "  --check     Check status only, don't install" >&2
+            echo "  --install   Install all packages" >&2
+            echo "  --minimal   Install required packages only" >&2
+            echo "  --help      Show this help" >&2
+            ;;
+        *)
+            # Interactive mode
+            verify_sudo
+            selected=$(select_groups_interactive)
+            
+            if [[ -n "$selected" ]]; then
+                # Convert string back to array
+                read -ra selected_array <<< "$selected"
+                install_selected_groups "${selected_array[@]}"
+                setup_services
+                create_hardware_ghost
+            fi
+            ;;
+    esac
     
-    echo ""
-    echo "Next steps:"
-    echo "  1. Run: cd $UKE_ROOT && ./scripts/install.sh"
-    echo "  2. Log out and back in (or reboot)"
-    echo "  3. Configure hardware: uke profile"
+    echo "" >&2
+    echo "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}" >&2
+    echo "" >&2
+    echo "Next steps:" >&2
+    echo "  1. Run UKE installer: cd $UKE_ROOT && ./scripts/install.sh" >&2
+    echo "  2. Configure hardware: uke profile" >&2
+    echo "  3. Apply config: uke apply" >&2
+    echo "  4. Generate WM config: uke gen" >&2
+    echo "" >&2
+    echo "If you have login issues:" >&2
+    echo "  Create ~/.no-hyprland to disable auto-start" >&2
+    echo "" >&2
 }
 
 main "$@"

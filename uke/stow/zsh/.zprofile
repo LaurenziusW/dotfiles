@@ -32,14 +32,40 @@ case "$(uname -s)" in
         [[ -f "/usr/local/bin/brew" ]] && eval "$(/usr/local/bin/brew shellenv)"
         ;;
     Linux)
+        # ==============================================================================
         # Linux (Arch): Hyprland Auto-start on TTY1
-        # Start Hyprland on TTY1 login with fallback
-        # To disable: comment out or remove this block
-        if [[ -z "${DISPLAY:-}" ]] && [[ "${XDG_VTNR:-}" == "1" ]] && [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
-            if command -v uke-autostart &>/dev/null; then
-                exec uke-autostart
-            elif command -v Hyprland &>/dev/null; then
-                exec Hyprland
+        # ==============================================================================
+        # SAFETY: Only runs on TTY1, not in graphical environment
+        # ESCAPE HATCH: Hold Ctrl+C during login to skip, or create ~/.no-hyprland
+        # TO DISABLE: Remove this block or create ~/.no-hyprland
+        # ==============================================================================
+        
+        # Skip autostart conditions:
+        # - Already in X or Wayland
+        # - Not on TTY1
+        # - Escape file exists
+        # - NOAUTOSTART environment variable set
+        if [[ -z "${DISPLAY:-}" ]] && \
+           [[ -z "${WAYLAND_DISPLAY:-}" ]] && \
+           [[ "${XDG_VTNR:-}" == "1" ]] && \
+           [[ ! -f "$HOME/.no-hyprland" ]] && \
+           [[ -z "${NOAUTOSTART:-}" ]]; then
+            
+            # Give user 2 seconds to press Ctrl+C to abort
+            echo "Starting Hyprland in 2 seconds... (Ctrl+C to cancel, or create ~/.no-hyprland)"
+            sleep 2
+            
+            # Check if Hyprland is actually installed and working
+            if command -v Hyprland &>/dev/null; then
+                # Use exec only if we're confident it will work
+                # If it fails, we fall through to normal shell
+                Hyprland || {
+                    echo "Hyprland failed to start!"
+                    echo "To disable autostart: touch ~/.no-hyprland"
+                    echo "Dropping to shell..."
+                }
+            else
+                echo "Hyprland not found. Install with: sudo pacman -S hyprland"
             fi
         fi
         ;;
