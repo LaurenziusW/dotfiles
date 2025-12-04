@@ -620,7 +620,7 @@ WINDOWRULES
     } > "$out"
     
     chmod 644 "$out"
-    log_ok "✓ Hyprland config generated: $out"
+    log_info "✓ Hyprland config generated: $out"
 }
 
 
