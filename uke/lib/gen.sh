@@ -459,27 +459,21 @@ HARDWARE_INCLUDE
 # ==============================================================================
 
 
-
-
-
 gen_hyprland() {
     local out="$UKE_GEN/hyprland/hyprland.conf"
     mkdir -p "$(dirname "$out")"
     
-    log_info "Generating Hyprland config (Fixed Variables)..."
+    log_info "Generating Hyprland config (SAFE MODE - NO GESTURES)..."
     
     {
         gen_header "conf" "HYPRLAND CONFIG - Window Manager (Linux)"
         
         cat << 'HYPRLAND_CORE'
 # ==============================================================================
-# MONITORS
+# MONITORS & GENERAL
 # ==============================================================================
 monitor=,preferred,auto,1
 
-# ==============================================================================
-# GENERAL
-# ==============================================================================
 general {
     gaps_in = 2
     gaps_out = 4
@@ -490,9 +484,6 @@ general {
     resize_on_border = true
 }
 
-# ==============================================================================
-# DECORATION
-# ==============================================================================
 decoration {
     rounding = 4
     blur {
@@ -507,9 +498,6 @@ decoration {
     }
 }
 
-# ==============================================================================
-# ANIMATIONS
-# ==============================================================================
 animations {
     enabled = true
     bezier = easeOutQuint, 0.22, 1, 0.36, 1
@@ -519,80 +507,65 @@ animations {
     animation = workspaces, 1, 4, easeOutQuint, slide
 }
 
-# ==============================================================================
-# INPUT
-# ==============================================================================
 input {
     kb_layout = us
     follow_mouse = 1
     touchpad {
         natural_scroll = true
-        tap-to-click = true
+        # tap-to-click often defaults to true, removing explicit set to avoid errors
     }
 }
 
-# ==============================================================================
-# GESTURES
-# ==============================================================================
-gestures {
-    # Standard workspace swiping (1:1 movement)
-    workspace_swipe = true
-    workspace_swipe_fingers = 3
-    workspace_swipe_distance = 300
-    workspace_swipe_invert = false
-    workspace_swipe_min_speed_to_force = 30
-    workspace_swipe_cancel_ratio = 0.5
-    workspace_swipe_create_new = true
-}
+# GESTURES DISABLED FOR RECOVERY
+# gestures {
+#     workspace_swipe = true
+# }
 
-# ==============================================================================
-# KEYBINDINGS
-# ==============================================================================
 HYPRLAND_CORE
 
-        # Get modifiers from registry or use defaults
+        # Get modifiers
         local MOD="${UKE_MAIN_MOD:-Super}"
         
-        # NOTE: We use \$mainMod so Bash treats it as text, not a variable!
+        # KEYBINDINGS - The critical part!
         cat << KEYBINDS
 
-\$mainMod = $MOD
+$mainMod = $MOD
 
 # Focus management
-bind = \$mainMod, return, exec, wezterm
-bind = \$mainMod, q, killactive
-bind = \$mainMod, e, exit
-bind = \$mainMod, f, togglefloating
-bind = \$mainMod, p, pseudo
-bind = \$mainMod, j, togglesplit
+bind = $mainMod, return, exec, wezterm
+bind = $mainMod, q, killactive
+bind = $mainMod, e, exit
+bind = $mainMod, f, togglefloating
+bind = $mainMod, p, pseudo
+bind = $mainMod, j, togglesplit
 
 # Movement (Vim-style hjkl)
-bind = \$mainMod, h, movefocus, l
-bind = \$mainMod, j, movefocus, d
-bind = \$mainMod, k, movefocus, u
-bind = \$mainMod, l, movefocus, r
+bind = $mainMod, h, movefocus, l
+bind = $mainMod, j, movefocus, d
+bind = $mainMod, k, movefocus, u
+bind = $mainMod, l, movefocus, r
 
 # Workspaces (1-9)
-bind = \$mainMod, 1, workspace, 1
-bind = \$mainMod, 2, workspace, 2
-bind = \$mainMod, 3, workspace, 3
-bind = \$mainMod, 4, workspace, 4
-bind = \$mainMod, 5, workspace, 5
-bind = \$mainMod, 6, workspace, 6
-bind = \$mainMod, 7, workspace, 7
-bind = \$mainMod, 8, workspace, 8
-bind = \$mainMod, 9, workspace, 9
+bind = $mainMod, 1, workspace, 1
+bind = $mainMod, 2, workspace, 2
+bind = $mainMod, 3, workspace, 3
+bind = $mainMod, 4, workspace, 4
+bind = $mainMod, 5, workspace, 5
+bind = $mainMod, 6, workspace, 6
+bind = $mainMod, 7, workspace, 7
+bind = $mainMod, 8, workspace, 8
+bind = $mainMod, 9, workspace, 9
 
 # Move window to workspace
-bind = \$mainMod|Shift, 1, movetoworkspace, 1
-bind = \$mainMod|Shift, 2, movetoworkspace, 2
-bind = \$mainMod|Shift, 3, movetoworkspace, 3
-bind = \$mainMod|Shift, 4, movetoworkspace, 4
-bind = \$mainMod|Shift, 5, movetoworkspace, 5
-bind = \$mainMod|Shift, 6, movetoworkspace, 6
-bind = \$mainMod|Shift, 7, movetoworkspace, 7
-bind = \$mainMod|Shift, 8, movetoworkspace, 8
-bind = \$mainMod|Shift, 9, movetoworkspace, 9
+bind = $mainMod|Shift, 1, movetoworkspace, 1
+bind = $mainMod|Shift, 2, movetoworkspace, 2
+bind = $mainMod|Shift, 3, movetoworkspace, 3
+bind = $mainMod|Shift, 4, movetoworkspace, 4
+bind = $mainMod|Shift, 5, movetoworkspace, 5
+bind = $mainMod|Shift, 6, movetoworkspace, 6
+bind = $mainMod|Shift, 7, movetoworkspace, 7
+bind = $mainMod|Shift, 8, movetoworkspace, 8
+bind = $mainMod|Shift, 9, movetoworkspace, 9
 
 KEYBINDS
 
@@ -611,16 +584,14 @@ windowrulev2 = workspace 8, class:^(libreoffice|soffice)$
 windowrulev2 = workspace 9, class:^(slack|Slack|discord|thunderbird|telegram-desktop)$
 windowrulev2 = workspace 10, class:^(claude)$
 
-# ==============================================================================
-# HARDWARE SPECIFIC INCLUDES
-# ==============================================================================
+# Hardware Includes
 source = ~/.config/hypr/generated_hardware.conf
 
 WINDOWRULES
     } > "$out"
     
     chmod 644 "$out"
-    log_info "✓ Hyprland config generated: $out"
+    log_info "✓ Hyprland config generated (SAFE MODE)"
 }
 
 
