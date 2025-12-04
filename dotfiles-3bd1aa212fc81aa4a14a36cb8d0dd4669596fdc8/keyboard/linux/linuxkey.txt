@@ -1,0 +1,24 @@
+[ids]
+*
+
+[main]
+# Remap Right Alt to be our "German" layer toggle
+# This prevents it from sending "Alt" to the OS
+rightalt = layer(german)
+
+[german]
+# Lowercase mappings
+a = ä
+o = ö
+u = ü
+s = ß
+
+# Uppercase mappings (implicitly handled by shift usually, but explicit is safer for unicode)
+# Note: Keyd often handles shift+a automatically if 'a' maps to a char key. 
+# But for extended chars, we explicit map the shifted state.
+
+shift+a = Ä
+shift+o = Ö
+shift+u = Ü
+# Big Sharp S (optional, rarely used)
+shift+s = ẞ

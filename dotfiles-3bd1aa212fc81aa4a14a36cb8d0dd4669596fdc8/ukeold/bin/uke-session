@@ -1,0 +1,402 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Session - Save and restore window layouts
+# ==============================================================================
+# Usage:
+#   uke-session save <n>     Save current layout
+#   uke-session restore <n>  Restore a saved layout
+#   uke-session list            List saved sessions
+#   uke-session delete <n>   Delete a session
+#   uke-session export <n>   Export session to stdout (JSON)
+# ==============================================================================
+set -euo pipefail
+
+# Resolve symlink to find true source location
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+source "$UKE_ROOT/lib/core.sh"
+
+# Session storage
+SESSION_DIR="$UKE_STATE/sessions"
+mkdir -p "$SESSION_DIR"
+
+# ==============================================================================
+# Save Session (macOS)
+# ==============================================================================
+save_session_macos() {
+    local name="$1"
+    local session_file="$SESSION_DIR/${name}.json"
+    
+    log_info "Saving session: $name"
+    
+    # Query all windows
+    local windows=$(yabai -m query --windows)
+    
+    # Query all spaces
+    local spaces=$(yabai -m query --spaces)
+    
+    # Query displays
+    local displays=$(yabai -m query --displays)
+    
+    # Build session data
+    local session_data=$(jq -n \
+        --arg name "$name" \
+        --arg timestamp "$(date -Iseconds)" \
+        --argjson windows "$windows" \
+        --argjson spaces "$spaces" \
+        --argjson displays "$displays" \
+        '{
+            name: $name,
+            timestamp: $timestamp,
+            platform: "macos",
+            displays: $displays,
+            spaces: $spaces,
+            windows: [
+                $windows[] | select(.["is-floating"] == false or .["is-floating"] == true) | {
+                    id: .id,
+                    app: .app,
+                    title: .title,
+                    space: .space,
+                    display: .display,
+                    frame: .frame,
+                    is_floating: .["is-floating"],
+                    is_fullscreen: .["has-fullscreen-zoom"],
+                    is_minimized: .["is-minimized"],
+                    split_type: .["split-type"],
+                    stack_index: .["stack-index"]
+                }
+            ]
+        }')
+    
+    echo "$session_data" > "$session_file"
+    
+    local window_count=$(echo "$session_data" | jq '.windows | length')
+    local space_count=$(echo "$session_data" | jq '[.windows[].space] | unique | length')
+    
+    ok "Session saved: $name ($window_count windows across $space_count spaces)"
+    echo "   File: $session_file"
+}
+
+# ==============================================================================
+# Restore Session (macOS)
+# ==============================================================================
+restore_session_macos() {
+    local name="$1"
+    local session_file="$SESSION_DIR/${name}.json"
+    
+    [[ -f "$session_file" ]] || log_fatal "Session not found: $name"
+    
+    log_info "Restoring session: $name"
+    
+    local session_data=$(cat "$session_file")
+    local timestamp=$(echo "$session_data" | jq -r '.timestamp')
+    
+    echo "Session from: $timestamp"
+    echo ""
+    
+    # Get saved windows
+    local saved_windows=$(echo "$session_data" | jq -c '.windows[]')
+    
+    # Track which apps we need to launch
+    declare -A apps_to_launch
+    declare -A app_spaces
+    
+    while IFS= read -r window; do
+        local app=$(echo "$window" | jq -r '.app')
+        local space=$(echo "$window" | jq -r '.space')
+        local is_floating=$(echo "$window" | jq -r '.is_floating')
+        local frame=$(echo "$window" | jq -c '.frame')
+        
+        # Check if app is running
+        local current_window=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app\")" | head -1)
+        
+        if [[ -z "$current_window" ]]; then
+            apps_to_launch["$app"]=1
+            app_spaces["$app"]="$space"
+            echo "  ⏳ Will launch: $app → space $space"
+        else
+            local window_id=$(echo "$current_window" | jq -r '.id')
+            local current_space=$(echo "$current_window" | jq -r '.space')
+            
+            # Move to correct space if needed
+            if [[ "$current_space" != "$space" ]]; then
+                yabai -m window "$window_id" --space "$space" 2>/dev/null || true
+                echo "  ↗ Moved: $app → space $space"
+            else
+                echo "  ✓ Already: $app on space $space"
+            fi
+            
+            # Restore floating state
+            local current_floating=$(yabai -m query --windows --window "$window_id" | jq -r '.["is-floating"]')
+            if [[ "$is_floating" == "true" && "$current_floating" != "true" ]]; then
+                yabai -m window "$window_id" --toggle float 2>/dev/null || true
+            elif [[ "$is_floating" == "false" && "$current_floating" == "true" ]]; then
+                yabai -m window "$window_id" --toggle float 2>/dev/null || true
+            fi
+            
+            # Restore position for floating windows
+            if [[ "$is_floating" == "true" && "$frame" != "null" ]]; then
+                local x=$(echo "$frame" | jq -r '.x')
+                local y=$(echo "$frame" | jq -r '.y')
+                local w=$(echo "$frame" | jq -r '.w')
+                local h=$(echo "$frame" | jq -r '.h')
+                yabai -m window "$window_id" --move abs:${x}:${y} 2>/dev/null || true
+                yabai -m window "$window_id" --resize abs:${w}:${h} 2>/dev/null || true
+            fi
+        fi
+    done <<< "$saved_windows"
+    
+    # Launch missing apps
+    for app in "${!apps_to_launch[@]}"; do
+        echo "  🚀 Launching: $app"
+        open -a "$app"
+        sleep 0.5
+        
+        # Move to correct space after launch
+        local space="${app_spaces[$app]}"
+        sleep 0.5
+        local new_window=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app\")" | head -1)
+        if [[ -n "$new_window" ]]; then
+            local window_id=$(echo "$new_window" | jq -r '.id')
+            yabai -m window "$window_id" --space "$space" 2>/dev/null || true
+        fi
+    done
+    
+    echo ""
+    ok "Session restored: $name"
+}
+
+# ==============================================================================
+# Save Session (Linux)
+# ==============================================================================
+save_session_linux() {
+    local name="$1"
+    local session_file="$SESSION_DIR/${name}.json"
+    
+    log_info "Saving session: $name"
+    
+    local clients=$(hyprctl clients -j)
+    local monitors=$(hyprctl monitors -j)
+    local workspaces=$(hyprctl workspaces -j)
+    
+    local session_data=$(jq -n \
+        --arg name "$name" \
+        --arg timestamp "$(date -Iseconds)" \
+        --argjson clients "$clients" \
+        --argjson monitors "$monitors" \
+        --argjson workspaces "$workspaces" \
+        '{
+            name: $name,
+            timestamp: $timestamp,
+            platform: "linux",
+            monitors: $monitors,
+            workspaces: $workspaces,
+            windows: [
+                $clients[] | {
+                    address: .address,
+                    class: .class,
+                    title: .title,
+                    workspace: .workspace.id,
+                    monitor: .monitor,
+                    at: .at,
+                    size: .size,
+                    floating: .floating,
+                    fullscreen: .fullscreen
+                }
+            ]
+        }')
+    
+    echo "$session_data" > "$session_file"
+    
+    local window_count=$(echo "$session_data" | jq '.windows | length')
+    ok "Session saved: $name ($window_count windows)"
+}
+
+# ==============================================================================
+# Restore Session (Linux)
+# ==============================================================================
+restore_session_linux() {
+    local name="$1"
+    local session_file="$SESSION_DIR/${name}.json"
+    
+    [[ -f "$session_file" ]] || log_fatal "Session not found: $name"
+    
+    log_info "Restoring session: $name"
+    
+    local session_data=$(cat "$session_file")
+    
+    echo "$session_data" | jq -c '.windows[]' | while IFS= read -r window; do
+        local class=$(echo "$window" | jq -r '.class')
+        local workspace=$(echo "$window" | jq -r '.workspace')
+        local floating=$(echo "$window" | jq -r '.floating')
+        
+        # Check if app is running
+        local current=$(hyprctl clients -j | jq -r ".[] | select(.class == \"$class\")" | head -1)
+        
+        if [[ -z "$current" ]]; then
+            echo "  ⏳ Launching: $class"
+            hyprctl dispatch exec "$class" 2>/dev/null || true
+            sleep 0.5
+        fi
+        
+        # Move to workspace
+        hyprctl dispatch movetoworkspacesilent "$workspace,class:$class" 2>/dev/null || true
+        echo "  ✓ $class → workspace $workspace"
+    done
+    
+    ok "Session restored: $name"
+}
+
+# ==============================================================================
+# List Sessions
+# ==============================================================================
+list_sessions() {
+    echo "Saved sessions:"
+    echo ""
+    
+    if [[ ! -d "$SESSION_DIR" ]] || [[ -z "$(ls -A "$SESSION_DIR" 2>/dev/null)" ]]; then
+        echo "  (no sessions saved)"
+        echo ""
+        echo "Save with: uke-session save <n>"
+        return 0
+    fi
+    
+    for session in "$SESSION_DIR"/*.json; do
+        [[ -f "$session" ]] || continue
+        local name=$(basename "$session" .json)
+        local data=$(cat "$session")
+        local timestamp=$(echo "$data" | jq -r '.timestamp')
+        local window_count=$(echo "$data" | jq '.windows | length')
+        local platform=$(echo "$data" | jq -r '.platform')
+        
+        printf "  %-20s %s windows  (%s) [%s]\n" "$name" "$window_count" "$timestamp" "$platform"
+    done
+    
+    echo ""
+    echo "Restore with: uke-session restore <n>"
+}
+
+# ==============================================================================
+# Delete Session
+# ==============================================================================
+delete_session() {
+    local name="$1"
+    local session_file="$SESSION_DIR/${name}.json"
+    
+    [[ -f "$session_file" ]] || log_fatal "Session not found: $name"
+    
+    rm "$session_file"
+    ok "Session deleted: $name"
+}
+
+# ==============================================================================
+# Export Session
+# ==============================================================================
+export_session() {
+    local name="$1"
+    local session_file="$SESSION_DIR/${name}.json"
+    
+    [[ -f "$session_file" ]] || log_fatal "Session not found: $name"
+    
+    cat "$session_file"
+}
+
+# ==============================================================================
+# Quick Save/Restore (numbered slots)
+# ==============================================================================
+quick_save() {
+    local slot="${1:-1}"
+    if is_macos; then
+        save_session_macos "quick-$slot"
+    else
+        save_session_linux "quick-$slot"
+    fi
+}
+
+quick_restore() {
+    local slot="${1:-1}"
+    if is_macos; then
+        restore_session_macos "quick-$slot"
+    else
+        restore_session_linux "quick-$slot"
+    fi
+}
+
+# ==============================================================================
+# Help
+# ==============================================================================
+show_help() {
+    cat << 'EOF'
+UKE Session - Save and restore window layouts
+
+Usage:
+  uke-session save <n>       Save current layout
+  uke-session restore <n>    Restore a saved layout
+  uke-session list              List saved sessions
+  uke-session delete <n>     Delete a session
+  uke-session export <n>     Export session as JSON
+  uke-session quick-save [n]    Quick save to slot (1-9)
+  uke-session quick-restore [n] Quick restore from slot
+
+Examples:
+  uke-session save deep-work
+  uke-session restore deep-work
+  uke-session quick-save 1
+  uke-session quick-restore 1
+
+Sessions are stored in: ~/.local/state/uke/sessions/
+EOF
+}
+
+# ==============================================================================
+# Main
+# ==============================================================================
+case "${1:-list}" in
+    save)
+        [[ -n "${2:-}" ]] || log_fatal "Usage: uke-session save <n>"
+        if is_macos; then
+            save_session_macos "$2"
+        else
+            save_session_linux "$2"
+        fi
+        ;;
+    restore)
+        [[ -n "${2:-}" ]] || log_fatal "Usage: uke-session restore <n>"
+        if is_macos; then
+            restore_session_macos "$2"
+        else
+            restore_session_linux "$2"
+        fi
+        ;;
+    list|ls)
+        list_sessions
+        ;;
+    delete|rm)
+        [[ -n "${2:-}" ]] || log_fatal "Usage: uke-session delete <n>"
+        delete_session "$2"
+        ;;
+    export)
+        [[ -n "${2:-}" ]] || log_fatal "Usage: uke-session export <n>"
+        export_session "$2"
+        ;;
+    quick-save|qs)
+        quick_save "${2:-1}"
+        ;;
+    quick-restore|qr)
+        quick_restore "${2:-1}"
+        ;;
+    help|--help|-h)
+        show_help
+        ;;
+    *)
+        log_error "Unknown command: $1"
+        show_help
+        exit 1
+        ;;
+esac

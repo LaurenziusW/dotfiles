@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Bunch Runner
+# ==============================================================================
+# Runs environment presets from the bunches/ directory
+# Usage: uke-bunch <n> or uke-bunch list
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+source "$UKE_ROOT/lib/core.sh"
+
+BUNCHES_DIR="$UKE_ROOT/bunches"
+
+list_bunches() {
+    echo "Available bunches:"
+    echo ""
+    for script in "$BUNCHES_DIR"/*.sh; do
+        [[ -f "$script" ]] || continue
+        local name=$(basename "$script" .sh)
+        # Skip library files
+        [[ "$name" == "lib-os-detect" || "$name" == "bunch-manager" ]] && continue
+        echo "  • $name"
+    done
+    echo ""
+    echo "Run with: uke-bunch <n>"
+    echo "Or via hotkey: Cmd+Ctrl+1-5 (macOS) / Alt+Ctrl+1-5 (Linux)"
+}
+
+run_bunch() {
+    local name="$1"
+    local script="$BUNCHES_DIR/${name}.sh"
+    
+    if [[ ! -f "$script" ]]; then
+        log_error "Bunch not found: $name"
+        echo ""
+        list_bunches
+        exit 1
+    fi
+    
+    if [[ ! -x "$script" ]]; then
+        chmod +x "$script"
+    fi
+    
+    "$script"
+}
+
+case "${1:-}" in
+    "") list_bunches ;;
+    list|ls) list_bunches ;;
+    help|--help|-h) 
+        echo "Usage: uke-bunch <n>"
+        echo ""
+        list_bunches
+        ;;
+    *) run_bunch "$1" ;;
+esac

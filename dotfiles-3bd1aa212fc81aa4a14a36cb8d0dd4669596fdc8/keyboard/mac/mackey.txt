@@ -1,0 +1,19 @@
+# Move to stow structure
+
+
+# 1. Create the Stow directory structure for Karabiner assets
+mkdir -p stow/karabiner/.config/karabiner/assets/complex_modifications
+
+# 2. Move your JSON rules into the Stow package
+# (Assuming you saved the JSONs from the chat into a temporary folder or current dir)
+mv iso_hyper_key.json stow/karabiner/.config/karabiner/assets/complex_modifications/
+mv lock_keyboard.json stow/karabiner/.config/karabiner/assets/complex_modifications/
+mv right_cmd_to_opt.json stow/karabiner/.config/karabiner/assets/complex_modifications/
+mv german_layer.json stow/karabiner/.config/karabiner/assets/complex_modifications/
+
+# 3. Move the bare config file
+mv karabiner.json stow/karabiner/.config/karabiner/
+
+# 4. Stow it! (Links everything to ~/.config/karabiner)
+cd stow
+stow -R karabiner

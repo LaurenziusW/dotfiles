@@ -1,0 +1,43 @@
+{
+  "title": "Keyboard Lock (Triple Tap Esc)",
+  "rules": [
+    {
+      "description": "Lock keyboard - triple-tap Esc to unlock",
+      "manipulators": [
+        {
+          "conditions": [ { "name": "esc_tap_count", "type": "variable_if", "value": 2 } ],
+          "from": { "key_code": "escape" },
+          "to": [
+            { "shell_command": "/usr/bin/shortcuts run 'ToggleKeyboard'" },
+            { "set_variable": { "name": "esc_tap_count", "value": 0 } }
+          ],
+          "type": "basic"
+        },
+        {
+          "conditions": [ { "name": "esc_tap_count", "type": "variable_if", "value": 1 } ],
+          "from": { "key_code": "escape" },
+          "parameters": { "basic.to_delayed_action_delay_milliseconds": 500 },
+          "to": [ { "set_variable": { "name": "esc_tap_count", "value": 2 } } ],
+          "to_delayed_action": {
+            "to_if_invoked": [ { "set_variable": { "name": "esc_tap_count", "value": 0 } } ]
+          },
+          "type": "basic"
+        },
+        {
+          "from": { "key_code": "escape" },
+          "parameters": { "basic.to_delayed_action_delay_milliseconds": 500 },
+          "to": [ { "set_variable": { "name": "esc_tap_count", "value": 1 } } ],
+          "to_delayed_action": {
+            "to_if_invoked": [ { "set_variable": { "name": "esc_tap_count", "value": 0 } } ]
+          },
+          "type": "basic"
+        },
+        {
+          "from": { "any": "key_code" },
+          "to": [ { "key_code": "vk_none" } ],
+          "type": "basic"
+        }
+      ]
+    }
+  ]
+}
