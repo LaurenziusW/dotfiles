@@ -1,52 +1,99 @@
 -- ==============================================================================
--- UKE WezTerm Configuration
+-- UKE WezTerm Configuration v7.2 - Cross-Platform
 -- ==============================================================================
--- This is the main WezTerm config managed by UKE
--- Hardware-specific settings are in generated_hardware.lua (ghost file)
+-- SECONDARY Layer: Alt (macOS) / Super (Linux)
+-- Conflict-free: Cmd stays with yabai, Alt handles terminal internals
 -- ==============================================================================
 
 local wezterm = require('wezterm')
 local config = wezterm.config_builder()
+local act = wezterm.action
+
+-- ==============================================================================
+-- OS Detection
+-- ==============================================================================
+local function is_macos()
+    return wezterm.target_triple:find("darwin") ~= nil
+end
+
+local function is_linux()
+    return wezterm.target_triple:find("linux") ~= nil
+end
+
+-- SECONDARY modifier: Alt on macOS, Super on Linux
+local SECONDARY = is_macos() and "ALT" or "SUPER"
 
 -- ==============================================================================
 -- Load Hardware Config (Ghost File)
 -- ==============================================================================
-local hw_ok, hw = pcall(function()
-    return dofile(wezterm.config_dir .. '/generated_hardware.lua')
-end)
+-- Try multiple paths to find the generated hardware config
+local hw = nil
+local hw_paths = {
+    wezterm.config_dir .. '/generated_hardware.lua',
+    os.getenv("HOME") .. '/.config/wezterm/generated_hardware.lua',
+    os.getenv("HOME") .. '/.wezterm_hardware.lua',
+}
 
-if not hw_ok then
-    -- Defaults if ghost file is missing
+for _, path in ipairs(hw_paths) do
+    local ok, result = pcall(function()
+        return dofile(path)
+    end)
+    if ok and result then
+        hw = result
+        break
+    end
+end
+
+-- Defaults if ghost file is missing
+if not hw then
     hw = {
-        font_size = 11.0,
-        is_macos = wezterm.target_triple:find("darwin") ~= nil,
-        is_linux = wezterm.target_triple:find("linux") ~= nil,
+        font_size = is_macos() and 14.0 or 11.0,
+        is_macos = is_macos(),
+        is_linux = is_linux(),
         front_end = "OpenGL",
+        gpu = "integrated",
+        keyboard = "standard",
+        monitors = 1,
     }
 end
 
 -- ==============================================================================
 -- Appearance
 -- ==============================================================================
-config.color_scheme = 'Nord (Gogh)'
+config.color_scheme = 'Catppuccin Mocha'
 config.font = wezterm.font_with_fallback({
     'JetBrainsMono Nerd Font',
     'JetBrains Mono',
     'Fira Code',
+    'Menlo',
+    'Monaco',
     'monospace',
 })
-config.font_size = hw.font_size
+config.font_size = hw.font_size or (is_macos() and 14.0 or 11.0)
+config.line_height = 1.2
 
 -- Window
 config.window_decorations = "RESIZE"
 config.window_padding = {
-    left = 4,
-    right = 4,
-    top = 4,
-    bottom = 4,
+    left = 8,
+    right = 8,
+    top = 8,
+    bottom = 8,
 }
 config.window_background_opacity = 0.95
+if is_macos() then
+    config.macos_window_background_blur = 20
+end
+
+-- Tab bar
+config.enable_tab_bar = true
+config.use_fancy_tab_bar = false
+config.tab_bar_at_bottom = true
 config.hide_tab_bar_if_only_one_tab = true
+
+-- Initial size
+config.initial_cols = 120
+config.initial_rows = 35
 
 -- ==============================================================================
 -- GPU / Rendering
@@ -59,6 +106,7 @@ config.webgpu_power_preference = "HighPerformance"
 -- ==============================================================================
 config.scrollback_lines = 10000
 config.enable_scroll_bar = false
+config.window_close_confirmation = "NeverPrompt"
 config.check_for_updates = false
 
 -- Cursor
@@ -66,55 +114,88 @@ config.default_cursor_style = 'BlinkingBlock'
 config.cursor_blink_rate = 500
 
 -- ==============================================================================
--- Keybindings
+-- Keybindings (SECONDARY Layer)
 -- ==============================================================================
--- UKE uses the window manager for most navigation, so WezTerm bindings are minimal
--- SECONDARY modifier (Alt on macOS, Super on Linux) is reserved for terminal internals
-
-local mod = hw.is_macos and 'ALT' or 'SUPER'
-
 config.keys = {
-    -- Pane management (SECONDARY modifier)
-    { key = 'd', mods = mod, action = wezterm.action.SplitHorizontal({ domain = 'CurrentPaneDomain' }) },
-    { key = 'D', mods = mod .. '|SHIFT', action = wezterm.action.SplitVertical({ domain = 'CurrentPaneDomain' }) },
-    { key = 'w', mods = mod, action = wezterm.action.CloseCurrentPane({ confirm = true }) },
+    -- ─────────────────────────────────────────────────────────────────────────
+    -- Tab Management
+    -- ─────────────────────────────────────────────────────────────────────────
+    { key = "t", mods = SECONDARY, action = act.SpawnTab("CurrentPaneDomain") },
     
-    -- Pane navigation
-    { key = 'h', mods = mod, action = wezterm.action.ActivatePaneDirection('Left') },
-    { key = 'j', mods = mod, action = wezterm.action.ActivatePaneDirection('Down') },
-    { key = 'k', mods = mod, action = wezterm.action.ActivatePaneDirection('Up') },
-    { key = 'l', mods = mod, action = wezterm.action.ActivatePaneDirection('Right') },
+    -- Close pane (closes split first, then tab if no more panes)
+    { key = "w", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
+    { key = "x", mods = SECONDARY, action = act.CloseCurrentPane({ confirm = false }) },
     
-    -- Tab management
-    { key = 't', mods = mod, action = wezterm.action.SpawnTab('CurrentPaneDomain') },
-    { key = '[', mods = mod, action = wezterm.action.ActivateTabRelative(-1) },
-    { key = ']', mods = mod, action = wezterm.action.ActivateTabRelative(1) },
-    
-    -- Zoom current pane
-    { key = 'z', mods = mod, action = wezterm.action.TogglePaneZoomState },
+    -- Tab navigation relative
+    { key = "[", mods = SECONDARY, action = act.ActivateTabRelative(-1) },
+    { key = "]", mods = SECONDARY, action = act.ActivateTabRelative(1) },
+
+    -- ─────────────────────────────────────────────────────────────────────────
+    -- Pane Splitting
+    -- ─────────────────────────────────────────────────────────────────────────
+    { key = "\\", mods = SECONDARY, action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
+    { key = "-", mods = SECONDARY, action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
+    { key = "d", mods = SECONDARY, action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
+    { key = "D", mods = SECONDARY .. "|SHIFT", action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
+
+    -- ─────────────────────────────────────────────────────────────────────────
+    -- Pane Navigation (Vim-style)
+    -- ─────────────────────────────────────────────────────────────────────────
+    { key = "h", mods = SECONDARY, action = act.ActivatePaneDirection("Left") },
+    { key = "j", mods = SECONDARY, action = act.ActivatePaneDirection("Down") },
+    { key = "k", mods = SECONDARY, action = act.ActivatePaneDirection("Up") },
+    { key = "l", mods = SECONDARY, action = act.ActivatePaneDirection("Right") },
+
+    -- ─────────────────────────────────────────────────────────────────────────
+    -- Pane Resizing (SECONDARY + Shift)
+    -- ─────────────────────────────────────────────────────────────────────────
+    { key = "H", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Left", 5 }) },
+    { key = "J", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Down", 5 }) },
+    { key = "K", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Up", 5 }) },
+    { key = "L", mods = SECONDARY .. "|SHIFT", action = act.AdjustPaneSize({ "Right", 5 }) },
+
+    -- ─────────────────────────────────────────────────────────────────────────
+    -- Utilities
+    -- ─────────────────────────────────────────────────────────────────────────
+    { key = "z", mods = SECONDARY, action = act.TogglePaneZoomState },
+    { key = "f", mods = SECONDARY, action = act.Search({ CaseInSensitiveString = "" }) },
+    { key = "r", mods = SECONDARY, action = act.ReloadConfiguration },
+    { key = "p", mods = SECONDARY, action = act.ActivateCommandPalette },
     
     -- Copy mode
-    { key = 'c', mods = mod .. '|SHIFT', action = wezterm.action.ActivateCopyMode },
-    
-    -- Scrollback search
-    { key = 'f', mods = mod .. '|SHIFT', action = wezterm.action.Search({ CaseInSensitiveString = '' }) },
-    
-    -- Font size
-    { key = '=', mods = mod, action = wezterm.action.IncreaseFontSize },
-    { key = '-', mods = mod, action = wezterm.action.DecreaseFontSize },
-    { key = '0', mods = mod, action = wezterm.action.ResetFontSize },
+    { key = "c", mods = SECONDARY .. "|SHIFT", action = act.ActivateCopyMode },
     
     -- Quick select (like tmux fingers)
-    { key = 'Space', mods = mod, action = wezterm.action.QuickSelect },
+    { key = "Space", mods = SECONDARY, action = act.QuickSelect },
+    
+    -- Font size
+    { key = "=", mods = SECONDARY, action = act.IncreaseFontSize },
+    { key = "+", mods = SECONDARY .. "|SHIFT", action = act.IncreaseFontSize },
+    { key = "0", mods = SECONDARY, action = act.ResetFontSize },
 }
 
--- Tab navigation with numbers
+-- Tab navigation with numbers (1-9)
 for i = 1, 9 do
     table.insert(config.keys, {
         key = tostring(i),
-        mods = mod,
-        action = wezterm.action.ActivateTab(i - 1),
+        mods = SECONDARY,
+        action = act.ActivateTab(i - 1),
     })
 end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Mouse Bindings
+-- ─────────────────────────────────────────────────────────────────────────────
+config.mouse_bindings = {
+    -- Right click to paste
+    {
+        event = { Down = { streak = 1, button = "Right" } },
+        mods = "NONE",
+        action = act.PasteFrom("Clipboard"),
+    },
+}
+
+-- Keep default keybindings for system copy/paste
+config.disable_default_key_bindings = false
 
 return config

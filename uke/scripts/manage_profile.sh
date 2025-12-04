@@ -10,10 +10,18 @@
 # ==============================================================================
 set -euo pipefail
 
-# Require Bash 4+ for associative arrays
-if ((BASH_VERSINFO[0] < 4)); then
-    echo "Error: Bash 4.0+ required (found ${BASH_VERSION})"
-    exit 1
+# [FIX] Bash Version Auto-Detection & Reload
+# macOS ships with Bash 3.2. This script requires Bash 4.0+ (associative arrays).
+if [ -z "${BASH_VERSINFO}" ] || [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+    if [ -x /opt/homebrew/bin/bash ]; then
+        exec /opt/homebrew/bin/bash "$0" "$@"
+    elif [ -x /usr/local/bin/bash ]; then
+        exec /usr/local/bin/bash "$0" "$@"
+    else
+        echo "Error: Bash 4.0+ required (found ${BASH_VERSION})."
+        echo "Please install bash via homebrew: brew install bash"
+        exit 1
+    fi
 fi
 
 # ==============================================================================
