@@ -46,6 +46,25 @@ modifiers:
   launcher:       { macos: "cmd + alt",     linux: "ALT SUPER" }
 
 # ==============================================================================
+# Custom Keybindings
+# ==============================================================================
+# These generate additional keybindings beyond standard WM controls
+keybindings:
+  # Toggle sticky window (floating + pinned + always-on-top)
+  sticky:
+    key: "s"
+    mod: "primary_shift"
+    action: "exec"
+    command: "uke-sticky toggle"
+  
+  # Quick fix
+  quickfix:
+    key: "f"
+    mod: "primary_shift"
+    action: "exec"
+    command: "uke-fix"
+
+# ==============================================================================
 # Applications
 # ==============================================================================
 # Maps app nicknames to actual app names per platform

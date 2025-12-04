@@ -255,6 +255,11 @@ cmd + alt - m : $HOME/.local/bin/uke-scratchpad music
 # ==============================================================================
 # Smart App Launchers (LAUNCHER: Cmd+Alt)
 # ==============================================================================
+# Sticky window (floating + pinned + always-on-top)
+cmd + shift - s : $HOME/.local/bin/uke-sticky toggle
+# Quick fix
+cmd + shift - x : $HOME/.local/bin/uke-fix
+
 cmd + alt - b : $HOME/.local/bin/uke-launch brave
 cmd + alt - o : $HOME/.local/bin/uke-launch obsidian
 cmd + alt - c : $HOME/.local/bin/uke-launch code
@@ -639,6 +644,11 @@ windowrulev2 = center, onworkspace:special:music
 # ==============================================================================
 # UKE TOOLS
 # ==============================================================================
+# Sticky window (floating + pinned + always-on-top)
+bind = ALT SHIFT, s, exec, \$HOME/.local/bin/uke-sticky toggle
+# Quick fix
+bind = ALT SHIFT, f, exec, \$HOME/.local/bin/uke-fix
+
 bind = ALT, grave, exec, \$HOME/.local/bin/uke-gather
 bind = ALT SUPER, b, exec, \$HOME/.local/bin/uke-launch brave
 bind = ALT SUPER, o, exec, \$HOME/.local/bin/uke-launch obsidian

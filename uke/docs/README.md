@@ -93,6 +93,20 @@ uke-fix --cache      # Clean caches
 uke-fix --all        # Fix everything
 ```
 
+## Sticky Window
+
+Make any window floating, always-on-top, and pinned to all workspaces:
+
+```bash
+uke-sticky toggle    # Toggle sticky mode (Alt+Shift+S / Cmd+Shift+S)
+uke-sticky list      # Show all sticky windows
+uke-sticky clear     # Reset all sticky windows
+```
+
+Perfect for keeping a terminal visible while working across workspaces.
+
+**Keybinding:** `Alt+Shift+S` (Linux) / `Cmd+Shift+S` (macOS)
+
 ## Smart Launcher
 
 ```bash
@@ -121,6 +135,8 @@ After installation, your shell has:
 | Switch workspace | Cmd+1-0 | Alt+1-0 |
 | Terminal | Cmd+Return | Alt+Return |
 | Launcher | Cmd+Space | Alt+Space |
+| Sticky toggle | Cmd+Shift+S | Alt+Shift+S |
+| Quick fix | Cmd+Shift+X | Alt+Shift+F |
 
 ## Directory Structure
 
