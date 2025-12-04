@@ -1,133 +1,167 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Launch - Smart App Launcher
-# ==============================================================================
-# Launches an app by nickname, handling platform differences.
-# If the app is already running, focuses it instead.
-#
-# Usage: uke-launch <app-name>
-# Example: uke-launch brave
+# UKE Launch v7.2 - Smart App & File Launcher
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
-
 source "$UKE_ROOT/lib/core.sh"
 
-APP="${1:-}"
+# App mappings (fallback if not in registry)
+declare -A LINUX_APPS=(
+    [browser]="brave"
+    [terminal]="wezterm"
+    [editor]="nvim"
+    [files]="thunar"
+    [pdf]="zathura"
+    [notes]="obsidian"
+    [music]="spotify"
+    [mail]="thunderbird"
+)
 
-if [[ -z "$APP" ]]; then
-    log_fatal "Usage: uke-launch <app-name>"
-fi
+declare -A MACOS_APPS=(
+    [browser]="Safari"
+    [terminal]="WezTerm"
+    [editor]="nvim"
+    [files]="Finder"
+    [pdf]="Preview"
+    [notes]="Obsidian"
+    [music]="Spotify"
+    [mail]="Mail"
+)
 
-# ==============================================================================
-# App Name Resolution
-# ==============================================================================
-get_app_name() {
-    local key="$1"
+# File type handlers
+launch_file() {
+    local file="$1"
     
-    case "$key" in
-        # Browsers
-        brave)       is_macos && echo "Brave Browser" || echo "brave" ;;
-        safari)      is_macos && echo "Safari" || echo "" ;;
-        firefox)     echo "firefox" ;;
-        chrome)      is_macos && echo "Google Chrome" || echo "google-chrome-stable" ;;
-        
-        # Notes
-        obsidian)    is_macos && echo "Obsidian" || echo "obsidian" ;;
-        notion)      is_macos && echo "Notion" || echo "notion-app" ;;
-        
-        # Development
-        wezterm)     is_macos && echo "WezTerm" || echo "wezterm" ;;
-        alacritty)   echo "Alacritty" ;;
-        kitty)       echo "kitty" ;;
-        code)        is_macos && echo "Visual Studio Code" || echo "code" ;;
-        cursor)      is_macos && echo "Cursor" || echo "cursor" ;;
-        
-        # Media
-        spotify)     is_macos && echo "Spotify" || echo "spotify" ;;
-        
-        # Communication
-        slack)       is_macos && echo "Slack" || echo "slack" ;;
-        discord)     is_macos && echo "Discord" || echo "discord" ;;
-        
-        # Documents
-        preview)     is_macos && echo "Preview" || echo "evince" ;;
-        zathura)     echo "zathura" ;;
-        
-        # Bookmarks
-        raindrop)    is_macos && echo "Raindrop.io" || echo "raindrop" ;;
-        
-        # Default: use as-is
-        *)           echo "$key" ;;
+    if [[ ! -f "$file" ]]; then
+        fail "File not found: $file"
+        return 1
+    fi
+    
+    local ext="${file##*.}"
+    ext="${ext,,}"  # lowercase
+    
+    case "$ext" in
+        pdf)
+            if is_macos; then
+                open -a Preview "$file"
+            else
+                zathura "$file" &>/dev/null &
+            fi
+            ;;
+        epub|djvu|ps)
+            if is_macos; then
+                open "$file"
+            else
+                zathura "$file" &>/dev/null &
+            fi
+            ;;
+        png|jpg|jpeg|gif|webp|svg)
+            if is_macos; then
+                open -a Preview "$file"
+            else
+                imv "$file" &>/dev/null & || feh "$file" &>/dev/null &
+            fi
+            ;;
+        mp3|flac|wav|ogg|m4a)
+            if is_macos; then
+                open -a Music "$file"
+            else
+                mpv --no-video "$file" &>/dev/null &
+            fi
+            ;;
+        mp4|mkv|avi|webm|mov)
+            if is_macos; then
+                open -a "QuickTime Player" "$file"
+            else
+                mpv "$file" &>/dev/null &
+            fi
+            ;;
+        txt|md|markdown)
+            ${EDITOR:-nvim} "$file"
+            ;;
+        *)
+            # Default: use system handler
+            if is_macos; then
+                open "$file"
+            else
+                xdg-open "$file" &>/dev/null &
+            fi
+            ;;
     esac
-}
-
-# ==============================================================================
-# Check if App is Running
-# ==============================================================================
-app_running() {
-    local name="$1"
     
-    if is_macos; then
-        pgrep -x "$name" &>/dev/null || osascript -e "tell application \"System Events\" to (name of processes) contains \"$name\"" 2>/dev/null | grep -q "true"
-    else
-        pgrep -i "${name,,}" &>/dev/null
-    fi
+    ok "Opened: $file"
 }
 
-# ==============================================================================
-# Focus Existing Window
-# ==============================================================================
-focus_app() {
-    local name="$1"
-    
-    if is_macos; then
-        osascript -e "tell application \"$name\" to activate" 2>/dev/null
-    else
-        # Find window and focus it
-        local addr
-        addr=$(hyprctl clients -j | jq -r ".[] | select(.class | test(\"$name\"; \"i\")) | .address" | head -1)
-        if [[ -n "$addr" ]]; then
-            hyprctl dispatch focuswindow "address:$addr" 2>/dev/null
-        fi
-    fi
-}
-
-# ==============================================================================
-# Launch App
-# ==============================================================================
+# App launcher
 launch_app() {
-    local name="$1"
+    local app="$1"
+    shift
+    local args=("$@")
     
+    # Get platform-specific app name
+    local app_name
     if is_macos; then
-        open -a "$name" &>/dev/null &
+        app_name="${MACOS_APPS[$app]:-$app}"
+        open -a "$app_name" "${args[@]}" 2>/dev/null || {
+            fail "App not found: $app_name"
+            return 1
+        }
     else
-        local cmd="${name,,}"
-        if command -v "$cmd" &>/dev/null; then
-            "$cmd" &>/dev/null &
-        elif command -v "$name" &>/dev/null; then
-            "$name" &>/dev/null &
-        else
-            log_fatal "Cannot launch: $name (command not found)"
-        fi
+        app_name="${LINUX_APPS[$app]:-$app}"
+        "$app_name" "${args[@]}" &>/dev/null &
+        disown 2>/dev/null || true
     fi
+    
+    ok "Launched: $app_name"
 }
 
-# ==============================================================================
+# URL handler
+launch_url() {
+    local url="$1"
+    
+    if is_macos; then
+        open "$url"
+    else
+        xdg-open "$url" &>/dev/null &
+    fi
+    
+    ok "Opened: $url"
+}
+
 # Main
-# ==============================================================================
-APP_NAME=$(get_app_name "$APP")
-
-if [[ -z "$APP_NAME" ]]; then
-    log_fatal "App '$APP' is not available on $UKE_OS"
-fi
-
-if app_running "$APP_NAME"; then
-    log_info "Focusing: $APP_NAME"
-    focus_app "$APP_NAME"
-else
-    log_info "Launching: $APP_NAME"
-    launch_app "$APP_NAME"
-fi
+case "${1:-}" in
+    -h|--help)
+        echo "Usage: uke-launch <app|file|url> [args...]"
+        echo ""
+        echo "Apps: browser, terminal, editor, files, pdf, notes, music, mail"
+        echo "Files: Automatically detected by extension"
+        echo "URLs: Opened in default browser"
+        echo ""
+        echo "Examples:"
+        echo "  uke-launch browser"
+        echo "  uke-launch ~/docs/paper.pdf"
+        echo "  uke-launch https://archlinux.org"
+        ;;
+    "")
+        fail "No target specified. Use --help for usage."
+        exit 1
+        ;;
+    *)
+        target="$1"
+        shift
+        
+        # Check if it's a URL
+        if [[ "$target" =~ ^https?:// ]]; then
+            launch_url "$target"
+        # Check if it's a file
+        elif [[ -f "$target" ]]; then
+            launch_file "$target"
+        # Assume it's an app
+        else
+            launch_app "$target" "$@"
+        fi
+        ;;
+esac

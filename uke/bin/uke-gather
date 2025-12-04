@@ -1,7 +1,16 @@
+# ==============================================================================
+# UKE Gather - Organize windows by workspace
+# ==============================================================================
+# Source: /Users/laurenz/dotfiles/uke/config/registry.yaml
+# Generated: 2025-12-03T22:44:19+01:00
+# Platform: macos
+#
+# DO NOT EDIT DIRECTLY - Regenerate with: uke gen
+# ==============================================================================
+
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve symlink to find true source location
 SOURCE="${BASH_SOURCE[0]}"
 while [ -h "$SOURCE" ]; do
   DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
@@ -21,7 +30,7 @@ gather_macos() {
     
     case $current_space in
         1)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser") | .id' | \
+            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser" or .app == "Firefox") | .id' | \
                 xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
             ;;
         2)
@@ -29,7 +38,7 @@ gather_macos() {
                 xargs -I {} yabai -m window {} --space 2 2>/dev/null || true
             ;;
         3)
-            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode") | .id' | \
+            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode" or .app == "Cursor") | .id' | \
                 xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
             ;;
         5)

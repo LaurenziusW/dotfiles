@@ -57,7 +57,7 @@ get_app_command() {
         music|spotify)
             [ "$OS_TYPE" = "macos" ] && echo "Spotify" || echo "spotify" ;;
         pdf|preview)
-            [ "$OS_TYPE" = "macos" ] && echo "Preview" || echo "evince" ;;
+            [ "$OS_TYPE" = "macos" ] && echo "Preview" || echo "zathura" ;;
         slack)
             [ "$OS_TYPE" = "macos" ] && echo "Slack" || echo "slack" ;;
         discord)

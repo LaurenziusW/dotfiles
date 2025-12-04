@@ -23,7 +23,7 @@ _resolve_uke_root() {
 }
 
 export UKE_ROOT="${UKE_ROOT:-$(_resolve_uke_root)}"
-export UKE_VERSION="7.0.0"
+export UKE_VERSION="7.2.0"
 
 # ==============================================================================
 # Cloud Path Support

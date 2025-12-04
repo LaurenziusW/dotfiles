@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Backup - Config backup utility
+# UKE Backup v7.2 - Comprehensive System State Backup
 # ==============================================================================
 set -euo pipefail
 
@@ -8,75 +8,176 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export UKE_ROOT="${SCRIPT_DIR%/bin}"
 source "$UKE_ROOT/lib/core.sh"
 
-BACKUP_ROOT="$HOME/.uke-backups"
+BACKUP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/uke/backups"
 
 create_backup() {
-    local timestamp=$(date +%Y%m%d-%H%M%S)
-    local backup_dir="$BACKUP_ROOT/$timestamp"
+    local full="${1:-false}"
+    local timestamp=$(date +%Y-%m-%d_%H%M%S)
+    local backup_path="$BACKUP_DIR/$timestamp"
     
-    log_info "Creating backup: $backup_dir"
-    mkdir -p "$backup_dir"
+    mkdir -p "$backup_path"/{config,gen,ghost,stow,packages}
     
-    # Backup registry
-    cp "$UKE_CONFIG/registry.yaml" "$backup_dir/" && ok "Backed up registry.yaml"
+    echo ""
+    printf "%s╔══════════════════════════════════════╗%s\n" "$C_CYAN" "$C_RESET"
+    printf "%s║%s        UKE Backup                    %s║%s\n" "$C_CYAN" "$C_BOLD" "$C_CYAN" "$C_RESET"
+    printf "%s╚══════════════════════════════════════╝%s\n" "$C_CYAN" "$C_RESET"
+    echo ""
+    info "Creating backup: $timestamp"
+    echo ""
     
-    # Backup generated configs
-    if is_macos; then
-        [[ -f "$UKE_GEN/skhd/skhdrc" ]] && cp "$UKE_GEN/skhd/skhdrc" "$backup_dir/"
-        [[ -f "$UKE_GEN/yabai/yabairc" ]] && cp "$UKE_GEN/yabai/yabairc" "$backup_dir/"
-    else
-        [[ -f "$UKE_GEN/hyprland/hyprland.conf" ]] && cp "$UKE_GEN/hyprland/hyprland.conf" "$backup_dir/"
+    # Always: UKE configs
+    [[ -f "$UKE_ROOT/config/registry.yaml" ]] && cp "$UKE_ROOT/config/registry.yaml" "$backup_path/config/"
+    [[ -f "$UKE_STATE/machine.profile" ]] && cp "$UKE_STATE/machine.profile" "$backup_path/config/"
+    ok "Config files"
+    
+    # Always: Generated configs
+    cp -r "$UKE_ROOT/gen"/* "$backup_path/gen/" 2>/dev/null || true
+    ok "Generated configs"
+    
+    # Always: Ghost files
+    for f in "$HOME/.config"/*/generated_*; do
+        [[ -f "$f" ]] && cp "$f" "$backup_path/ghost/" 2>/dev/null
+    done
+    ok "Ghost files"
+    
+    if [[ "$full" == "true" ]]; then
+        # Full: Stow packages
+        cp -r "$UKE_ROOT/stow"/* "$backup_path/stow/" 2>/dev/null || true
+        ok "Stow packages"
+        
+        # Full: Package lists
+        pacman -Qe > "$backup_path/packages/official.txt" 2>/dev/null || true
+        pacman -Qm > "$backup_path/packages/aur.txt" 2>/dev/null || true
+        systemctl list-unit-files --state=enabled > "$backup_path/packages/services.txt" 2>/dev/null || true
+        ok "Package lists"
     fi
     
     # Create manifest
-    cat > "$backup_dir/MANIFEST.txt" << EOF
-UKE Backup
-Created: $(date)
-Platform: $UKE_OS
-Version: $UKE_VERSION
-
-Files:
-$(ls -1 "$backup_dir" | grep -v MANIFEST)
+    cat > "$backup_path/manifest.yaml" << EOF
+version: "$UKE_VERSION"
+timestamp: "$timestamp"
+full: $full
+hostname: "$(hostname)"
+user: "$USER"
 EOF
     
-    ok "Backup complete: $backup_dir"
+    # Update latest symlink
+    rm -f "$BACKUP_DIR/latest"
+    ln -sf "$timestamp" "$BACKUP_DIR/latest"
+    
+    echo ""
+    ok "Backup created: $backup_path"
+    echo "  Size: $(du -sh "$backup_path" | cut -f1)"
 }
 
 list_backups() {
-    if [[ ! -d "$BACKUP_ROOT" ]]; then
-        log_info "No backups found"
-        return 0
+    echo ""
+    printf "%s=== Available Backups ===%s\n" "$C_BOLD" "$C_RESET"
+    echo ""
+    
+    if [[ ! -d "$BACKUP_DIR" ]]; then
+        warn "No backups found"
+        return
     fi
     
-    echo "Available backups:"
-    for backup in "$BACKUP_ROOT"/*; do
-        [[ -d "$backup" ]] || continue
-        echo "  $(basename "$backup")"
+    for dir in "$BACKUP_DIR"/*/; do
+        [[ -d "$dir" ]] || continue
+        local name=$(basename "$dir")
+        [[ "$name" == "latest" ]] && continue
+        
+        local size=$(du -sh "$dir" 2>/dev/null | cut -f1)
+        local full="config"
+        [[ -d "$dir/packages" ]] && [[ -f "$dir/packages/official.txt" ]] && full="full"
+        
+        if [[ -L "$BACKUP_DIR/latest" ]] && [[ "$(readlink "$BACKUP_DIR/latest")" == "$name" ]]; then
+            printf "  %s→%s %-20s %s (%s)\n" "$C_GREEN" "$C_RESET" "$name" "$size" "$full"
+        else
+            printf "    %-20s %s (%s)\n" "$name" "$size" "$full"
+        fi
     done
 }
 
 restore_backup() {
     local name="$1"
-    local backup_dir="$BACKUP_ROOT/$name"
+    local backup_path="$BACKUP_DIR/$name"
     
-    [[ -d "$backup_dir" ]] || log_fatal "Backup not found: $name"
+    if [[ ! -d "$backup_path" ]]; then
+        fail "Backup not found: $name"
+        exit 1
+    fi
     
-    log_warn "This will overwrite your current configs!"
-    read -p "Continue? (y/N) " -n 1 -r
-    echo
-    [[ $REPLY =~ ^[Yy]$ ]] || { log_info "Aborted"; return 1; }
+    echo ""
+    printf "%s╔══════════════════════════════════════╗%s\n" "$C_YELLOW" "$C_RESET"
+    printf "%s║%s        UKE Restore                   %s║%s\n" "$C_YELLOW" "$C_BOLD" "$C_YELLOW" "$C_RESET"
+    printf "%s╚══════════════════════════════════════╝%s\n" "$C_YELLOW" "$C_RESET"
+    echo ""
     
-    [[ -f "$backup_dir/registry.yaml" ]] && {
-        cp "$backup_dir/registry.yaml" "$UKE_CONFIG/"
-        ok "Restored registry.yaml"
-    }
+    info "Restoring from: $name"
+    cat "$backup_path/manifest.yaml" 2>/dev/null || true
+    echo ""
     
-    log_info "Run 'uke gen && uke reload' to apply"
+    read -p "Continue? [y/N] " -n 1 -r
+    echo ""
+    [[ ! $REPLY =~ ^[Yy]$ ]] && exit 0
+    
+    # Backup current state first
+    info "Backing up current state..."
+    create_backup false
+    
+    # Restore configs
+    info "Restoring configs..."
+    [[ -f "$backup_path/config/registry.yaml" ]] && cp "$backup_path/config/registry.yaml" "$UKE_ROOT/config/"
+    [[ -f "$backup_path/config/machine.profile" ]] && cp "$backup_path/config/machine.profile" "$UKE_STATE/"
+    
+    # Restore ghost files
+    for f in "$backup_path/ghost"/*; do
+        [[ -f "$f" ]] || continue
+        local fname=$(basename "$f")
+        local target_dir=$(echo "$fname" | sed 's/_generated.*//')
+        mkdir -p "$HOME/.config/$target_dir"
+        cp "$f" "$HOME/.config/$target_dir/generated_${fname#*_generated}"
+    done
+    
+    # Regenerate
+    info "Regenerating configs..."
+    "$UKE_ROOT/lib/gen.sh" all
+    
+    ok "Restore complete!"
+    info "Run 'uke reload' to apply changes"
+}
+
+show_diff() {
+    local name="$1"
+    local backup_path="$BACKUP_DIR/$name"
+    
+    if [[ ! -d "$backup_path" ]]; then
+        fail "Backup not found: $name"
+        exit 1
+    fi
+    
+    echo ""
+    printf "%s=== Diff: Current vs %s ===%s\n" "$C_BOLD" "$name" "$C_RESET"
+    
+    if [[ -f "$backup_path/config/registry.yaml" ]] && [[ -f "$UKE_ROOT/config/registry.yaml" ]]; then
+        diff --color=auto "$backup_path/config/registry.yaml" "$UKE_ROOT/config/registry.yaml" || true
+    fi
 }
 
 case "${1:-}" in
-    create|"") create_backup ;;
-    list|ls)   list_backups ;;
-    restore)   restore_backup "${2:-}" ;;
-    *)         echo "Usage: uke-backup [create|list|restore <name>]" ;;
+    ""|create)    create_backup false ;;
+    --full)       create_backup true ;;
+    --config-only) create_backup false ;;
+    --list|list)  list_backups ;;
+    --restore)    restore_backup "${2:-latest}" ;;
+    --diff)       show_diff "${2:-latest}" ;;
+    -h|--help)
+        echo "Usage: uke-backup [option]"
+        echo "Options:"
+        echo "  (none)      Create config backup"
+        echo "  --full      Include package lists"
+        echo "  --list      List available backups"
+        echo "  --restore   Restore from backup"
+        echo "  --diff      Show diff with backup"
+        ;;
+    *)            fail "Unknown option: $1" ;;
 esac

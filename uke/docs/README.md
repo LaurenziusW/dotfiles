@@ -1,221 +1,167 @@
-# UKE v7.0 - Unified Keyboard Environment
+# UKE - Unified Keyboard Environment v7.2
 
-**One muscle memory for macOS & Linux** with hardware-agnostic dotfiles.
+A cross-platform keyboard-driven workflow system with comprehensive Arch Linux management.
 
----
+## What's New in v7.2
 
-## Architecture Overview
+### Core Features
+- **`uke-services`** - Service health monitoring (reads from registry.yaml)
+- **`uke-update`** - Unified updates with mirror optimization & cache cleaning
+- **`uke-fix`** - Quick fixes with auto-detection & cache cleanup
+- **`uke-setup`** - First-boot wizard with safe sudo handling
+- **`uke-backup`** - Enhanced backup with full restore capability
+- **`uke-snapshot`** - System snapshots (btrfs/snapper/timeshift)
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         VERSION CONTROLLED (Git)                            │
-│  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────────┐   │
-│  │  registry.yaml  │────▶│     gen.sh      │────▶│  Generated Configs  │   │
-│  │ (preferences)   │     │   (generator)   │     │  (skhdrc, yabairc)  │   │
-│  └─────────────────┘     └─────────────────┘     └─────────────────────┘   │
-│                                                              │              │
-│                                                    source = ...            │
-│                                                              ↓              │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                                               │
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         LOCAL ONLY (.gitignored)                            │
-│  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────────┐   │
-│  │ machine.profile │────▶│ apply_profile.sh│────▶│   Ghost Files       │   │
-│  │  (hardware)     │     │   (generator)   │     │  generated_*.conf   │   │
-│  └─────────────────┘     └─────────────────┘     └─────────────────────┘   │
-│                                                                             │
-│  UKE_OS=arch                                      ~/.config/hypr/           │
-│  UKE_GPU=nvidia         →  Computed Settings  →   generated_hardware.conf  │
-│  UKE_FORM_FACTOR=laptop    (font size, gaps)     ~/.config/alacritty/      │
-│                                                   generated_font.toml      │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+### QoL Improvements
+- **`uke-launch`** - Smart file type detection (PDFs open in zathura)
+- **Mirror optimization** - reflector integration for faster updates
+- **Cache cleaning** - paccache & orphan removal built-in
+- **fzf integration** - Fuzzy history (Ctrl+R), file search (Ctrl+T)
+- **Service definitions in YAML** - Configure services in registry.yaml
+
+### New Stow Packages
+- **zathura/** - Vim-like PDF viewer with Nord theme
+- Enhanced **.zshrc** with fzf, better aliases, UKE shortcuts
 
 ## Quick Start
 
+### Fresh Arch Install
 ```bash
-# Clone and install
-git clone <your-repo> ~/dotfiles/uke
+git clone <repo> ~/dotfiles/uke
 cd ~/dotfiles/uke
+./bin/uke-setup
+# Reboot - done!
+```
+
+### Existing System
+```bash
+cd ~/dotfiles/uke
+./scripts/arch-check.sh
 ./scripts/install.sh
-
-# Configure hardware (interactive TUI)
-uke profile
-
-# Apply changes
-uke gen && uke reload
+uke profile && uke apply
 ```
 
-## Key Concepts
-
-### 1. Single Source of Truth
-- **registry.yaml**: All software preferences, keybindings, app assignments
-- **machine.profile**: Hardware-specific settings (local only, not committed)
-
-### 2. Ghost Files
-Machine-specific configs that are:
-- Generated from `machine.profile`
-- Sourced by main configs via `source = ...`
-- Never version controlled
-- Regenerated on each machine
-
-### 3. Modifier Hierarchy
-
-| Layer | macOS | Linux | Purpose |
-|:------|:------|:------|:--------|
-| **PRIMARY** | Cmd ⌘ | Alt | Window Manager |
-| **+SHIFT** | Cmd+Shift | Alt+Shift | Move Windows |
-| **SECONDARY** | Alt ⌥ | Super | Terminal (WezTerm) |
-| **TERTIARY** | Alt+Shift | Super+Shift | Resize Windows |
-| **QUATERNARY** | Ctrl | Ctrl | Shell (never intercepted) |
-
-## Commands
-
-### Core
-```bash
-uke gen              # Generate configs from registry.yaml
-uke apply            # Generate hardware configs from machine.profile
-uke profile          # Interactive hardware settings TUI
-uke reload           # Reload window manager
-uke status           # Show current status
-uke validate         # Validate configuration
-```
-
-### Workflow
-```bash
-# New machine setup
-uke profile          # Set hardware (auto-detects)
-uke apply            # Generate ghost files
-uke gen && uke reload # Apply everything
-
-# After editing registry.yaml
-uke gen && uke reload
-
-# After changing hardware (new monitor, etc.)
-uke profile          # Update settings
-uke apply            # Regenerate ghost files
-uke reload           # Apply
-```
-
-## Hardware Profile Variables
-
-| Variable | Options | Description |
-|----------|---------|-------------|
-| `UKE_OS` | `arch`, `macos` | Operating system |
-| `UKE_FORM_FACTOR` | `desktop`, `laptop_14`, `laptop_10` | Display size |
-| `UKE_MONITORS` | `1`, `2`, `3` | Monitor count |
-| `UKE_GPU` | `integrated`, `nvidia`, `amd` | GPU type |
-| `UKE_KEYBOARD` | `pc`, `mac` | Keyboard layout |
-
-### Form Factor Effects
-| Form Factor | Font Size | Gaps |
-|-------------|-----------|------|
-| `desktop` | 11pt | 3/6/2 |
-| `laptop_14` | 12.5pt | 2/4/2 |
-| `laptop_10` | 10pt | 1/2/1 |
-
-## File Structure
-
-```
-~/dotfiles/uke/
-├── bin/                      # CLI tools
-│   └── uke                   # Main command
-├── lib/
-│   ├── core.sh              # Foundation (cloud path support)
-│   ├── wm.sh                # Window manager abstraction
-│   └── gen.sh               # Config generator
-├── config/
-│   └── registry.yaml        # Single source of truth
-├── scripts/
-│   ├── manage_profile.sh    # Hardware TUI
-│   ├── apply_profile.sh     # Ghost file generator
-│   └── install.sh           # Installer
-├── gen/                     # Generated (committed)
-│   ├── skhd/skhdrc
-│   ├── yabai/yabairc
-│   └── hyprland/hyprland.conf
-├── bunches/                 # Environment presets
-└── stow/                    # Dotfiles
-```
-
-### Ghost Files (Local Only)
-```
-~/.local/state/uke/
-└── machine.profile          # Hardware identity
-
-~/.config/hypr/
-└── generated_hardware.conf  # GPU, monitors, gaps
-
-~/.config/alacritty/
-└── generated_font.toml      # Font size
-
-~/.config/wezterm/
-└── generated_hardware.lua   # All settings as Lua
-```
-
-## Cloud Sync Support
-
-Set `UKE_CLOUD_PATH` to use cloud storage for registry.yaml:
+## Daily Commands
 
 ```bash
-# In ~/.zshrc or similar
-export UKE_CLOUD_PATH="$HOME/Dropbox/uke-config"
-# or
-export UKE_CLOUD_PATH="$HOME/iCloud/uke-config"
+uke-update          # Update system + AUR + UKE + optimize mirrors
+uke-update --clean  # Clean cache & orphans
+uke-fix             # Auto-detect and fix issues
+uke-services        # Check service status
 ```
 
-When set, UKE reads `registry.yaml` from the cloud path instead of `~/dotfiles/uke/config/`.
+## Update Manager
 
-## Keybindings Quick Reference
+```bash
+uke-update --check    # Show pending updates
+uke-update --news     # Show Arch news
+uke-update --mirrors  # Refresh mirror list
+uke-update --clean    # Clean cache & orphans
+uke-update --all      # Everything (default)
+```
 
-### Window Management (PRIMARY)
+Features:
+- Mirror optimization via reflector
+- Package cache cleanup (keeps last 2 versions)
+- Orphaned package removal
+- Kernel update detection (reboot warning)
+
+## Service Manager
+
+Services are defined in `config/registry.yaml`:
+```yaml
+services:
+  system: [keyd, bluetooth, NetworkManager]
+  user: [pipewire, pipewire-pulse, wireplumber]
+  hyprland: [waybar, dunst, hypridle, hyprpaper]
+```
+
+Commands:
+```bash
+uke-services          # Status
+uke-services restart  # Restart all
+uke-services logs keyd
+```
+
+## Quick Fixes
+
+```bash
+uke-fix              # Auto-detect issues
+uke-fix --audio      # Restart PipeWire
+uke-fix --keys       # Restart keyd
+uke-fix --cache      # Clean caches
+uke-fix --all        # Fix everything
+```
+
+## Smart Launcher
+
+```bash
+uke-launch browser              # Open default browser
+uke-launch ~/docs/paper.pdf     # Opens in zathura
+uke-launch https://arch.org     # Opens URL
+```
+
+## Shell Features (fzf)
+
+After installation, your shell has:
+- **Ctrl+R** - Fuzzy history search
+- **Ctrl+T** - Fuzzy file search
+- **Alt+C** - Fuzzy cd
+- **fcd** - Fuzzy cd with preview
+- **fh** - Fuzzy history
+- **fkill** - Fuzzy process kill
+
+## Key Bindings
+
 | Action | macOS | Linux |
-|:-------|:------|:------|
-| Focus hjkl | Cmd + hjkl | Alt + hjkl |
-| Move window | Cmd+Shift + hjkl | Alt+Shift + hjkl |
-| Resize | Alt+Shift + hjkl | Super+Shift + hjkl |
-| Workspace 1-10 | Cmd + 0-9 | Alt + 0-9 |
-| Move to WS | Cmd+Shift + 0-9 | Alt+Shift + 0-9 |
+|--------|-------|-------|
+| Focus window | Cmd+hjkl | Alt+hjkl |
+| Move window | Cmd+Shift+hjkl | Alt+Shift+hjkl |
+| Resize | Alt+Shift+hjkl | Super+Shift+hjkl |
+| Switch workspace | Cmd+1-0 | Alt+1-0 |
+| Terminal | Cmd+Return | Alt+Return |
+| Launcher | Cmd+Space | Alt+Space |
 
-### Bunches
-| Bunch | macOS | Linux |
-|:------|:------|:------|
-| Study | Cmd+Ctrl + 1 | Alt+Ctrl + F1 |
-| Coding | Cmd+Ctrl + 3 | Alt+Ctrl + F3 |
+## Directory Structure
 
-### Scratchpads
-| Window | macOS | Linux |
-|:-------|:------|:------|
-| Terminal | Cmd+Alt + ` | Alt + ` |
-| Notes | Cmd+Alt + n | Alt+Super + n |
+```
+uke/
+├── bin/                    # CLI tools
+│   ├── uke-services        # Service manager
+│   ├── uke-update          # Update manager
+│   ├── uke-fix             # Quick fixes
+│   ├── uke-setup           # First-boot wizard
+│   ├── uke-launch          # Smart launcher
+│   └── ...
+├── config/
+│   └── registry.yaml       # Single source of truth
+├── stow/
+│   ├── zathura/            # PDF viewer
+│   ├── zsh/                # Shell with fzf
+│   └── ...
+└── scripts/
+    └── arch-check.sh       # Package checker
+```
 
 ## Troubleshooting
 
-### No hardware profile
+### Low disk space
 ```bash
-uke profile  # Create one interactively
+uke-update --clean
 ```
 
-### Ghost files missing
+### Slow updates
 ```bash
-uke apply    # Generate from machine.profile
+uke-update --mirrors
 ```
 
-### Configs out of sync
+### Audio not working
 ```bash
-uke gen && uke reload
+uke-fix --audio
 ```
 
 ### Check everything
 ```bash
-uke status
-uke validate
+uke doctor
+uke-services
 ```
-
----
-
-## Version History
-
-- **v7.0** - Ghost Files architecture, hardware profiles, cloud sync
-- **v6.x** - Original UKE with static generation

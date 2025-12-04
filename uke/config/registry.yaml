@@ -264,3 +264,24 @@ sessions:
     enabled: false
     interval: 300
     name: "autosave"
+
+# ==============================================================================
+# Services (for uke-services)
+# ==============================================================================
+# Managed services that UKE monitors and can restart
+services:
+  system:
+    - keyd              # Keyboard remapping
+    - bluetooth         # Bluetooth (optional)
+    - NetworkManager    # Network management
+  
+  user:
+    - pipewire          # Audio server
+    - pipewire-pulse    # PulseAudio compatibility
+    - wireplumber       # Session manager
+  
+  hyprland:
+    - waybar            # Status bar
+    - dunst             # Notifications
+    - hypridle          # Idle manager
+    - hyprpaper         # Wallpaper

@@ -178,6 +178,36 @@ check_symlinks() {
 }
 
 # ==============================================================================
+# Service Status
+# ==============================================================================
+check_services() {
+    echo ""
+    printf "%s=== Services ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    if is_linux; then
+        systemctl is-active keyd &>/dev/null && check "keyd service" "ok" || check "keyd service" "warn" "sudo systemctl start keyd"
+        systemctl --user is-active pipewire &>/dev/null && check "pipewire" "ok" || check "pipewire" "warn" "Audio may not work"
+    fi
+}
+
+# ==============================================================================
+# Update Status
+# ==============================================================================
+check_updates() {
+    echo ""
+    printf "%s=== Updates ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    if command -v checkupdates &>/dev/null; then
+        local count=$(checkupdates 2>/dev/null | wc -l)
+        if [[ $count -gt 0 ]]; then
+            check "$count update(s) available" "warn" "Run: uke-update"
+        else
+            check "System up to date" "ok"
+        fi
+    fi
+}
+
+# ==============================================================================
 # Window Manager Status
 # ==============================================================================
 check_wm() {
@@ -229,6 +259,8 @@ check_profile
 check_ghost_files
 check_generated
 check_symlinks
+check_services
+check_updates
 check_wm
 print_summary
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# UKE Installer v7.0 - Complete Setup with Hardware Profile
+# UKE Installer v7.1 - Complete Setup with Hardware Profile & Auto-start
 # ==============================================================================
 set -euo pipefail
 
@@ -62,6 +62,9 @@ check_deps() {
             echo "  brew install ${missing[*]}"
         elif [[ "$DISTRO" == "arch" ]]; then
             echo "  sudo pacman -S ${missing[*]}"
+            echo ""
+            echo "Or run the full package check:"
+            echo "  $UKE_ROOT/scripts/arch-check.sh"
         else
             echo "  Please install: ${missing[*]}"
         fi
@@ -83,6 +86,7 @@ create_dirs() {
     mkdir -p ~/.config/hypr
     mkdir -p ~/.config/alacritty
     mkdir -p ~/.config/wezterm
+    mkdir -p ~/.config/keyd
     mkdir -p "$UKE_ROOT/gen"/{skhd,yabai,hyprland}
     ok "Directories created"
 }
@@ -117,14 +121,20 @@ link_configs() {
     info "Linking generated configs..."
     
     if [[ "$OS" == "macos" ]]; then
-        ln -sf "$UKE_ROOT/gen/skhd/skhdrc" "$HOME/.config/skhd/skhdrc"
-        ok "Linked: skhdrc"
+        [[ -f "$UKE_ROOT/gen/skhd/skhdrc" ]] && {
+            ln -sf "$UKE_ROOT/gen/skhd/skhdrc" "$HOME/.config/skhd/skhdrc"
+            ok "Linked: skhdrc"
+        }
         
-        ln -sf "$UKE_ROOT/gen/yabai/yabairc" "$HOME/.config/yabai/yabairc"
-        ok "Linked: yabairc"
+        [[ -f "$UKE_ROOT/gen/yabai/yabairc" ]] && {
+            ln -sf "$UKE_ROOT/gen/yabai/yabairc" "$HOME/.config/yabai/yabairc"
+            ok "Linked: yabairc"
+        }
     else
-        ln -sf "$UKE_ROOT/gen/hyprland/hyprland.conf" "$HOME/.config/hypr/hyprland.conf"
-        ok "Linked: hyprland.conf"
+        [[ -f "$UKE_ROOT/gen/hyprland/hyprland.conf" ]] && {
+            ln -sf "$UKE_ROOT/gen/hyprland/hyprland.conf" "$HOME/.config/hypr/hyprland.conf"
+            ok "Linked: hyprland.conf"
+        }
     fi
 }
 
@@ -133,14 +143,43 @@ link_configs() {
 # ==============================================================================
 stow_dotfiles() {
     info "Stowing dotfiles..."
-    cd "$UKE_ROOT/stow"
     
-    local packages=(wezterm tmux zsh nvim)
+    local stow_dir="$UKE_ROOT/stow"
+    
+    if [[ ! -d "$stow_dir" ]]; then
+        warn "Stow directory not found: $stow_dir"
+        warn "Skipping dotfile stowing - create stow packages first"
+        return 0
+    fi
+    
+    # Check if stow directory has any packages
+    local has_packages=false
+    for dir in "$stow_dir"/*/; do
+        if [[ -d "$dir" ]]; then
+            has_packages=true
+            break
+        fi
+    done
+    
+    if [[ "$has_packages" == "false" ]]; then
+        warn "No stow packages found in $stow_dir"
+        return 0
+    fi
+    
+    cd "$stow_dir"
+    
+    local packages=(wezterm tmux zsh nvim zathura)
     [[ "$OS" == "macos" ]] && packages+=(karabiner)
+    [[ "$OS" == "linux" ]] && packages+=(keyd)
     
     for pkg in "${packages[@]}"; do
         if [[ -d "$pkg" ]]; then
-            stow -t "$HOME" -R "$pkg" 2>/dev/null && ok "Stowed: $pkg" || warn "Skipped: $pkg"
+            # Check if package has content
+            if find "$pkg" -mindepth 1 -maxdepth 1 | grep -q .; then
+                stow -t "$HOME" -R "$pkg" 2>/dev/null && ok "Stowed: $pkg" || warn "Skipped: $pkg (conflict?)"
+            else
+                warn "Package empty: $pkg"
+            fi
         fi
     done
 }
@@ -149,18 +188,65 @@ stow_dotfiles() {
 # Setup Hardware Profile
 # ==============================================================================
 setup_profile() {
-    info "Setting up hardware profile..."
-    
     if [[ -f "$HOME/.local/state/uke/machine.profile" ]]; then
         ok "Hardware profile exists"
+        # Generate hardware ghost files
+        info "Generating hardware configs..."
+        bash "$UKE_ROOT/scripts/apply_profile.sh" 2>/dev/null || warn "Could not apply profile"
     else
-        info "Creating initial hardware profile..."
-        bash "$UKE_ROOT/scripts/manage_profile.sh" --auto
+        warn "No hardware profile found!"
+        info "Run 'uke profile' to configure machine-specific settings"
+        info "Then run 'uke apply' to generate hardware configs"
+        
+        # Create a placeholder hardware config to prevent Hyprland errors
+        if [[ "$OS" == "linux" ]]; then
+            if [[ ! -f "$HOME/.config/hypr/generated_hardware.conf" ]]; then
+                mkdir -p "$HOME/.config/hypr"
+                cat > "$HOME/.config/hypr/generated_hardware.conf" << 'EOF'
+# Placeholder - run 'uke profile' then 'uke apply' to configure
+general {
+    gaps_in = 2
+    gaps_out = 4
+    border_size = 2
+}
+EOF
+                ok "Created placeholder hardware config"
+            fi
+        fi
+    fi
+}
+
+# ==============================================================================
+# Setup Hyprland Auto-start (Linux only)
+# ==============================================================================
+setup_autostart() {
+    if [[ "$OS" != "linux" ]]; then
+        return 0
     fi
     
-    # Generate hardware ghost files
-    info "Generating hardware configs..."
-    bash "$UKE_ROOT/scripts/apply_profile.sh"
+    info "Setting up Hyprland auto-start..."
+    
+    # Create the auto-start entry in .zprofile if using zsh
+    local zprofile="$HOME/.zprofile"
+    local marker="# UKE Hyprland Auto-start"
+    
+    if ! grep -q "$marker" "$zprofile" 2>/dev/null; then
+        cat >> "$zprofile" << 'AUTOSTART'
+
+# UKE Hyprland Auto-start
+# Start Hyprland on TTY1 login with fallback
+if [[ -z "${DISPLAY:-}" ]] && [[ "${XDG_VTNR:-}" == "1" ]] && [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+    if command -v uke-autostart &>/dev/null; then
+        exec uke-autostart
+    elif command -v Hyprland &>/dev/null; then
+        exec Hyprland
+    fi
+fi
+AUTOSTART
+        ok "Added auto-start to $zprofile"
+    else
+        ok "Auto-start already configured in $zprofile"
+    fi
 }
 
 # ==============================================================================
@@ -187,7 +273,7 @@ start_services() {
 main() {
     echo ""
     printf "%s╔══════════════════════════════════════╗%s\n" "$CYAN" "$RESET"
-    printf "%s║%s     UKE v7.0 Installer               %s║%s\n" "$CYAN" "$BOLD" "$CYAN" "$RESET"
+    printf "%s║%s     UKE v7.1 Installer               %s║%s\n" "$CYAN" "$BOLD" "$CYAN" "$RESET"
     printf "%s╚══════════════════════════════════════╝%s\n" "$CYAN" "$RESET"
     echo ""
     echo "Platform: $OS"
@@ -212,6 +298,9 @@ main() {
         --profile)
             setup_profile
             ;;
+        --autostart)
+            setup_autostart
+            ;;
         full|*)
             check_deps
             create_dirs
@@ -220,6 +309,7 @@ main() {
             link_configs
             stow_dotfiles
             setup_profile
+            setup_autostart
             start_services
             
             echo ""
@@ -234,6 +324,13 @@ main() {
             echo "Quick commands:"
             echo "  uke status    # Show current status"
             echo "  uke help      # Full command reference"
+            echo "  uke doctor    # Diagnose issues"
+            echo ""
+            if [[ "$OS" == "linux" ]]; then
+                echo "Auto-start:"
+                echo "  Hyprland will auto-start on TTY1 login"
+                echo "  To disable: remove UKE block from ~/.zprofile"
+            fi
             ;;
     esac
 }
