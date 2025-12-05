@@ -52,7 +52,7 @@ if not hw then
     font_size = is_macos() and 14.0 or 11.0,
     is_macos = is_macos(),
     is_linux = is_linux(),
-    front_end = "OpenGL",
+    front_end = "WebGpu",
     gpu = "integrated",
     keyboard = "standard",
     monitors = 1,

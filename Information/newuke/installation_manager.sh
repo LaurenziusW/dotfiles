@@ -53,7 +53,7 @@ detect_system() {
             if command -v "$tool" &>/dev/null; then ok "$tool installed"; else fail "$tool missing"; ((missing++)); fi
         done
     else
-        for tool in stow hyprctl waybar keyd jq; do
+        for tool in stow hyprctl waybar keyd jq wezterm; do
             if command -v "$tool" &>/dev/null; then ok "$tool installed"; else fail "$tool missing"; ((missing++)); fi
         done
     fi
