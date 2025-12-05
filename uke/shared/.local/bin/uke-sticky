@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Sticky v7.2 - Toggle Floating Always-On-Top Window
+# ==============================================================================
+# Makes the focused window a floating, always-on-top, sticky window that
+# follows you across workspaces. Perfect for keeping a terminal visible
+# while working. Press again to restore normal behavior.
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
+if [[ -f "$SCRIPT_DIR/../lib/core.sh" ]]; then
+    source "$SCRIPT_DIR/../lib/core.sh"
+else
+    ok() { echo "OK: $*"; }
+    fail() { echo "FAIL: $*" >&2; }
+    info() { echo "INFO: $*"; }
+    is_macos() { [[ "$(uname -s)" == "Darwin" ]]; }
+    is_linux() { [[ "$(uname -s)" == "Linux" ]]; }
+fi
+
+# State file to track sticky windows
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/uke"
+STICKY_STATE="$STATE_DIR/sticky_windows"
+
+mkdir -p "$STATE_DIR"
+touch "$STICKY_STATE"
+
+# ==============================================================================
+# Hyprland Implementation
+# ==============================================================================
+hyprland_get_window_id() {
+    hyprctl activewindow -j | jq -r '.address'
+}
+
+hyprland_is_sticky() {
+    local addr="$1"
+    grep -qx "$addr" "$STICKY_STATE" 2>/dev/null
+}
+
+hyprland_make_sticky() {
+    local addr="$1"
+    hyprctl dispatch togglefloating
+    hyprctl dispatch pin
+    # Resize to a nice floating size (40% width, 50% height, bottom-right)
+    hyprctl dispatch resizeactive exact 40% 50%
+    hyprctl dispatch moveactive exact 58% 48%
+    echo "$addr" >> "$STICKY_STATE"
+    ok "Window is now sticky"
+}
+
+hyprland_unmake_sticky() {
+    local addr="$1"
+    hyprctl dispatch pin
+    hyprctl dispatch togglefloating
+    sed -i "\|^${addr}$|d" "$STICKY_STATE"
+    ok "Window restored"
+}
+
+hyprland_toggle() {
+    local addr=$(hyprland_get_window_id)
+    [[ -z "$addr" || "$addr" == "null" ]] && { fail "No active window"; return 1; }
+    if hyprland_is_sticky "$addr"; then
+        hyprland_unmake_sticky "$addr"
+    else
+        hyprland_make_sticky "$addr"
+    fi
+}
+
+# ==============================================================================
+# Yabai (macOS) Implementation
+# ==============================================================================
+yabai_get_window_id() {
+    yabai -m query --windows --window | jq -r '.id'
+}
+
+yabai_is_sticky() {
+    local wid="$1"
+    grep -qx "$wid" "$STICKY_STATE" 2>/dev/null
+}
+
+yabai_make_sticky() {
+    local wid="$1"
+    yabai -m window --toggle float
+    yabai -m window --toggle sticky
+    yabai -m window --toggle topmost
+    yabai -m window --resize abs:800:500
+    yabai -m window --move abs:1100:550
+    echo "$wid" >> "$STICKY_STATE"
+    ok "Window is now sticky"
+}
+
+yabai_unmake_sticky() {
+    local wid="$1"
+    yabai -m window --toggle topmost
+    yabai -m window --toggle sticky
+    yabai -m window --toggle float
+    if sed --version 2>/dev/null | grep -q GNU; then
+        sed -i "\|^${wid}$|d" "$STICKY_STATE"
+    else
+        sed -i '' "\|^${wid}$|d" "$STICKY_STATE" # macOS sed
+    fi
+    ok "Window restored"
+}
+
+yabai_toggle() {
+    local wid=$(yabai_get_window_id)
+    [[ -z "$wid" || "$wid" == "null" ]] && { fail "No active window"; return 1; }
+    if yabai_is_sticky "$wid"; then
+        yabai_unmake_sticky "$wid"
+    else
+        yabai_make_sticky "$wid"
+    fi
+}
+
+# ==============================================================================
+# Main
+# ==============================================================================
+case "${1:-toggle}" in
+    toggle|"")
+        if is_linux; then
+            [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && hyprland_toggle || fail "Hyprland not running"
+        elif is_macos; then
+            yabai_toggle
+        fi
+        ;;
+    list)
+        cat "$STICKY_STATE"
+        ;;
+    clear)
+        > "$STICKY_STATE"
+        ok "Sticky state cleared"
+        ;;
+    *)
+        fail "Unknown command: $1"
+        ;;
+esac

@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Arch Linux Package Checker v8.0
+# ==============================================================================
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# No library sourcing needed as this script is standalone
+
+
+RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
+CYAN=$'\e[36m' BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
+
+ok()   { printf "%s✓%s %s\n" "$GREEN" "$RESET" "$*" >&2; }
+fail() { printf "%s✗%s %s\n" "$RED" "$RESET" "$*" >&2; }
+info() { printf "%s→%s %s\n" "$BLUE" "$RESET" "$*" >&2; }
+warn() { printf "%s!%s %s\n" "$YELLOW" "$RESET" "$*" >&2; }
+
+# Package groups as simple arrays
+CORE_PKGS="hyprland stow jq git wezterm"
+WM_PKGS="wofi waybar dunst hyprpaper hypridle hyprlock"
+UTIL_PKGS="wl-clipboard cliphist grim slurp zathura zathura-pdf-mupdf"
+SYSTEM_PKGS="pavucontrol network-manager-applet blueman thunar polkit-kde-agent"
+DEV_PKGS="neovim ripgrep fd eza bat htop tmux zsh-autosuggestions zsh-syntax-highlighting fzf ollama"
+YAML_PKGS="go-yq"
+ADMIN_PKGS="reflector pacman-contrib"
+KEYBOARD_PKGS="keyd"
+FONT_PKGS="ttf-jetbrains-mono-nerd noto-fonts-emoji"
+
+check_pkg() { pacman -Qi "$1" &>/dev/null; }
+
+get_missing() {
+    local pkgs="$1" missing=""
+    for p in $pkgs; do check_pkg "$p" || missing="$missing $p"; done
+    echo "$missing"
+}
+
+show_group() {
+    local name="$1" pkgs="$2" required="${3:-false}"
+    local missing=$(get_missing "$pkgs")
+    local total=$(echo $pkgs | wc -w)
+    local miss_count=$(echo $missing | wc -w)
+    [[ -z "$missing" ]] && miss_count=0
+    local inst=$((total - miss_count))
+    local icon="✓" color="$GREEN"
+    [[ $miss_count -gt 0 ]] && { icon="○"; color="$YELLOW"; }
+    [[ "$required" == "true" && $miss_count -gt 0 ]] && { icon="✗"; color="$RED"; }
+    local badge=""; [[ "$required" == "true" ]] && badge="${RED}[REQUIRED]${RESET} "
+    printf "  %s%-30s%s %s%s%s (%d/%d)\n" "$badge" "$name" "$RESET" "$color" "$icon" "$RESET" "$inst" "$total" >&2
+    [[ $miss_count -gt 0 ]] && printf "      ${DIM}Missing:%s\n" "$missing" >&2
+    echo "$missing"
+}
+
+handle_yq_conflict() {
+    if check_pkg "yq"; then
+        warn "Conflict: 'yq' conflicts with 'go-yq'"
+        read -p "  Remove 'yq' and install 'go-yq'? [Y/n] " -r resp
+        [[ "$resp" =~ ^[Nn] ]] && return 1
+        sudo pacman -Rns --noconfirm yq 2>/dev/null || true
+        ok "Removed 'yq'"
+    fi
+    return 0
+}
+
+install_pkgs() {
+    local pkgs="$1"
+    [[ -z "$pkgs" ]] && return 0
+    info "Installing:$pkgs"
+    sudo pacman -S --needed --noconfirm $pkgs
+}
+
+setup_services() {
+    info "Setting up services..."
+    check_pkg "keyd" && { sudo systemctl enable --now keyd 2>/dev/null && ok "keyd enabled"; }
+    check_pkg "networkmanager" && { sudo systemctl enable --now NetworkManager 2>/dev/null; }
+    check_pkg "bluez" && { sudo systemctl enable --now bluetooth 2>/dev/null; }
+}
+
+main() {
+    local mode="${1:-}"
+    echo "" >&2
+    printf "%s╔══════════════════════════════════════╗%s\n" "$CYAN" "$RESET" >&2
+    printf "%s║%s  UKE Arch Package Checker v8.0      %s║%s\n" "$CYAN" "$BOLD" "$CYAN" "$RESET" >&2
+    printf "%s╚══════════════════════════════════════╝%s\n" "$CYAN" "$RESET" >&2
+    echo "" >&2
+
+    local m1=$(show_group "Core Dependencies" "$CORE_PKGS" true)
+    local m2=$(show_group "Window Manager" "$WM_PKGS")
+    local m3=$(show_group "Clipboard & Screenshots" "$UTIL_PKGS")
+    local m4=$(show_group "System Utilities" "$SYSTEM_PKGS")
+    local m5=$(show_group "Development Tools" "$DEV_PKGS")
+    local m6=$(show_group "YAML Processor" "$YAML_PKGS")
+    local m7=$(show_group "System Admin" "$ADMIN_PKGS")
+    local m8=$(show_group "Keyboard Remapping" "$KEYBOARD_PKGS")
+    local m9=$(show_group "Fonts" "$FONT_PKGS")
+
+    echo "" >&2
+    [[ "$mode" == "--check" ]] && exit 0
+
+    echo "  ${BOLD}Install options:${RESET}" >&2
+    echo "    a = ALL    r = Required only    1-9 = Select groups    q = Quit" >&2
+    read -p "  Choice: " -r choice
+
+    local to_install=""
+    case "$choice" in
+        a|A) to_install="$m1 $m2 $m3 $m4 $m5 $m6 $m7 $m8 $m9" ;;
+        r|R) to_install="$m1" ;;
+        q|Q) exit 0 ;;
+        *) 
+            [[ "$choice" == *1* ]] && to_install="$to_install $m1"
+            [[ "$choice" == *2* ]] && to_install="$to_install $m2"
+            [[ "$choice" == *3* ]] && to_install="$to_install $m3"
+            [[ "$choice" == *4* ]] && to_install="$to_install $m4"
+            [[ "$choice" == *5* ]] && to_install="$to_install $m5"
+            [[ "$choice" == *6* ]] && to_install="$to_install $m6"
+            [[ "$choice" == *7* ]] && to_install="$to_install $m7"
+            [[ "$choice" == *8* ]] && to_install="$to_install $m8"
+            [[ "$choice" == *9* ]] && to_install="$to_install $m9"
+            to_install="$to_install $m1"  # Always include required
+            ;;
+    esac
+
+    to_install=$(echo "$to_install" | xargs -n1 | sort -u | xargs)
+    [[ -z "$to_install" ]] && { ok "Nothing to install!"; exit 0; }
+
+    # Handle yq conflict
+    if [[ "$to_install" == *"go-yq"* ]]; then
+        handle_yq_conflict || to_install=$(echo "$to_install" | sed 's/go-yq//')
+    fi
+
+    info "Will install:$to_install"
+    read -p "  Proceed? [Y/n] " -r resp
+    [[ "$resp" =~ ^[Nn] ]] && exit 0
+
+    sudo pacman -Syu --noconfirm
+    install_pkgs "$to_install"
+    setup_services
+    ok "Done! Run 'uke doctor' to verify system health."
+}
+
+main "$@"

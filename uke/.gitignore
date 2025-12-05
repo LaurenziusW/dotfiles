@@ -4,6 +4,7 @@
 
 # Local overrides (hardware-specific, not shared)
 *.local
+!**/.local/
 *.local.lua
 local.lua
 local.conf

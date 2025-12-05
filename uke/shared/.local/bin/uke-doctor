@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Doctor - Health Check and Diagnostics
+# ==============================================================================
+# Performs comprehensive health checks on the UKE installation.
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
+if [[ -f "$SCRIPT_DIR/../lib/core.sh" ]]; then
+    source "$SCRIPT_DIR/../lib/core.sh"
+else
+    # Minimal defs
+    ok() { echo "OK: $*"; }
+    fail() { echo "FAIL: $*"; }
+    warn() { echo "WARN: $*"; }
+    is_macos() { [[ "$(uname -s)" == "Darwin" ]]; }
+fi
+
+ERRORS=0
+WARNINGS=0
+
+check() {
+    local name="$1"
+    local result="$2"
+    local fix_hint="${3:-}"
+    
+    if [[ "$result" == "ok" ]]; then
+        ok "$name"
+    elif [[ "$result" == "warn" ]]; then
+        warn "$name"
+        [[ -n "$fix_hint" ]] && echo "    → $fix_hint"
+        ((WARNINGS++))
+    else
+        fail "$name"
+        [[ -n "$fix_hint" ]] && echo "    → $fix_hint"
+        ((ERRORS++))
+    fi
+}
+
+check_core() {
+    echo "Core Checks:"
+    [[ -d "$UKE_ROOT" ]] && check "UKE_ROOT exists" "ok" || check "UKE_ROOT exists" "fail"
+    [[ -x "$UKE_ROOT/bin/uke-doctor" ]] && check "bin/uke-doctor executable" "ok" || check "bin/uke-doctor executable" "fail"
+}
+
+check_deps() {
+    echo "Dependencies:"
+    command -v jq &>/dev/null && check "jq" "ok" || check "jq" "fail" "Install jq"
+    command -v stow &>/dev/null && check "stow" "ok" || check "stow" "warn" "Install stow"
+    
+    if is_macos; then
+        command -v yabai &>/dev/null && check "yabai" "ok" || check "yabai" "fail"
+        command -v skhd &>/dev/null && check "skhd" "ok" || check "skhd" "fail"
+    else
+        command -v hyprctl &>/dev/null && check "hyprland" "ok" || check "hyprland" "fail"
+    fi
+}
+
+check_services() {
+    echo "Services:"
+    if is_macos; then
+        pgrep -q yabai && check "yabai running" "ok" || check "yabai running" "warn"
+    else
+        [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && check "hyprland running" "ok" || check "hyprland running" "warn"
+    fi
+}
+
+check_core
+check_deps
+check_services
+
+if [[ $ERRORS -eq 0 ]]; then
+    ok "Health check passed with $WARNINGS warnings."
+    exit 0
+else
+    fail "Health check failed with $ERRORS errors."
+    exit 1
+fi

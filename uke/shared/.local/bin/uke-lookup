@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Lookup - Fuzzy search for aliases, hotkeys, and documentation
+# ==============================================================================
+# Usage: uke-lookup [aliases|keys|docs]
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# .local/bin -> .local -> shared -> newuke (root)
+UKE_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+
+# Colors
+GREEN=$'\e[32m' RESET=$'\e[0m'
+
+if ! command -v fzf &>/dev/null; then
+    echo "Error: 'fzf' is required."
+    exit 1
+fi
+
+OS="unknown"
+case "$(uname -s)" in
+    Darwin*) OS="macos" ;; 
+    Linux*)  OS="linux" ;; 
+esac
+
+search_aliases() {
+    echo "Searching Aliases..."
+    # Extract aliases from .zshrc
+    local zshrc="$HOME/.zshrc"
+    [[ -f "$zshrc" ]] || zshrc="$UKE_ROOT/shared/.zshrc"
+    
+grep "^alias" "$zshrc" | \
+        sed 's/^alias //' | \
+        sed "s/='/: /" | \
+        sed "s/'$//" | \
+        fzf --header "ALIASES (Enter to copy)" --preview "echo {}" | \
+        awk -F": " '{print $1}' | \
+        tr -d '\n' | \
+        if [[ "$OS" == "macos" ]]; then pbcopy; else wl-copy; fi
+    
+    echo "${GREEN}Alias copied to clipboard.${RESET}"
+}
+
+search_keys() {
+    echo "Searching Hotkeys..."
+    local config_file=""
+    
+    if [[ "$OS" == "macos" ]]; then
+        config_file="$HOME/.config/skhd/skhdrc"
+        [[ -f "$config_file" ]] || config_file="$UKE_ROOT/mac/.config/skhd/skhdrc"
+        
+        grep -v "^#" "$config_file" | grep ":" | \
+            fzf --header "HOTKEYS (macOS)" --preview "echo {}"
+            
+    elif [[ "$OS" == "linux" ]]; then
+        config_file="$HOME/.config/hypr/hyprland.conf"
+        [[ -f "$config_file" ]] || config_file="$UKE_ROOT/arch/.config/hypr/hyprland.conf"
+        
+        grep "^bind =" "$config_file" | \
+            sed 's/bind = //' | \
+            fzf --header "HOTKEYS (Hyprland)" --preview "echo {}"
+    fi
+}
+
+search_docs() {
+    echo "Searching Documentation..."
+    local doc_file="$UKE_ROOT/UKE_REFERENCE.md"
+    
+    if [[ ! -f "$doc_file" ]]; then
+        echo "Documentation not found at $doc_file"
+        exit 1
+    fi
+    
+    # Simple header search
+    grep "^# " "$doc_file" | \
+        fzf --header "DOCUMENTATION SECTIONS" --preview "grep -A 20 \"{}\" \"$doc_file\""
+}
+
+search_wiki() {
+    if ! command -v wikiman &>/dev/null; then
+        echo "Error: 'wikiman' is not installed."
+        echo "  Install it to search Arch/Gentoo wikis and man pages."
+        exit 1
+    fi
+    echo "Searching Wiki..."
+    wikiman
+}
+
+case "${1:-all}" in
+    alias|aliases) search_aliases ;;
+    key|keys)      search_keys ;;
+    doc|docs)      search_docs ;;
+    wiki)          search_wiki ;;
+    all)
+        echo "Select category:"
+        local choice
+        choice=$(echo -e "aliases\nkeys\ndocs\nwiki" | fzf --header "UKE LOOKUP")
+        [[ -n "$choice" ]] && $0 "$choice"
+        ;;
+    *) echo "Usage: uke-lookup [aliases|keys|docs|wiki]"; exit 1 ;;
+esac

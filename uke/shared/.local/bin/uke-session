@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Session - Window Layout Save/Restore
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
+if [[ -f "$SCRIPT_DIR/../lib/core.sh" ]]; then
+    source "$SCRIPT_DIR/../lib/core.sh"
+else
+    ok() { echo "OK: $*"; }
+    fail() { echo "FAIL: $*" >&2; }
+    log_info() { echo "INFO: $*"; }
+    is_macos() { [[ "$(uname -s)" == "Darwin" ]]; }
+fi
+
+SESSION_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/uke/sessions"
+mkdir -p "$SESSION_DIR"
+
+CMD="${1:-help}"
+NAME="${2:-default}"
+
+save_session_macos() {
+    yabai -m query --windows | jq '[.[] | {app: .app, space: .space}]' > "$SESSION_DIR/$1.json"
+    ok "Session saved: $1"
+}
+
+restore_session_macos() {
+    local file="$SESSION_DIR/$1.json"
+    [[ -f "$file" ]] || { fail "Session not found: $1"; exit 1; }
+    
+    jq -c '.[]' "$file" | while read -r win; do
+        local app=$(echo "$win" | jq -r '.app')
+        local space=$(echo "$win" | jq -r '.space')
+        local id=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app\") | .id" | head -1)
+        [[ -n "$id" ]] && yabai -m window "$id" --space "$space"
+    done
+    ok "Session restored: $1"
+}
+
+save_session_linux() {
+    hyprctl clients -j | jq '[.[] | {class: .class, workspace: .workspace.id}]' > "$SESSION_DIR/$1.json"
+    ok "Session saved: $1"
+}
+
+restore_session_linux() {
+    local file="$SESSION_DIR/$1.json"
+    [[ -f "$file" ]] || { fail "Session not found: $1"; exit 1; }
+    
+    jq -c '.[]' "$file" | while read -r win; do
+        local class=$(echo "$win" | jq -r '.class')
+        local ws=$(echo "$win" | jq -r '.workspace')
+        local addr=$(hyprctl clients -j | jq -r ".[] | select(.class == \"$class\") | .address" | head -1)
+        [[ -n "$addr" ]] && hyprctl dispatch movetoworkspacesilent "$ws,address:$addr"
+    done
+    ok "Session restored: $1"
+}
+
+case "$CMD" in
+    save)    is_macos && save_session_macos "$NAME" || save_session_linux "$NAME" ;;
+    restore) is_macos && restore_session_macos "$NAME" || restore_session_linux "$NAME" ;;
+    list)    ls "$SESSION_DIR"/*.json 2>/dev/null | xargs -n 1 basename .json ;;
+    delete)  rm "$SESSION_DIR/$NAME.json" && ok "Deleted $NAME" ;;
+    *)       echo "Usage: uke-session <save|restore|list|delete> [name]" ;;
+esac

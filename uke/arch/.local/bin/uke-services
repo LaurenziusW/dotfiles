@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Services v7.2 - Service Health & Management
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -f "$SCRIPT_DIR/../lib/core.sh" ]]; then
+    export UKE_ROOT="${SCRIPT_DIR%/bin}"
+    source "$SCRIPT_DIR/../lib/core.sh"
+elif [[ -f "$SCRIPT_DIR/../../../shared/.local/lib/core.sh" ]]; then
+    export UKE_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+    source "$SCRIPT_DIR/../../../shared/.local/lib/core.sh"
+else
+    export UKE_ROOT="${SCRIPT_DIR%/bin}"
+    ok() { echo "OK: $*"; }
+    warn() { echo "WARN: $*"; }
+fi
+
+SYSTEM_SERVICES=(keyd bluetooth NetworkManager)
+USER_SERVICES=(pipewire pipewire-pulse wireplumber)
+
+show_status() {
+    echo "System Services:"
+    for svc in "${SYSTEM_SERVICES[@]}"; do
+        systemctl is-active "$svc" &>/dev/null && ok "$svc active" || warn "$svc stopped"
+    done
+    echo "User Services:"
+    for svc in "${USER_SERVICES[@]}"; do
+        systemctl --user is-active "$svc" &>/dev/null && ok "$svc active" || warn "$svc stopped"
+    done
+}
+
+case "${1:-status}" in
+    status) show_status ;;
+    *)      echo "Usage: uke-services [status]" ;;
+esac
