@@ -6,6 +6,7 @@
 *.local
 !**/.local/
 *.local.lua
+arch/.config/hypr/machine.conf
 local.lua
 local.conf
 local_rules

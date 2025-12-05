@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Profile Manager - Switch Hyprland/System Profiles
+# ==============================================================================
+set -euo pipefail
+
+CONFIG_DIR="$HOME/.config/hypr"
+PROFILES_DIR="$CONFIG_DIR/profiles"
+LINK_FILE="$CONFIG_DIR/machine.conf"
+
+# Colors
+GREEN=$'\e[32m' RESET=$'\e[0m' RED=$'\e[31m' BOLD=$'\e[1m'
+
+list_profiles() {
+    echo "${BOLD}Available Profiles:${RESET}"
+    if [[ -d "$PROFILES_DIR" ]]; then
+        for f in "$PROFILES_DIR"/*.conf; do
+            name=$(basename "$f" .conf)
+            if [[ -L "$LINK_FILE" ]] && [[ "$(readlink "$LINK_FILE")" == *"$name.conf" ]]; then
+                echo "  $GREEN* $name$RESET"
+            else
+                echo "    $name"
+            fi
+        done
+    else
+        echo "  (No profiles directory found at $PROFILES_DIR)"
+    fi
+}
+
+set_profile() {
+    local target="$1"
+    local target_file="$PROFILES_DIR/$target.conf"
+
+    if [[ ! -f "$target_file" ]]; then
+        echo "${RED}Error: Profile '$target' not found.${RESET}"
+        exit 1
+    fi
+
+    ln -sf "$target_file" "$LINK_FILE"
+    echo "${GREEN}✓ Switched to profile: $target${RESET}"
+    
+    # Reload Hyprland if running
+    if command -v hyprctl &>/dev/null && pgrep Hyprland &>/dev/null; then
+        echo "Reloading Hyprland..."
+        hyprctl reload
+    fi
+}
+
+# Main
+if [[ $# -eq 0 ]]; then
+    list_profiles
+    echo ""
+    echo "Usage: uke-profile <name>"
+    exit 0
+fi
+
+set_profile "$1"

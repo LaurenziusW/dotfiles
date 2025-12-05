@@ -315,6 +315,16 @@ do_install() {
         else
             warn "uke-keyd-setup not found."
         fi
+
+        # Initialize Hyprland Profile
+        if [[ ! -e "$HOME/.config/hypr/machine.conf" ]]; then
+            info "Initializing default Hyprland profile (fallback)..."
+            mkdir -p "$HOME/.config/hypr/profiles"
+            # Ensure the fallback file exists in destination if stow hasn't run perfectly yet, 
+            # but usually stow runs first. We assume stow linked profiles/.
+            ln -sf "$HOME/.config/hypr/profiles/fallback.conf" "$HOME/.config/hypr/machine.conf"
+            ok "Default profile set."
+        fi
     fi
 
     # Post-Install
