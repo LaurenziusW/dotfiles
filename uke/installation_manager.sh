@@ -53,7 +53,7 @@ detect_system() {
             if command -v "$tool" &>/dev/null; then ok "$tool installed"; else fail "$tool missing"; ((missing++)); fi
         done
     else
-        for tool in stow hyprctl waybar keyd jq; do
+        for tool in stow hyprctl waybar keyd jq wezterm; do
             if command -v "$tool" &>/dev/null; then ok "$tool installed"; else fail "$tool missing"; ((missing++)); fi
         done
     fi
@@ -314,6 +314,34 @@ do_install() {
             "$UKE_ROOT/arch/.local/bin/uke-keyd-setup" || failed=1
         else
             warn "uke-keyd-setup not found."
+        fi
+
+        # Hyprland Profile Selection
+        header "Hyprland Profile Setup"
+        local current="fallback"
+        if [[ -L "$HOME/.config/hypr/machine.conf" ]]; then
+            current=$(basename "$(readlink "$HOME/.config/hypr/machine.conf")" .conf)
+        fi
+        
+        info "Current profile: $current"
+        echo "Available profiles:"
+        if [[ -d "$HOME/.config/hypr/profiles" ]]; then
+            for p in "$HOME/.config/hypr/profiles"/*.conf; do
+                echo "  - $(basename "$p" .conf)"
+            done
+        fi
+        
+        echo ""
+        read -p "Select profile [$current]: " choice
+        choice=${choice:-$current}
+        
+        if [[ -x "$HOME/.local/bin/uke-profile" ]]; then
+            "$HOME/.local/bin/uke-profile" "$choice" || true
+        else
+            warn "uke-profile tool not found. Linking manually..."
+            mkdir -p "$HOME/.config/hypr"
+            ln -sf "$HOME/.config/hypr/profiles/$choice.conf" "$HOME/.config/hypr/machine.conf"
+            ok "Profile set to $choice"
         fi
     fi
 
