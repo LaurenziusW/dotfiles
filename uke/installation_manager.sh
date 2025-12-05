@@ -111,8 +111,17 @@ detect_system() {
                     fail "${path/#$HOME/\~} → Regular file (Conflict)"
                 fi
             fi
+        else
+             # File doesn't exist
+             :
         fi
     done
+    
+    if [[ $configs_found -eq 0 ]]; then
+        info "No configs found. System is clean."
+    else
+        info "Config check complete."
+    fi
 
     echo ""
     # We count conflicts (failures) specifically? 
@@ -155,6 +164,65 @@ do_backup() {
     done
 }
 
+preserve_local_overrides() {
+    local temp_dir="/tmp/uke_overrides_$(date +%s)"
+    mkdir -p "$temp_dir"
+    
+    local overrides=(
+        ".zshrc.local"
+        ".config/hypr/local.conf"
+        ".config/wezterm/local.lua"
+        ".config/nvim/local.lua"
+        ".config/tmux/local.conf"
+        ".config/yabai/local_rules"
+    )
+    
+    info "Preserving local overrides..."
+    local count=0
+    for file in "${overrides[@]}"; do
+        if [[ -f "$HOME/$file" ]]; then
+            # Maintain directory structure in temp
+            local dir
+            dir=$(dirname "$file")
+            mkdir -p "$temp_dir/$dir"
+            cp "$HOME/$file" "$temp_dir/$file"
+            ok "Saved: ~/$file"
+            ((count++))
+        fi
+    done
+    
+    echo "$temp_dir"
+}
+
+restore_local_overrides() {
+    local temp_dir="$1"
+    [[ -z "$temp_dir" || ! -d "$temp_dir" ]] && return
+    
+    info "Restoring local overrides..."
+    
+    local overrides=(
+        ".zshrc.local"
+        ".config/hypr/local.conf"
+        ".config/wezterm/local.lua"
+        ".config/nvim/local.lua"
+        ".config/tmux/local.conf"
+        ".config/yabai/local_rules"
+    )
+    
+    for file in "${overrides[@]}"; do
+        if [[ -f "$temp_dir/$file" ]]; then
+            # Ensure target dir exists
+            local dir
+            dir=$(dirname "$file")
+            mkdir -p "$HOME/$dir"
+            mv "$temp_dir/$file" "$HOME/$file"
+            ok "Restored: ~/$file"
+        fi
+    done
+    
+    rm -rf "$temp_dir"
+}
+
 do_wipe() {
     header "Wipe System Configs"
     warn "This will DELETE your current configs in ~/"
@@ -165,6 +233,10 @@ do_wipe() {
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then echo "Aborted."; exit 0; fi
 
     do_backup
+    
+    # Preserve overrides
+    local preserved_dir
+    preserved_dir=$(preserve_local_overrides)
 
     header "Removing Files"
     local items=(
@@ -183,6 +255,9 @@ do_wipe() {
             fi
         done
     done
+    
+    # Restore overrides
+    restore_local_overrides "$preserved_dir"
     
     # Ensure config dir exists for Stow
     mkdir -p "$HOME/.config"

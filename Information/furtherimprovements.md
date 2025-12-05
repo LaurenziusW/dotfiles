@@ -1,64 +1,26 @@
-# UKE v8.1 - Post-Migration Roadmap
+# Future Improvements & Ideas
 
-**Current Status:** ✅ Migration Complete
-The `newuke` directory now contains the fully consolidated v8.1 configuration, separated into `arch/`, `mac/`, and `shared/` components. All legacy scripts and configs have been merged or superseded.
+## 1. Installer Enhancements
+- [ ] **Interactive Tool Selection**: Update `installation_manager.sh` or create a new `uke-install-extras` script that iterates through the "Extended Arsenal" in `UKE_TOOLCHAIN.md` and asks the user (Yes/No) to install each category (e.g., "Install Rust Tools?", "Install AI Tools?").
+- [ ] **Theme Selector**: Add a way to switch themes (Nord, Catppuccin, Dracula) across all configs (WezTerm, Neovim, Hyprland/Yabai) with a single command.
 
----
+## 2. Shell & Workflow
+- [ ] **Full `thefuck` Integration**: Ensure `thefuck` is aliased to `fuck` or `f` and works seamlessly in `.zshrc`.
+- [ ] **Zoxide Expansion**: Verify `zoxide` is fully replacing `cd` habits. Add aliases like `zi` (interactive selection).
+- [ ] **Lazygit Integration**: Create a `uke-git` wrapper or alias `lg` that launches `lazygit` but falls back to standard git status if not installed.
 
-## 1. Immediate Verification (QA Phase)
+## 3. AI Evolution
+- [ ] **Model Switching**: Add a flag to `uke-ai` (e.g., `--model codellama`) to switch models on the fly without editing the script.
+- [ ] **Context Expansion**: Allow `uke-ai` to ingest other config files (like `.zshrc` or `init.lua`) for more specific answers about code/aliases.
 
-Before performing a destructive installation (`wipe`), run these non-destructive checks to ensure integrity.
+## 4. System Monitoring
+- [ ] **Dashboard**: Create a custom `btop` theme or layout that matches the UKE aesthetic.
+- [ ] **Hyprland/Waybar**: Polish the Waybar CSS to fully match the WezTerm theme (colors, rounding, fonts).
 
-### A. File Permissions
-Scripts in the repository should be executable to ensure they work immediately after cloning/stowing.
-- [ ] Run: `chmod +x newuke/installation_manager.sh newuke/collect-for-ai.sh`
-- [ ] Run: `chmod +x newuke/shared/.local/bin/uke-*`
-- [ ] Verify: `ls -l newuke/shared/.local/bin/` (Look for 'x' permission)
+## 5. Neovim
+- [ ] **Lazy.nvim Bootstrap**: Double-check that the shared `init.lua` correctly bootstraps `lazy.nvim` on a completely fresh machine without manual intervention.
+- [ ] **LSP Config**: Ensure the LSP setup in Neovim is robust for the core languages used (Python, Bash, Lua, Rust).
 
-### B. Static Analysis "Health Check"
-Run this command block in your terminal to scan for common migration errors (legacy paths, broken links).
-
-```bash
-echo "=== UKE v8.1 Static Analysis ==="
-echo "[1] Checking for hardcoded legacy paths..."
-grep -r "/Users/laurenz" newuke --exclude-dir=.git || echo "✅ No hardcoded user paths found."
-
-echo "[2] Checking for internal references to 'oldbin'..."
-grep -r "oldbin" newuke --exclude-dir=.git || echo "✅ No references to 'oldbin' found."
-
-echo "[3] Checking Shebangs..."
-head -n 1 newuke/shared/.local/bin/uke-* | grep "==>" || echo "✅ Shebang check complete (review output above)."
-
-echo "[4] Checking ZSH sourcing..."
-grep "source" newuke/shared/.zshrc | grep -v "#"
-```
-
-### C. Installation Manager Logic
-- [ ] Run `./newuke/installation_manager.sh status`
-    - **Expected:** correctly identifies your OS, missing tools (like `stow`), and existing conflict files.
-- [ ] Test **Dry Run** (Manual verification):
-    - Ensure `do_backup` function logic matches your expectations (it copies files to `~/.local/share/uke-backups`).
-
----
-
-## 2. Known "Ghost" Files
-The following files exist in `newuke` but were not explicitly detailed in the migration report. Verify their purpose:
-- `newuke/shared/.local/bin/uke-check`: Likely a system health checker?
-- `newuke/shared/.local/bin/uke-keyd-setup`: Likely a helper for Keyd on Linux.
-- **Action:** If these are valid, ensure they are documented in `newuke/README.md` or `newuke/docs/CHEATSHEET.md`.
-
----
-
-## 3. Future Improvements
-
-### Automation & CI
-- **ShellCheck:** Run `shellcheck` on all scripts in `.local/bin` to catch potential bugs.
-- **Pre-commit Hook:** Add a hook to ensure no sensitive data (API keys) is committed.
-
-### Aesthetic Polish
-- **Waybar:** Verify `newuke/arch/.config/waybar/style.css` matches the "Nord/Catppuccin" hybrid theme chosen for WezTerm/Tmux.
-- **Neovim:** Verify `init.lua` in `shared` correctly bootstraps `lazy.nvim` on a fresh install.
-
-### Documentation
-- **User Guide:** Update `newuke/docs/user_manual.md` with the new `uke-*` command list.
-- **Migration Guide:** Add a note for existing users on how to use `installation_manager.sh` to upgrade from v7.
+## 6. Testing & CI
+- [ ] **ShellCheck**: Run `shellcheck` on all `uke-*` scripts to ensure POSIX compliance and catch hidden bugs.
+- [ ] **Pre-commit Hooks**: Implement hooks to prevent committing secrets or large files.
