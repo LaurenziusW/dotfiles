@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# =============================================================================
+# UKE v8 - Keyd Setup (Linux)
+# Handles system-level configuration for keyd.
+# Called by installation_manager.sh
+# =============================================================================
+set -euo pipefail
+
+# Colors
+if [[ -t 1 ]]; then
+    GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m' RED=$'\e[31m' RESET=$'\e[0m'
+else
+    GREEN='' YELLOW='' BLUE='' RED='' RESET=''
+fi
+
+ok()   { echo "${GREEN}✓${RESET} $*"; }
+info() { echo "${BLUE}→${RESET} $*"; }
+warn() { echo "${YELLOW}!${RESET} $*"; }
+fail() { echo "${RED}✗${RESET} $*"; }
+
+# Paths
+USER_CONFIG="$HOME/.config/keyd/default.conf"
+SYS_CONFIG="/etc/keyd/default.conf"
+SYS_DIR="/etc/keyd"
+
+# Check if running on Linux
+if [[ "$(uname -s)" != "Linux" ]]; then
+    fail "This script is for Linux only."
+    exit 1
+fi
+
+info "Setting up keyd..."
+
+# 1. Check Installation
+if ! command -v keyd &>/dev/null; then
+    warn "keyd is not installed."
+    if command -v pacman &>/dev/null; then
+        read -p "Install keyd via pacman? [y/N] " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            sudo pacman -S --needed --noconfirm keyd
+            ok "keyd installed."
+        else
+            fail "keyd installation skipped. Setup aborted."
+            exit 1
+        fi
+    else
+        fail "Please install 'keyd' manually."
+        exit 1
+    fi
+else
+    ok "keyd is installed."
+fi
+
+# 2. Link Configuration
+if [[ ! -f "$USER_CONFIG" ]]; then
+    fail "User config not found at $USER_CONFIG"
+    info "Run installation_manager.sh install first."
+    exit 1
+fi
+
+# Create /etc/keyd if missing
+if [[ ! -d "$SYS_DIR" ]]; then
+    sudo mkdir -p "$SYS_DIR"
+    ok "Created $SYS_DIR"
+fi
+
+# Check if link already exists and is correct
+setup_link=true
+if [[ -L "$SYS_CONFIG" ]]; then
+    target=$(readlink "$SYS_CONFIG")
+    if [[ "$target" == "$USER_CONFIG" ]]; then
+        ok "Symlink already correct: $SYS_CONFIG -> $USER_CONFIG"
+        setup_link=false
+    fi
+fi
+
+if [[ "$setup_link" == "true" ]]; then
+    info "Linking $USER_CONFIG to $SYS_CONFIG (sudo required)..."
+    # Backup existing if it's a real file
+    if [[ -f "$SYS_CONFIG" && ! -L "$SYS_CONFIG" ]]; then
+        sudo mv "$SYS_CONFIG" "${SYS_CONFIG}.bak"
+        warn "Existing config backed up to ${SYS_CONFIG}.bak"
+    fi
+    
+    sudo ln -sf "$USER_CONFIG" "$SYS_CONFIG"
+    ok "Symlink created."
+fi
+
+# 3. Service Management
+if [[ -d /run/systemd/system ]]; then
+    info "Reloading keyd service..."
+    if ! systemctl is-active keyd &>/dev/null; then
+        sudo systemctl enable --now keyd
+        ok "keyd service enabled and started."
+    else
+        sudo keyd reload
+        ok "keyd service reloaded."
+    fi
+else
+    warn "Systemd not detected. Skipping service management."
+    info "You may need to manually start keyd."
+fi
+
+echo ""
+ok "keyd setup complete!"

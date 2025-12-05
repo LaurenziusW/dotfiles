@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Launch v7.3 - Smart App & File Launcher
+# ==============================================================================
+
+# [FIX] Bash 3.2 Compatibility (macOS Default)
+# We removed `declare -A` so this script runs on standard macOS bash without brew.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
+if [[ -f "$SCRIPT_DIR/../lib/core.sh" ]]; then
+    source "$SCRIPT_DIR/../lib/core.sh"
+else
+    ok() { echo "OK: $*"; }
+    fail() { echo "FAIL: $*" >&2; }
+    is_macos() { [[ "$(uname -s)" == "Darwin" ]]; }
+fi
+
+# App mappings helper
+get_app_name() {
+    local key="$1"
+    local os="$2"
+    
+    if [[ "$os" == "macos" ]]; then
+        case "$key" in
+            browser)  echo "Safari" ;;
+            terminal) echo "WezTerm" ;;
+            editor)   echo "nvim" ;;
+            files)    echo "Finder" ;;
+            pdf)      echo "Preview" ;;
+            notes)    echo "Obsidian" ;;
+            music)    echo "Spotify" ;;
+            mail)     echo "Mail" ;;
+            wezterm)  echo "WezTerm" ;;
+            brave)    echo "Brave Browser" ;;
+            obsidian) echo "Obsidian" ;;
+            spotify)  echo "Spotify" ;;
+            code|vscode) echo "Visual Studio Code" ;;
+            safari)   echo "Safari" ;;
+            *)        echo "$key" ;;
+        esac
+    else
+        # Linux
+        case "$key" in
+            browser)  echo "brave" ;;
+            terminal) echo "wezterm" ;;
+            editor)   echo "nvim" ;;
+            files)    echo "thunar" ;;
+            pdf)      echo "zathura" ;;
+            notes)    echo "obsidian" ;;
+            music)    echo "spotify" ;;
+            mail)     echo "thunderbird" ;;
+            *)        echo "$key" ;;
+        esac
+    fi
+}
+
+# File type handlers
+launch_file() {
+    local file="$1"
+    
+    if [[ ! -f "$file" ]]; then
+        fail "File not found: $file"
+        return 1
+    fi
+    
+    local ext="${file##*.}"
+    ext="${ext,,}"  # lowercase (Bash 4.0 feature)
+    # Bash 3.2 alternative for lowercase:
+    if [ "${BASH_VERSINFO:-0}" -lt 4 ]; then
+        ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+    fi
+    
+    case "$ext" in
+        pdf)
+            if is_macos; then
+                open -a Preview "$file"
+            else
+                zathura "$file" &>/dev/null &
+            fi
+            ;;
+        epub|djvu|ps)
+            if is_macos; then
+                open "$file"
+            else
+                zathura "$file" &>/dev/null &
+            fi
+            ;;
+        png|jpg|jpeg|gif|webp|svg)
+            if is_macos; then
+                open -a Preview "$file"
+            else
+                (imv "$file" &>/dev/null || feh "$file" &>/dev/null) &
+            fi
+            ;;
+        mp3|flac|wav|ogg|m4a)
+            if is_macos; then
+                open -a Music "$file"
+            else
+                mpv --no-video "$file" &>/dev/null &
+            fi
+            ;;
+        mp4|mkv|avi|webm|mov)
+            if is_macos; then
+                open -a "QuickTime Player" "$file"
+            else
+                mpv "$file" &>/dev/null &
+            fi
+            ;;
+        txt|md|markdown)
+            ${EDITOR:-nvim} "$file"
+            ;;
+        *)
+            # Default: use system handler
+            if is_macos; then
+                open "$file"
+            else
+                xdg-open "$file" &>/dev/null &
+            fi
+            ;;
+    esac
+    
+    ok "Opened: $file"
+}
+
+# App launcher
+launch_app() {
+    local app="$1"
+    shift
+    local args=("$@")
+    
+    local app_name
+    if is_macos; then
+        app_name=$(get_app_name "$app" "macos")
+        open -a "$app_name" "${args[@]}" 2>/dev/null || {
+            fail "App not found: $app_name"
+            return 1
+        }
+    else
+        app_name=$(get_app_name "$app" "linux")
+        "$app_name" "${args[@]}" &>/dev/null &
+        disown 2>/dev/null || true
+    fi
+    
+    ok "Launched: $app_name"
+}
+
+# URL handler
+launch_url() {
+    local url="$1"
+    
+    if is_macos; then
+        open "$url"
+    else
+        xdg-open "$url" &>/dev/null &
+    fi
+    
+    ok "Opened: $url"
+}
+
+# Main
+case "${1:-}" in
+    -h|--help)
+        echo "Usage: uke-launch <app|file|url> [args...]"
+        echo ""
+        echo "Apps: browser, terminal, editor, files, pdf, notes, music, mail"
+        echo "Files: Automatically detected by extension"
+        echo "URLs: Opened in default browser"
+        ;;
+    "")
+        fail "No target specified. Use --help for usage."
+        exit 1
+        ;;
+    *)
+        target="$1"
+        shift
+        
+        # Check if it's a URL
+        if [[ "$target" =~ ^https?:// ]]; then
+            launch_url "$target"
+        # Check if it's a file
+        elif [[ -f "$target" ]]; then
+            launch_file "$target"
+        # Assume it's an app
+        else
+            launch_app "$target" "$@"
+        fi
+        ;;
+esac

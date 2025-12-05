@@ -1,0 +1,161 @@
+#!/usr/bin/env sh
+# =============================================================================
+# UKE v8.1 - Yabai Configuration
+# macOS Tiling Window Manager
+# Hand-crafted & Consolidated
+# =============================================================================
+
+# Load scripting addition (requires SIP partial disable)
+sudo yabai --load-sa
+yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+yabai -m config layout                       bsp
+yabai -m config window_placement             second_child
+
+# Padding and gaps (4px for minimal spacing)
+yabai -m config top_padding                  4
+yabai -m config bottom_padding               4
+yabai -m config left_padding                 4
+yabai -m config right_padding                4
+yabai -m config window_gap                   4
+
+# Mouse
+yabai -m config mouse_follows_focus          off
+yabai -m config focus_follows_mouse          off
+yabai -m config mouse_modifier               alt
+yabai -m config mouse_action1                move
+yabai -m config mouse_action2                resize
+yabai -m config mouse_drop_action            swap
+
+# Window behavior
+yabai -m config window_shadow                on
+yabai -m config split_ratio                  0.50
+yabai -m config auto_balance                 off
+
+# =============================================================================
+# Visuals (Borders & Opacity)
+# =============================================================================
+# Window Borders (Nord colorscheme)
+# Requires: brew install borders
+if command -v borders >/dev/null; then
+    pkill -x borders 2>/dev/null || true
+    borders width=3 active_color=0xff88c0d0 inactive_color=0xff3b4252 &
+fi
+
+# Opacity
+yabai -m config window_opacity               on
+yabai -m config active_window_opacity        1.0
+yabai -m config normal_window_opacity        0.95
+
+# Specific Opacity Rules
+yabai -m rule --add app="^WezTerm$" opacity=0.92
+yabai -m rule --add app="^Alacritty$" opacity=0.92
+
+# =============================================================================
+# Window Rules - Apps to Float
+# =============================================================================
+# System apps
+yabai -m rule --add app="^System Preferences$" manage=off
+yabai -m rule --add app="^System Settings$" manage=off
+yabai -m rule --add app="^System Information$" manage=off
+yabai -m rule --add app="^Activity Monitor$" manage=off
+yabai -m rule --add app="^Disk Utility$" manage=off
+yabai -m rule --add app="^Keychain Access$" manage=off
+yabai -m rule --add app="^Archive Utility$" manage=off
+yabai -m rule --add app="^App Store$" manage=off
+
+# Utility apps
+yabai -m rule --add app="^Calculator$" manage=off sticky=on
+yabai -m rule --add app="^Calendar$" manage=off
+yabai -m rule --add app="^Finder$" title="(Info|Connect|Copy|Move)" manage=off
+yabai -m rule --add app="^Font Book$" manage=off
+yabai -m rule --add app="^Preview$" title="^$" manage=off
+yabai -m rule --add app="^Karabiner-Elements$" manage=off
+yabai -m rule --add app="^Karabiner-EventViewer$" manage=off
+
+# Third-party
+yabai -m rule --add app="^Alfred Preferences$" manage=off
+yabai -m rule --add app="^1Password$" manage=off
+yabai -m rule --add app="^Bartender" manage=off
+yabai -m rule --add app="^BetterTouchTool$" manage=off
+yabai -m rule --add app="^CleanMyMac" manage=off
+yabai -m rule --add app="^Docker Desktop$" manage=off
+yabai -m rule --add app="^Raycast$" manage=off
+
+# Communication / Video
+yabai -m rule --add app="^zoom.us$" manage=off sticky=on opacity=1.0
+yabai -m rule --add app="^FaceTime$" manage=off sticky=on
+yabai -m rule --add title="Picture in Picture" manage=off sticky=on layer=above
+
+# =============================================================================
+# Window Rules - Workspace Assignments
+# =============================================================================
+# Workspace 1: Browser
+yabai -m rule --add app="^Safari$" space=^1
+yabai -m rule --add app="^Brave Browser$" space=^1
+yabai -m rule --add app="^Firefox$" space=^1
+yabai -m rule --add app="^Google Chrome$" space=^1
+
+# Workspace 2: Notes
+yabai -m rule --add app="^Obsidian$" space=^2
+yabai -m rule --add app="^Notion$" space=^2
+
+# Workspace 3: Code
+yabai -m rule --add app="^WezTerm$" space=^3
+yabai -m rule --add app="^Code$" space=^3
+yabai -m rule --add app="^Visual Studio Code$" space=^3
+yabai -m rule --add app="^VSCodium$" space=^3
+yabai -m rule --add app="^Xcode$" space=^3
+yabai -m rule --add app="^Cursor$" space=^3
+
+# Workspace 5: Documents
+yabai -m rule --add app="^Preview$" space=^5 manage=on
+yabai -m rule --add app="^PDF Expert$" space=^5
+yabai -m rule --add app="^Skim$" space=^5
+
+# Workspace 6: Raindrop
+yabai -m rule --add app="^Raindrop.io$" space=^6
+
+# Workspace 7: Media
+yabai -m rule --add app="^Spotify$" space=^7
+yabai -m rule --add app="^Music$" space=^7
+yabai -m rule --add app="^VLC$" space=^7
+
+# Workspace 8: Office
+yabai -m rule --add app="^Microsoft Word$" space=^8
+yabai -m rule --add app="^Microsoft Excel$" space=^8
+yabai -m rule --add app="^Microsoft PowerPoint$" space=^8
+yabai -m rule --add app="^Pages$" space=^8
+yabai -m rule --add app="^Numbers$" space=^8
+yabai -m rule --add app="^Keynote$" space=^8
+
+# Workspace 9: Communications
+yabai -m rule --add app="^Slack$" space=^9
+yabai -m rule --add app="^Discord$" space=^9
+yabai -m rule --add app="^Mail$" space=^9
+yabai -m rule --add app="^Telegram$" space=^9
+yabai -m rule --add app="^WhatsApp$" space=^9
+yabai -m rule --add app="^Messages$" space=^9
+yabai -m rule --add app="^Microsoft Teams$" space=^9
+
+# Workspace 10: AI
+yabai -m rule --add app="^Claude$" space=^10
+yabai -m rule --add app="^Perplexity$" space=^10
+yabai -m rule --add app="^ChatGPT$" space=^10
+
+# =============================================================================
+# Catch-all Rule (Everything else -> Space 4)
+# =============================================================================
+# This rule MUST be last. It sends any app not explicitly listed above to Space 4.
+# This keeps your specific workspaces clean.
+yabai -m rule --add app!="^(Safari|Brave Browser|Firefox|Google Chrome|Obsidian|Notion|WezTerm|Code|Visual Studio Code|VSCodium|Xcode|Cursor|Preview|PDF Expert|Skim|Raindrop.io|Spotify|Music|VLC|Microsoft Word|Microsoft Excel|Microsoft PowerPoint|Pages|Numbers|Keynote|Slack|Discord|Mail|Telegram|WhatsApp|Messages|Microsoft Teams|Claude|Perplexity|ChatGPT)$" space=^4
+
+# =============================================================================
+# Local Overrides
+# =============================================================================
+[ -x "$HOME/.config/yabai/local_rules" ] && "$HOME/.config/yabai/local_rules"
+
+echo "yabai configuration loaded."

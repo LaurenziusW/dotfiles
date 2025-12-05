@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Fix v7.2 - Quick Fixes for Common Issues
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -f "$SCRIPT_DIR/../lib/core.sh" ]]; then
+    export UKE_ROOT="${SCRIPT_DIR%/bin}"
+    source "$SCRIPT_DIR/../lib/core.sh"
+elif [[ -f "$SCRIPT_DIR/../../../shared/.local/lib/core.sh" ]]; then
+    export UKE_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+    source "$SCRIPT_DIR/../../../shared/.local/lib/core.sh"
+else
+    export UKE_ROOT="${SCRIPT_DIR%/bin}"
+    ok() { echo "OK: $*"; }
+    info() { echo "INFO: $*"; }
+    warn() { echo "WARN: $*"; }
+    fail() { echo "FAIL: $*"; }
+fi
+
+fix_audio() {
+    info "Restarting audio stack..."
+    systemctl --user restart pipewire pipewire-pulse wireplumber 2>/dev/null
+    sleep 1
+    if pactl info &>/dev/null; then ok "Audio restored"; else fail "Audio broken"; fi
+}
+
+fix_display() {
+    if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+        hyprctl reload && ok "Hyprland reloaded"
+    else
+        warn "Hyprland not running"
+    fi
+}
+
+fix_keys() {
+    sudo systemctl restart keyd && ok "keyd restarted"
+}
+
+fix_waybar() {
+    pkill -x waybar 2>/dev/null || true
+    sleep 0.5
+    waybar &>/dev/null & disown
+    ok "Waybar restarted"
+}
+
+fix_clipboard() {
+    pkill -x wl-copy 2>/dev/null || true
+    pkill -x wl-paste 2>/dev/null || true
+    cliphist wipe 2>/dev/null || true
+    ok "Clipboard cleared"
+}
+
+auto_detect() {
+    # Check audio
+    if ! pactl info &>/dev/null; then warn "Audio broken"; fix_audio; fi
+    # Check keyd
+    if ! systemctl is-active keyd &>/dev/null; then warn "keyd stopped"; fix_keys; fi
+    # Check waybar
+    if ! pgrep -x waybar &>/dev/null; then warn "Waybar stopped"; fix_waybar; fi
+}
+
+case "${1:-}" in
+    "")           auto_detect ;;
+    --audio)      fix_audio ;;
+    --display)    fix_display ;;
+    --keys)       fix_keys ;;
+    --waybar)     fix_waybar ;;
+    --clipboard)  fix_clipboard ;;
+    *)            fail "Unknown option" ;;
+esac

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE AI - Local LLM Assistant with Context
+# ==============================================================================
+# Wraps 'ollama' to provide AI assistance aware of your dotfiles.
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# .local/bin -> .local -> shared -> newuke (root)
+UKE_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+DOC_FILE="$UKE_ROOT/UKE_REFERENCE.md"
+MODEL="llama3.2"
+
+# Colors
+BLUE=$'\e[34m' BOLD=$'\e[1m' RESET=$'\e[0m'
+
+if ! command -v ollama &>/dev/null; then
+    echo "Error: 'ollama' is required."
+    echo "  macOS: brew install ollama"
+    echo "  Linux: pacman -S ollama (or install script)"
+    exit 1
+fi
+
+# Ensure server is running
+if ! pgrep -x "ollama" >/dev/null; then
+    echo "Starting Ollama server..."
+    ollama serve &>/dev/null &
+    sleep 2
+fi
+
+# Construct Prompt
+SYSTEM_PROMPT="You are an expert assistant for the UKE (Unified Keyboard Environment) dotfiles project. 
+You answer questions based on the provided reference documentation. 
+Keep answers concise and relevant to the user's configuration (macOS/Arch Linux). 
+If the user asks a general Linux/coding question, answer it normally.
+Here is the reference documentation:
+"
+
+if [[ -f "$DOC_FILE" ]]; then
+    CONTEXT=$(cat "$DOC_FILE")
+else
+    CONTEXT="Documentation not found."
+fi
+
+FULL_PROMPT="${SYSTEM_PROMPT}
+
+${CONTEXT}
+
+User Question: $1"
+
+echo "${BLUE}${BOLD}UKE AI ($MODEL)${RESET}"
+echo "Thinking..."
+
+# Run Inference
+# We pipe the prompt to ollama run to avoid shell argument limits issues if context gets huge
+# but for a single md file it's fine. However, 'ollama run' expects interactive input or piped input.
+# echo "$FULL_PROMPT" | ollama run "$MODEL" 
+# Better: create a temporary Modelfile? No, that's too slow.
+# Just passing it as the first message.
+
+ollama run "$MODEL" "$FULL_PROMPT"

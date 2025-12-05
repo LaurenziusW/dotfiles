@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Debug - Diagnostics
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
+if [[ -f "$SCRIPT_DIR/../lib/core.sh" ]]; then
+    source "$SCRIPT_DIR/../lib/core.sh"
+else
+    log_info() { echo "INFO: $*"; }
+    is_macos() { [[ "$(uname -s)" == "Darwin" ]]; }
+fi
+
+dump_system() {
+    echo "--- UKE Debug Report ---"
+    echo "Generated: $(date)"
+    echo "OS: $(uname -s) $(uname -r)"
+    echo "Shell: $SHELL"
+    
+    for cmd in stow jq git yabai skhd hyprctl borders; do
+        if command -v $cmd &>/dev/null; then
+            echo "  $cmd: $(command -v $cmd)"
+        else
+            echo "  $cmd: MISSING"
+        fi
+    done
+}
+
+trace_key() {
+    local key="$1"
+    log_info "Tracing keybinding: $key"
+    grep -n "$key" "$UKE_GEN/skhd/skhdrc" 2>/dev/null || echo "Not found in skhdrc"
+}
+
+case "${1:-dump}" in
+    dump)  dump_system ;;
+    trace) trace_key "${2:-h}" ;;
+    *)     echo "Usage: uke-debug [dump|trace <key>]" ;;
+esac

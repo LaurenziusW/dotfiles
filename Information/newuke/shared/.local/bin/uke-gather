@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Gather - Organize windows by workspace
+# ==============================================================================
+# Platform: macos/linux
+# ==============================================================================
+
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
+if [[ -f "$SCRIPT_DIR/../lib/core.sh" ]]; then
+    source "$SCRIPT_DIR/../lib/core.sh"
+else
+    log_info() { echo "INFO: $*"; }
+    ok() { echo "OK: $*"; }
+    is_macos() { [[ "$(uname -s)" == "Darwin" ]]; }
+fi
+
+require_cmd() {
+    if ! command -v "$1" &>/dev/null; then
+        echo "Command not found: $1"
+        exit 1
+    fi
+}
+
+require_cmd jq
+
+gather_macos() {
+    local current_space
+    current_space=$(yabai -m query --spaces --space | jq -r '.index')
+    log_info "Gathering windows for space $current_space..."
+    
+    case $current_space in
+        1)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser" or .app == "Firefox") | .id' | \
+                xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
+            ;;
+        2)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Obsidian") | .id' | \
+                xargs -I {} yabai -m window {} --space 2 2>/dev/null || true
+            ;;
+        3)
+            yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode" or .app == "Cursor") | .id' | \
+                xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
+            ;;
+        5)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' | \
+                xargs -I {} yabai -m window {} --space 5 2>/dev/null || true
+            ;;
+        6)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Raindrop.io") | .id' | \
+                xargs -I {} yabai -m window {} --space 6 2>/dev/null || true
+            ;;
+        7)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' | \
+                xargs -I {} yabai -m window {} --space 7 2>/dev/null || true
+            ;;
+        8)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Microsoft Word" or .app == "Microsoft Excel" or .app == "Microsoft PowerPoint") | .id' | \
+                xargs -I {} yabai -m window {} --space 8 2>/dev/null || true
+            ;;
+        9)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Slack" or .app == "Discord" or .app == "Mail") | .id' | \
+                xargs -I {} yabai -m window {} --space 9 2>/dev/null || true
+            ;;
+        10)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Claude" or .app == "Perplexity") | .id' | \
+                xargs -I {} yabai -m window {} --space 10 2>/dev/null || true
+            ;;
+        *)
+            log_info "No gather action for space $current_space"
+            ;;
+    esac
+    ok "Windows gathered"
+}
+
+gather_linux() {
+    local current_ws
+    current_ws=$(hyprctl activeworkspace -j | jq -r '.id')
+    log_info "Gathering windows for workspace $current_ws..."
+    
+    case $current_ws in
+        1)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("brave|firefox|chromium"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "1,address:$addr" 2>/dev/null; done
+            ;;
+        2)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("obsidian"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "2,address:$addr" 2>/dev/null; done
+            ;;
+        3)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("wezterm|code|alacritty|kitty"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "3,address:$addr" 2>/dev/null; done
+            ;;
+        5)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("evince|zathura|okular"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "5,address:$addr" 2>/dev/null; done
+            ;;
+        6)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("raindrop"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "6,address:$addr" 2>/dev/null; done
+            ;;
+        7)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("spotify"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "7,address:$addr" 2>/dev/null; done
+            ;;
+        8)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("libreoffice|soffice"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "8,address:$addr" 2>/dev/null; done
+            ;;
+        9)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("slack|discord|thunderbird|telegram"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "9,address:$addr" 2>/dev/null; done
+            ;;
+        10)
+            hyprctl clients -j | jq -r '.[] | select(.class | test("claude"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "10,address:$addr" 2>/dev/null; done
+            ;;
+        *)
+            log_info "No gather action for workspace $current_ws"
+            ;;
+    esac
+    ok "Windows gathered"
+}
+
+is_macos && gather_macos || gather_linux
