@@ -1,4 +1,6 @@
-Here is the updated **UKE v8 Toolchain** documentation, incorporating the potential new tools at the end as requested.
+Here is the unified **UKE v8 Toolchain** documentation.
+
+I have consolidated the active toolchain and the comprehensive inventory into a single document. **Duplicate entries have been removed**: if a tool appears in Sections 1–7 (Active), it was removed from Section 8 (Roadmap/Inventory) to ensure a clean list.
 
 ***
 
@@ -75,61 +77,27 @@ UKE replaces standard unix tools with modern Rust/Go alternatives in `.zshrc`.
 
 ---
 
+## 8. Extended Inventory & Roadmap
+The following tools are part of the comprehensive UKE inventory but are either optional, specialized, or waiting to be fully integrated into the core automation scripts.
 
+### High Priority / Daily Drivers
+*Tools that complement the core workflow established above.*
 
-
-
-
-
-## 8. Potential Additions (Not Yet Utilized)
-
-
-Yes, **many** packages were missing from the previous "New" list because I initially filtered them to show only the "highest impact" tools. Since you want a **complete inventory** (every unique tool mentioned in your texts) without duplicates, I have regenerated the full list below.
-
-I have organized them by **Priority** (Best-in-Class/Modern) vs. **Extended** (Alternatives/Niche) so you still have a clear path for installation, but **every single tool** from your notes is accounted for here.
-
-***
-
-### 1. The "Must-Have" Core (Modern Daily Drivers)
-*These are the best-in-class tools for your M1 Mac, CS/Physics workflow, and Neovim setup.*
-
-**Navigation & Shell**
-* **zoxide**: Smarter `cd` that remembers directory history.
-* **fzf**: Fuzzy finder. Essential for Neovim and shell history.
-* **starship**: High-performance, customizable shell prompt.
 * **thefuck**: Auto-corrects console command errors.
 * **tldr**: Simplified man pages with examples.
-* **bat**: `cat` clone with syntax highlighting and Git integration.
+* **wikiman**: Offline search for Arch Wiki, Gentoo Wiki, man pages, and tldr.
 * **direnv**: Loads environment variables automatically when entering directories.
-
-**File Operations & Search**
-* **ripgrep (rg)**: The fastest grep. Essential for coding.
-* **fd**: User-friendly, faster alternative to `find`.
-* **lsd** (or **eza**): Modern `ls` with icons.
 * **dust**: Visual disk usage analyzer (tree view).
 * **delta**: Syntax-highlighted git diff viewer.
-
-**Git & Version Control**
 * **lazygit**: Powerful Terminal UI (TUI) for git.
 * **gh**: Official GitHub CLI.
-
-**Development & Physics**
 * **just**: Modern command runner (simpler `make`).
 * **entr**: Run arbitrary commands when files change.
 * **hyperfine**: Command-line benchmarking (great for algorithm testing).
 * **scc**: Fast line-of-code counter and complexity analyzer.
-* **jq**: Command-line JSON processor.
-
-**System Monitoring**
-* **btop**: The best visual resource monitor (CPU/GPU).
 * **bandwhich**: Network bandwidth monitor by process.
 
----
-
-### 2. The Extended Arsenal (Restored Packages)
-*These are valuable tools from your old list that are specific, niche, or alternatives to the core tools.*
-
-**AI & LLMs (Terminal Based)**
+### AI & LLMs (Terminal Based)
 * **ollama**: Run local LLMs (Llama 3, etc.) offline on your M1.
 * **aichat**: ChatGPT-like terminal interface.
 * **aider**: AI pair programming in the terminal.
@@ -137,7 +105,7 @@ I have organized them by **Priority** (Best-in-Class/Modern) vs. **Extended** (A
 * **github-copilot-cli**: Copilot for the shell.
 * **qodo-command**: AI agents for code generation.
 
-**Databases (SQL & NoSQL)**
+### Databases (SQL & NoSQL)
 * **duckdb**: OLAP database (great for physics data analysis).
 * **pgcli**: Postgres client with auto-completion.
 * **mycli**: MySQL client with auto-completion.
@@ -146,7 +114,7 @@ I have organized them by **Priority** (Best-in-Class/Modern) vs. **Extended** (A
 * **dblab**: Database lab for cloning/testing.
 * **gobang**: TUI for database management.
 
-**Rust & Code Dev Utilities**
+### Rust & Code Dev Utilities
 * **bacon**: Background Rust compiler (watch mode).
 * **cargo**: Rust package manager.
 * **rustup**: Rust toolchain installer.
@@ -158,7 +126,7 @@ I have organized them by **Priority** (Best-in-Class/Modern) vs. **Extended** (A
 * **gitui**: Extremely fast Git TUI (Alternative to lazygit).
 * **interactive-rebase-tool**: Visual git rebase editor.
 
-**Security & Encryption**
+### Security & Encryption
 * **gpg**: Gnu Privacy Guard.
 * **age** / **rage**: Simple, modern file encryption.
 * **bitwarden-cli**: Password manager CLI.
@@ -166,7 +134,7 @@ I have organized them by **Priority** (Best-in-Class/Modern) vs. **Extended** (A
 * **openssl**: Crypto toolkit.
 * **ssh-keyscan**: Gather SSH public keys.
 
-**Networking & Web**
+### Networking & Web
 * **httpie** / **xh**: User-friendly HTTP clients (xh is the Rust version).
 * **aria2**: High-speed download utility.
 * **wget**: Classic file downloader.
@@ -177,14 +145,14 @@ I have organized them by **Priority** (Best-in-Class/Modern) vs. **Extended** (A
 * **step-ci** / **tavern**: API testing frameworks.
 * **wuzz**: Interactive HTTP inspector.
 
-**Productivity & Organization**
+### Productivity & Organization
 * **taskwarrior** / **vit**: Command line TODO list + TUI.
 * **nb**: CLI note-taking with encryption and git syncing.
 * **jrnl**: CLI journaling.
 * **calcure**: TUI calendar.
-* **obsidian** / **logseq**: (Usually GUI apps, but listed in your notes).
+* **obsidian** / **logseq**: (GUI apps referenced in notes).
 
-**Science, Math & Binary Analysis**
+### Science, Math & Binary Analysis
 * **julia**: High-performance scientific language.
 * **octave**: Open-source Matlab alternative.
 * **hexyl**: Command-line hex viewer.
@@ -193,46 +161,29 @@ I have organized them by **Priority** (Best-in-Class/Modern) vs. **Extended** (A
 * **ffmpeg**: Video/audio processing.
 * **imagemagick**: Image manipulation.
 
-**Containers & Cloud**
+### Containers & Cloud
 * **lazydocker**: TUI for Docker.
 * **k9s**: TUI for Kubernetes.
 * **aws-cli** / **az** / **gcloud**: Cloud provider CLIs.
 * **terraform** / **ansible**: Infrastructure as Code.
 * **dive**: Docker image layer inspector.
 
----
+### Alternatives & Redundant Tools (Reference)
+*Alternatives to the current stack, listed for reference but not installed by default.*
 
-### 3. Redundant / Lower Priority / Alternatives
-*These are present in your list but functionally "covered" by better tools in Section 1, or are very specific.*
+* **File Managers:** `ranger`, `nnn`, `lf`, `mc`, `xplr`, `yazi`.
+* **Multiplexers:** `zellij`, `screen` (Alternatives to `tmux`).
+* **Text Editors:** `micro`, `nano`, `helix` (Alternatives to `neovim`).
+* **Monitoring:** `glances`, `bottom`, `gtop` (Alternatives to `btop`).
+* **Disk Usage:** `duf`, `ncdu`, `dua-cli` (Alternatives to `dust`).
 
-* **File Managers:** `ranger`, `nnn`, `lf`, `mc`, `xplr` (You likely only need one; `lf` or `yazi` are the modern fast ones).
-* **Find/Search Alts:** `ack`, `grep` (use `rg`), `find` (use `fd`).
-* **Multiplexers:** `tmux`, `zellij`, `screen` (Pick one. `tmux` is standard, `zellij` is modern).
-* **Text Editors:** `micro`, `nano`, `helix`, `vim` (You use Neovim).
-* **Monitoring Alts:** `htop`, `glances`, `bottom`, `gtop` (You have `btop`).
-* **Disk Usage Alts:** `duf`, `ncdu`, `dua-cli` (You have `dust`).
-* **Benchmark Alts:** `vegeta`, `k6`, `ab` (HTTP load testing, distinct from `hyperfine`).
+### Incompatible / Native Tools (Do Not Install)
+* **Linux Specifics:** `perf`, `strace`, `ltrace`, `free`, `vmstat`, `iostat`.
+* **Language Managers:** `python`/`pip` (Use `conda` or `pyenv`), `ruby`, `perl`.
+* **Build Tools:** `make` (Use Xcode CLI tools).
 
----
-
-### 4. Incompatible or "Built-in" (Do Not Install via Brew)
-*These appeared in your old lists but are either Linux-specific or come pre-installed on macOS.*
-
-* **Linux Package Managers:** `apt`, `pacman`, `dnf`, `yum`. (Use `brew`).
-* **Linux-Specific System Tools:**
-    * `perf` (Linux profiler; use `Instruments` on Mac).
-    * `strace` / `ltrace` (Linux; macOS uses `dtruss` or `sc_usage`, though a limited `strace` exists in brew).
-    * `free`, `vmstat`, `iostat` (BSD versions come pre-installed on Mac).
-* **Pre-installed (or handled by specific environments):**
-    * `python`, `pip` (Better managed via `pyenv` or `conda` to avoid messing up system Python).
-    * `ruby`, `perl`.
-    * `curl` (Pre-installed, though brew version is newer).
-    * `make` (Comes with Xcode Command Line Tools).
-
----
-
-### 5. "Just for Fun" (Visuals)
-* `cmatrix`, `cowsay`, `sl`, `figlet`, `toilet`, `asciiquarium`, `pipes.sh`, `lolcat`, `neofetch`.
+### Visuals ("Just for Fun")
+* `cmatrix`, `cowsay`, `sl`, `figlet`, `toilet`, `asciiquarium`, `pipes.sh`, `lolcat`.
 
 ### Next Step
-Since this list is massive (over 150 items), **would you like me to generate a categorized installation script** that asks you Yes/No for each *category* (e.g., "Install AI Tools?", "Install Rust Tools?") so you don't have to install everything at once?
+Would you like me to create an **interactive installation script** (e.g., `uke-extras`) that iterates through these specific "Extended Inventory" categories (AI, Science, Dev, etc.) and allows you to toggle them on or off?
