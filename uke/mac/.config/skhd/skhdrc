@@ -80,7 +80,7 @@ cmd + shift - 0x1D : yabai -m window --space 10 --focus
 # Window Controls
 # =============================================================================
 # Launch terminal (Standard: Cmd+Return)
-cmd - return : $HOME/.local/bin/uke-launch wezterm
+cmd - return : $HOME/.local/bin/uke-launch terminal
 
 # Gather windows to workspaces (Cmd + ` / Tilde)
 cmd - 0x32 : $HOME/.local/bin/uke-gather

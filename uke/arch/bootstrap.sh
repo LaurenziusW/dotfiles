@@ -17,6 +17,7 @@ sudo pacman -S --needed --noconfirm \
     waybar \
     wezterm \
     wofi \
+    fzf \
     ttf-jetbrains-mono-nerd \
     firefox
 

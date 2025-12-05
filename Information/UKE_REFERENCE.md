@@ -131,6 +131,23 @@ System diagnostics helper.
 | `uke-debug dump` | Prints system info and tool versions. |
 | `uke-debug trace <key>` | Searches for a keybinding in config files. |
 
+### `uke-lookup`
+Deterministic fuzzy finder for configuration details.
+
+| Usage | Description |
+|:------|:------------|
+| `uke-lookup` | Interactive menu to select category. |
+| `uke-lookup aliases` | FZF search through `.zshrc` aliases. |
+| `uke-lookup keys` | FZF search through `skhdrc` (macOS) or `hyprland.conf` (Linux). |
+| `uke-lookup docs` | FZF search through headers in `UKE_REFERENCE.md`. |
+
+### `uke-ai`
+Local AI assistant (via Ollama) aware of the UKE documentation.
+
+| Usage | Description |
+|:------|:------------|
+| `uke-ai "question"` | Ask the AI a question. It uses `UKE_REFERENCE.md` as context. |
+
 ---
 
 ## 3. Arch Linux Specific Tools
