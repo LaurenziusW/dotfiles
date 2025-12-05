@@ -46,7 +46,7 @@ get_app_name() {
         # Linux
         case "$key" in
             browser)  echo "brave" ;;
-            terminal) echo "wezterm" ;;
+            terminal) echo "kitty" ;;
             editor)   echo "nvim" ;;
             files)    echo "thunar" ;;
             pdf)      echo "zathura" ;;
