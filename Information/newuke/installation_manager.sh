@@ -325,23 +325,34 @@ do_install() {
         
         info "Current profile: $current"
         echo "Available profiles:"
+        local profiles_array=()
+        local i=1
         if [[ -d "$HOME/.config/hypr/profiles" ]]; then
             for p in "$HOME/.config/hypr/profiles"/*.conf; do
-                echo "  - $(basename "$p" .conf)"
+                local p_name=$(basename "$p" .conf)
+                profiles_array+=("$p_name")
+                echo "  ${i}. $p_name"
+                i=$((i+1))
             done
         fi
         
         echo ""
-        read -p "Select profile [$current]: " choice
-        choice=${choice:-$current}
+        read -p "Select profile (number or name) [$current]: " choice_input
         
+        local selected_profile="$current"
+        if [[ "$choice_input" =~ ^[0-9]+$ ]] && [[ "$choice_input" -ge 1 ]] && [[ "$choice_input" -le ${#profiles_array[@]} ]]; then
+            selected_profile="${profiles_array[$((choice_input-1))]}"
+        elif [[ -n "$choice_input" ]]; then
+            selected_profile="$choice_input"
+        fi
+
         if [[ -x "$HOME/.local/bin/uke-profile" ]]; then
-            "$HOME/.local/bin/uke-profile" "$choice" || true
+            "$HOME/.local/bin/uke-profile" "$selected_profile" || true
         else
             warn "uke-profile tool not found. Linking manually..."
             mkdir -p "$HOME/.config/hypr"
-            ln -sf "$HOME/.config/hypr/profiles/$choice.conf" "$HOME/.config/hypr/machine.conf"
-            ok "Profile set to $choice"
+            ln -sf "$HOME/.config/hypr/profiles/$selected_profile.conf" "$HOME/.config/hypr/machine.conf"
+            ok "Profile set to $selected_profile"
         fi
     fi
 
