@@ -82,6 +82,9 @@ cmd + shift - 0x1D : yabai -m window --space 10 --focus
 # Launch terminal (Standard: Cmd+Return)
 cmd - return : $HOME/.local/bin/uke-launch terminal
 
+# Fallback Terminal (Cmd+Shift+Return) - Direct Launch
+cmd + shift - return : open -a WezTerm
+
 # Gather windows to workspaces (Cmd + ` / Tilde)
 cmd - 0x32 : $HOME/.local/bin/uke-gather
 
