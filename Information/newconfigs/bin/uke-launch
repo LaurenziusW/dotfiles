@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Launch - Smart Launcher
+# ==============================================================================
+# Usage: uke-launch <alias|file|url>
+# ==============================================================================
+
+TARGET="$1"
+OS="$(uname -s)"
+
+if [[ -z "$TARGET" ]]; then
+    echo "Usage: uke-launch <alias|file|url>"
+    exit 1
+fi
+
+# 1. URL Handler
+if [[ "$TARGET" =~ ^https?:// ]]; then
+    if [[ "$OS" == "Darwin" ]]; then open "$TARGET"; else xdg-open "$TARGET"; fi
+    exit 0
+fi
+
+# 2. File Handler
+if [[ -f "$TARGET" ]]; then
+    if [[ "$OS" == "Darwin" ]]; then open "$TARGET"; else xdg-open "$TARGET"; fi
+    exit 0
+fi
+
+# 3. Alias Handler (v8 Defaults)
+case "$TARGET" in
+    browser)  CMD="Brave Browser" ; LINUX_CMD="brave" ;;
+    terminal) CMD="WezTerm"       ; LINUX_CMD="wezterm" ;;
+    editor)   CMD="nvim"          ; LINUX_CMD="nvim" ;;
+    files)    CMD="Finder"        ; LINUX_CMD="thunar" ;;
+    pdf)      CMD="Preview"       ; LINUX_CMD="zathura" ;;
+    notes)    CMD="Obsidian"      ; LINUX_CMD="obsidian" ;;
+    music)    CMD="Spotify"       ; LINUX_CMD="spotify" ;;
+    *)        CMD="$TARGET"       ; LINUX_CMD="$TARGET" ;;
+esac
+
+if [[ "$OS" == "Darwin" ]]; then
+    if [[ "$CMD" == "nvim" ]]; then
+        wezterm start -- nvim
+    else
+        open -a "$CMD"
+    fi
+else
+    if [[ "$LINUX_CMD" == "nvim" ]]; then
+        wezterm start -- nvim
+    else
+        "$LINUX_CMD" >/dev/null 2>&1 &
+        disown
+    fi
+fi

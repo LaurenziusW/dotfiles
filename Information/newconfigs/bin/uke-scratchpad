@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Scratchpad - Toggle Dropdown Apps
+# ==============================================================================
+# Usage: uke-scratchpad [terminal|notes|music]
+# ==============================================================================
+
+APP="$1"
+OS="$(uname -s)"
+
+if [[ -z "$APP" ]]; then
+    echo "Usage: uke-scratchpad <name>"
+    exit 1
+fi
+
+if [[ "$OS" == "Darwin" ]]; then
+    # macOS Implementation (Basic Focus/Launch)
+    # Note: Full scratchpad behavior on macOS requires complex yabai rules
+    # This is a 'best effort' launcher/focuser for v8 simplicity
+    case "$APP" in
+        terminal) TARGET="WezTerm" ;;
+        notes)    TARGET="Obsidian" ;;
+        music)    TARGET="Spotify" ;;
+        *)        TARGET="$APP" ;;
+    esac
+    
+    open -a "$TARGET"
+    
+elif [[ "$OS" == "Linux" ]]; then
+    # Linux Implementation (Hyprland Special Workspaces)
+    hyprctl dispatch togglespecialworkspace "$APP"
+fi

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Usage: uke-scratchpad [terminal|notes|music]
+
+APP="$1"
+OS="$(uname -s)"
+
+if [[ -z "$APP" ]]; then
+    echo "Usage: uke-scratchpad <name>"
+    exit 1
+fi
+
+if [[ "$OS" == "Darwin" ]]; then
+    # macOS implementation requires specific rules in yabairc to work perfectly
+    # For now, we just attempt to focus or launch
+    echo "Focusing scratchpad: $APP"
+    # Logic to find window by title and focus/hide it would go here
+    # This is complex in yabai without proper scripting additions
+    
+elif [[ "$OS" == "Linux" ]]; then
+    # Hyprland has built-in special workspaces
+    hyprctl dispatch togglespecialworkspace "$APP"
+fi

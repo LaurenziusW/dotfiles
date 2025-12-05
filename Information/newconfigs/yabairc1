@@ -1,0 +1,143 @@
+# ==============================================================================
+# YABAI CONFIG - Window Manager (macOS)
+# ==============================================================================
+# Source: /Users/laurenz/dotfiles/uke/config/registry.yaml
+# Generated: 2025-12-04T21:08:37+01:00
+# Platform: macos
+#
+# DO NOT EDIT DIRECTLY - Regenerate with: uke gen
+# ==============================================================================
+
+#!/usr/bin/env sh
+
+# Load Scripting Addition
+sudo yabai --load-sa
+
+# ==============================================================================
+# Layout Configuration
+# ==============================================================================
+yabai -m config layout bsp
+yabai -m config window_placement second_child
+yabai -m config top_padding    4
+yabai -m config bottom_padding 4
+yabai -m config left_padding   4
+yabai -m config right_padding  4
+yabai -m config window_gap     4
+
+# ==============================================================================
+# Mouse Configuration
+# ==============================================================================
+yabai -m config mouse_follows_focus off
+yabai -m config focus_follows_mouse off
+yabai -m config mouse_modifier alt
+yabai -m config mouse_action1 move
+yabai -m config mouse_action2 resize
+
+# ==============================================================================
+# Window Behavior
+# ==============================================================================
+yabai -m config split_ratio 0.50
+yabai -m config auto_balance off
+
+# ==============================================================================
+# Window Borders (Nord colorscheme)
+# ==============================================================================
+pkill -x borders 2>/dev/null || true
+borders width=3 active_color=0xff88c0d0 inactive_color=0xff3b4252 &
+
+# ==============================================================================
+# Terminal Opacity
+# ==============================================================================
+yabai -m config window_opacity off
+yabai -m rule --add app="^WezTerm$" opacity=0.92
+yabai -m rule --add app="^Alacritty$" opacity=0.92
+
+# ==============================================================================
+# Float Rules (Generated from registry.yaml)
+# ==============================================================================
+yabai -m rule --add app="^System$" manage=off
+yabai -m rule --add app="^Settings$" manage=off
+yabai -m rule --add app="^System$" manage=off
+yabai -m rule --add app="^Preferences$" manage=off
+yabai -m rule --add app="^Calculator$" manage=off
+yabai -m rule --add app="^Finder$" manage=off
+yabai -m rule --add app="^App$" manage=off
+yabai -m rule --add app="^Store$" manage=off
+yabai -m rule --add app="^Karabiner-Elements$" manage=off
+yabai -m rule --add app="^Karabiner-EventViewer$" manage=off
+yabai -m rule --add app="^Activity$" manage=off
+yabai -m rule --add app="^Monitor$" manage=off
+yabai -m rule --add app="^Archive$" manage=off
+yabai -m rule --add app="^Utility$" manage=off
+yabai -m rule --add app="^zoom.us$" manage=off
+yabai -m rule --add app="^FaceTime$" manage=off
+yabai -m rule --add app="^pavucontrol$" manage=off
+yabai -m rule --add app="^nm-connection-editor$" manage=off
+yabai -m rule --add app="^lxappearance$" manage=off
+yabai -m rule --add app="^blueman-manager$" manage=off
+
+# ==============================================================================
+# Window Rules (Generated from registry.yaml)
+# ==============================================================================
+yabai -m rule --add app="^System Settings$" manage=off
+yabai -m rule --add app="^Calculator$" manage=off sticky=on
+yabai -m rule --add app="^Finder$" manage=off
+yabai -m rule --add app="^App Store$" manage=off
+yabai -m rule --add app="^Karabiner-Elements$" manage=off
+yabai -m rule --add app="^Karabiner-EventViewer$" manage=off
+yabai -m rule --add app="^zoom.us$" manage=off sticky=on opacity=1.0
+yabai -m rule --add app="^FaceTime$" manage=off sticky=on
+yabai -m rule --add title="Picture in Picture" manage=off sticky=on layer=above
+yabai -m rule --add app="^Code$" title="Settings" manage=off
+yabai -m rule --add title="Preferences" manage=off
+yabai -m rule --add title="Settings" manage=off
+
+# ==============================================================================
+# Workspace Assignments (Generated from registry.yaml)
+# ==============================================================================
+yabai -m rule --add app="^Safari$" space=^1
+yabai -m rule --add app="^Brave Browser$" space=^1
+yabai -m rule --add app="^Firefox$" space=^1
+yabai -m rule --add app="^Google Chrome$" space=^1
+yabai -m rule --add app="^Obsidian$" space=^2
+yabai -m rule --add app="^Notion$" space=^2
+yabai -m rule --add app="^WezTerm$" space=^3
+yabai -m rule --add app="^Alacritty$" space=^3
+yabai -m rule --add app="^kitty$" space=^3
+yabai -m rule --add app="^Visual Studio Code$" space=^3
+yabai -m rule --add app="^VSCodium$" space=^3
+yabai -m rule --add app="^Xcode$" space=^3
+yabai -m rule --add app="^Cursor$" space=^3
+yabai -m rule --add app="^Preview$" space=^5
+yabai -m rule --add app="^PDF Expert$" space=^5
+yabai -m rule --add app="^Raindrop.io$" space=^6
+yabai -m rule --add app="^Spotify$" space=^7
+yabai -m rule --add app="^Music$" space=^7
+yabai -m rule --add app="^Microsoft Word$" space=^8
+yabai -m rule --add app="^Microsoft Excel$" space=^8
+yabai -m rule --add app="^Microsoft PowerPoint$" space=^8
+yabai -m rule --add app="^Pages$" space=^8
+yabai -m rule --add app="^Numbers$" space=^8
+yabai -m rule --add app="^Keynote$" space=^8
+yabai -m rule --add app="^Slack$" space=^9
+yabai -m rule --add app="^Discord$" space=^9
+yabai -m rule --add app="^Mail$" space=^9
+yabai -m rule --add app="^Telegram$" space=^9
+yabai -m rule --add app="^WhatsApp$" space=^9
+yabai -m rule --add app="^Messages$" space=^9
+yabai -m rule --add app="^Microsoft Teams$" space=^9
+yabai -m rule --add app="^Claude$" space=^10
+yabai -m rule --add app="^Perplexity$" space=^10
+yabai -m rule --add app="^ChatGPT$" space=^10
+
+# ==============================================================================
+# HARDWARE SPECIFIC INCLUDES (Ghost Files)
+# ==============================================================================
+# Loads GPU/Monitor/Form Factor settings generated by: uke profile
+# These settings override defaults based on machine.profile
+HARDWARE_CONF="$HOME/.config/yabai/generated_hardware.conf"
+if [[ -f "$HARDWARE_CONF" ]]; then
+    source "$HARDWARE_CONF"
+fi
+
+echo "yabai: Configuration loaded"

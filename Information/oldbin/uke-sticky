@@ -1,0 +1,237 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Sticky v7.2 - Toggle Floating Always-On-Top Window
+# ==============================================================================
+# Makes the focused window a floating, always-on-top, sticky window that
+# follows you across workspaces. Perfect for keeping a terminal visible
+# while working. Press again to restore normal behavior.
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+source "$UKE_ROOT/lib/core.sh"
+
+# State file to track sticky windows
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/uke"
+STICKY_STATE="$STATE_DIR/sticky_windows"
+
+mkdir -p "$STATE_DIR"
+touch "$STICKY_STATE"
+
+# ==============================================================================
+# Hyprland Implementation
+# ==============================================================================
+hyprland_get_window_id() {
+    hyprctl activewindow -j | jq -r '.address'
+}
+
+hyprland_is_sticky() {
+    local addr="$1"
+    grep -qx "$addr" "$STICKY_STATE" 2>/dev/null
+}
+
+hyprland_make_sticky() {
+    local addr="$1"
+    
+    # Make floating
+    hyprctl dispatch togglefloating
+    
+    # Pin to all workspaces (sticky)
+    hyprctl dispatch pin
+    
+    # Resize to a nice floating size (40% width, 50% height, bottom-right)
+    hyprctl dispatch resizeactive exact 40% 50%
+    hyprctl dispatch moveactive exact 58% 48%
+    
+    # Record as sticky
+    echo "$addr" >> "$STICKY_STATE"
+    
+    ok "Window is now sticky (floating + pinned)"
+    info "Press again to unstick, or drag to move"
+}
+
+hyprland_unmake_sticky() {
+    local addr="$1"
+    
+    # Unpin
+    hyprctl dispatch pin
+    
+    # Return to tiled
+    hyprctl dispatch togglefloating
+    
+    # Remove from state
+    sed -i "\|^${addr}$|d" "$STICKY_STATE"
+    
+    ok "Window restored to normal"
+}
+
+hyprland_toggle() {
+    local addr=$(hyprland_get_window_id)
+    
+    if [[ -z "$addr" ]] || [[ "$addr" == "null" ]]; then
+        fail "No active window"
+        return 1
+    fi
+    
+    if hyprland_is_sticky "$addr"; then
+        hyprland_unmake_sticky "$addr"
+    else
+        hyprland_make_sticky "$addr"
+    fi
+}
+
+# ==============================================================================
+# Yabai (macOS) Implementation
+# ==============================================================================
+yabai_get_window_id() {
+    yabai -m query --windows --window | jq -r '.id'
+}
+
+yabai_is_sticky() {
+    local wid="$1"
+    grep -qx "$wid" "$STICKY_STATE" 2>/dev/null
+}
+
+yabai_make_sticky() {
+    local wid="$1"
+    
+    # Make floating
+    yabai -m window --toggle float
+    
+    # Make sticky (visible on all spaces)
+    yabai -m window --toggle sticky
+    
+    # Make topmost (always on top)
+    yabai -m window --toggle topmost
+    
+    # Resize and position (bottom-right quadrant)
+    yabai -m window --resize abs:800:500
+    yabai -m window --move abs:1100:550
+    
+    # Record as sticky
+    echo "$wid" >> "$STICKY_STATE"
+    
+    ok "Window is now sticky (floating + sticky + topmost)"
+    info "Press again to unstick, or drag to move"
+}
+
+yabai_unmake_sticky() {
+    local wid="$1"
+    
+    # Remove topmost
+    yabai -m window --toggle topmost
+    
+    # Remove sticky
+    yabai -m window --toggle sticky
+    
+    # Return to tiled
+    yabai -m window --toggle float
+    
+    # Remove from state
+    sed -i '' "\|^${wid}$|d" "$STICKY_STATE" 2>/dev/null || \
+        sed -i "\|^${wid}$|d" "$STICKY_STATE"
+    
+    ok "Window restored to normal"
+}
+
+yabai_toggle() {
+    local wid=$(yabai_get_window_id)
+    
+    if [[ -z "$wid" ]] || [[ "$wid" == "null" ]]; then
+        fail "No active window"
+        return 1
+    fi
+    
+    if yabai_is_sticky "$wid"; then
+        yabai_unmake_sticky "$wid"
+    else
+        yabai_make_sticky "$wid"
+    fi
+}
+
+# ==============================================================================
+# Utility Commands
+# ==============================================================================
+list_sticky() {
+    echo ""
+    printf "%s=== Sticky Windows ===%s\n" "$C_BOLD" "$C_RESET"
+    
+    if [[ ! -s "$STICKY_STATE" ]]; then
+        info "No sticky windows"
+        return
+    fi
+    
+    while read -r addr; do
+        [[ -z "$addr" ]] && continue
+        if is_linux; then
+            local title=$(hyprctl clients -j | jq -r ".[] | select(.address == \"$addr\") | .title" 2>/dev/null)
+            echo "  • $addr: ${title:-unknown}"
+        else
+            echo "  • $addr"
+        fi
+    done < "$STICKY_STATE"
+}
+
+clear_sticky() {
+    info "Clearing sticky state..."
+    
+    # Try to unstick all tracked windows
+    while read -r addr; do
+        [[ -z "$addr" ]] && continue
+        if is_linux; then
+            # Try to unpin if window still exists
+            hyprctl dispatch pin address:"$addr" 2>/dev/null || true
+        fi
+    done < "$STICKY_STATE"
+    
+    > "$STICKY_STATE"
+    ok "Sticky state cleared"
+}
+
+# ==============================================================================
+# Main
+# ==============================================================================
+case "${1:-toggle}" in
+    toggle|"")
+        if is_linux; then
+            if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+                hyprland_toggle
+            else
+                fail "Hyprland not running"
+                exit 1
+            fi
+        elif is_macos; then
+            yabai_toggle
+        else
+            fail "Unsupported platform"
+            exit 1
+        fi
+        ;;
+    list)
+        list_sticky
+        ;;
+    clear)
+        clear_sticky
+        ;;
+    -h|--help)
+        echo "Usage: uke-sticky [command]"
+        echo ""
+        echo "Commands:"
+        echo "  toggle  Toggle sticky mode for focused window (default)"
+        echo "  list    List all sticky windows"
+        echo "  clear   Clear sticky state (reset)"
+        echo ""
+        echo "Sticky windows are:"
+        echo "  • Floating (not tiled)"
+        echo "  • Pinned to all workspaces"
+        echo "  • Always on top"
+        echo "  • Draggable with mouse"
+        echo ""
+        echo "Keybinding: PRIMARY+S (Alt+S on Linux, Cmd+S on macOS)"
+        ;;
+    *)
+        fail "Unknown command: $1"
+        exit 1
+        ;;
+esac

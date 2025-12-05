@@ -1,0 +1,371 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Setup v7.2 - First-Boot Wizard
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export UKE_ROOT="${SCRIPT_DIR%/bin}"
+
+# Minimal colors (core.sh may not be ready)
+RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BLUE=$'\e[34m'
+CYAN=$'\e[36m' BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
+
+# [FIX] Logging functions redirect to stderr so they don't corrupt captured output
+ok()   { printf "%s✓%s %s\n" "$GREEN" "$RESET" "$*" >&2; }
+fail() { printf "%s✗%s %s\n" "$RED" "$RESET" "$*" >&2; }
+info() { printf "%s→%s %s\n" "$BLUE" "$RESET" "$*" >&2; }
+warn() { printf "%s!%s %s\n" "$YELLOW" "$RESET" "$*" >&2; }
+
+STATE_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/uke/setup-state"
+HEADLESS="${HEADLESS:-false}"
+
+# ==============================================================================
+# State Management
+# ==============================================================================
+save_state() {
+    mkdir -p "$(dirname "$STATE_FILE")"
+    cat > "$STATE_FILE" << EOF
+SETUP_STEP=$CURRENT_STEP
+SETUP_STARTED="${SETUP_STARTED:-$(date -Iseconds)}"
+EOF
+}
+
+load_state() {
+    if [[ -f "$STATE_FILE" ]]; then
+        source "$STATE_FILE"
+        CURRENT_STEP="${SETUP_STEP:-1}"
+    else
+        CURRENT_STEP=1
+        SETUP_STARTED="$(date -Iseconds)"
+    fi
+}
+
+clear_state() {
+    rm -f "$STATE_FILE"
+}
+
+# ==============================================================================
+# Sudo Setup (Safe)
+# ==============================================================================
+setup_sudo() {
+    info "Checking sudo access..."
+    
+    # Test if we can sudo
+    if sudo -n true 2>/dev/null; then
+        ok "sudo access OK (passwordless)"
+        return 0
+    fi
+    
+    if sudo true; then
+        ok "sudo access OK"
+        return 0
+    fi
+    
+    # Need to set up sudo
+    warn "sudo not configured for $USER"
+    echo ""
+    echo "To fix this, you need root access. Options:"
+    echo ""
+    echo "  Option 1: If you know the root password:"
+    echo "    su -c 'usermod -aG wheel $USER'"
+    echo "    su -c 'echo \"$USER ALL=(ALL:ALL) NOPASSWD: ALL\" > /etc/sudoers.d/uke-$USER'"
+    echo "    Then logout and back in"
+    echo ""
+    echo "  Option 2: From a TTY as root:"
+    echo "    1. Press Ctrl+Alt+F3"
+    echo "    2. Login as root"
+    echo "    3. Run: usermod -aG wheel $USER"
+    echo "    4. Run: echo '$USER ALL=(ALL:ALL) ALL' > /etc/sudoers.d/$USER"
+    echo "    5. Run: chmod 440 /etc/sudoers.d/$USER"
+    echo "    6. Reboot"
+    echo ""
+    
+    return 1
+}
+
+# ==============================================================================
+# Hardware Detection
+# ==============================================================================
+detect_hardware() {
+    # GPU
+    if lspci 2>/dev/null | grep -qi nvidia; then
+        DETECTED_GPU="nvidia"
+    elif lspci 2>/dev/null | grep -qi "amd.*radeon\|radeon.*amd"; then
+        DETECTED_GPU="amd"
+    else
+        DETECTED_GPU="intel"
+    fi
+    
+    # Form factor
+    if [[ -d /sys/class/power_supply/BAT0 ]] || [[ -d /sys/class/power_supply/BAT1 ]]; then
+        DETECTED_FORM="laptop_14"
+    else
+        DETECTED_FORM="desktop"
+    fi
+    
+    # Monitors (if Hyprland running)
+    if command -v hyprctl &>/dev/null && [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+        DETECTED_MONITORS=$(hyprctl monitors -j 2>/dev/null | jq length 2>/dev/null || echo "1")
+    else
+        DETECTED_MONITORS=1
+    fi
+}
+
+# ==============================================================================
+# Step 1: System Check
+# ==============================================================================
+step_system_check() {
+    echo ""
+    printf "%s[Step 1/6] System Check%s\n" "$BOLD" "$RESET"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Check arch
+    if [[ -f /etc/arch-release ]]; then
+        ok "Arch Linux detected"
+    else
+        warn "Not Arch Linux - some features may not work"
+    fi
+    
+    # Check internet
+    if ping -c1 -W2 archlinux.org &>/dev/null; then
+        ok "Internet connectivity"
+    else
+        fail "No internet. Connect first."
+        exit 1
+    fi
+    
+    # Check sudo
+    if ! setup_sudo; then
+        fail "Cannot proceed without sudo. See instructions above."
+        exit 1
+    fi
+    
+    CURRENT_STEP=2
+    save_state
+}
+
+# ==============================================================================
+# Step 2: Package Installation
+# ==============================================================================
+step_packages() {
+    echo ""
+    printf "%s[Step 2/6] Package Installation%s\n" "$BOLD" "$RESET"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Update mirrors first
+    if command -v reflector &>/dev/null; then
+        info "Optimizing mirrors..."
+        sudo reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist 2>/dev/null || true
+    fi
+    
+    if [[ -x "$UKE_ROOT/scripts/arch-check.sh" ]]; then
+        info "Running package checker..."
+        "$UKE_ROOT/scripts/arch-check.sh" --install
+    else
+        warn "arch-check.sh not found, installing manually..."
+        sudo pacman -Syu --noconfirm
+        sudo pacman -S --noconfirm --needed hyprland wezterm stow jq wofi waybar dunst fzf
+    fi
+    
+    # Ensure AUR helper exists
+    if ! command -v yay &>/dev/null && ! command -v paru &>/dev/null; then
+        info "Installing yay (AUR helper)..."
+        local tmp_dir=$(mktemp -d)
+        git clone https://aur.archlinux.org/yay.git "$tmp_dir/yay" 2>/dev/null
+        cd "$tmp_dir/yay" && makepkg -si --noconfirm
+        cd - >/dev/null
+        rm -rf "$tmp_dir"
+    fi
+    
+    ok "Packages installed"
+    CURRENT_STEP=3
+    save_state
+}
+
+# ==============================================================================
+# Step 3: UKE Core Installation
+# ==============================================================================
+step_uke_install() {
+    echo ""
+    printf "%s[Step 3/6] UKE Core Installation%s\n" "$BOLD" "$RESET"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    if [[ -x "$UKE_ROOT/scripts/install.sh" ]]; then
+        info "Running UKE installer..."
+        "$UKE_ROOT/scripts/install.sh"
+    else
+        fail "install.sh not found"
+        exit 1
+    fi
+    
+    ok "UKE core installed"
+    CURRENT_STEP=4
+    save_state
+}
+
+# ==============================================================================
+# Step 4: Hardware Profile
+# ==============================================================================
+step_hardware() {
+    echo ""
+    printf "%s[Step 4/6] Hardware Profile%s\n" "$BOLD" "$RESET"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    detect_hardware
+    
+    info "Detected: GPU=$DETECTED_GPU, Form=$DETECTED_FORM, Monitors=$DETECTED_MONITORS"
+    
+    local profile_file="${XDG_STATE_HOME:-$HOME/.local/state}/uke/machine.profile"
+    mkdir -p "$(dirname "$profile_file")"
+    
+    if [[ "$HEADLESS" == "true" ]]; then
+        # Auto-generate profile
+        cat > "$profile_file" << EOF
+# UKE Machine Profile (auto-generated)
+UKE_OS="arch"
+UKE_FORM_FACTOR="$DETECTED_FORM"
+UKE_MONITORS="$DETECTED_MONITORS"
+UKE_GPU="$DETECTED_GPU"
+UKE_KEYBOARD="pc"
+EOF
+        ok "Profile auto-generated"
+    else
+        # Interactive
+        if [[ -x "$UKE_ROOT/scripts/manage_profile.sh" ]]; then
+            "$UKE_ROOT/scripts/manage_profile.sh"
+        else
+            # Fallback to simple questions
+            echo ""
+            read -p "GPU [$DETECTED_GPU]: " gpu
+            read -p "Form factor [$DETECTED_FORM]: " form
+            read -p "Monitors [$DETECTED_MONITORS]: " mons
+            read -p "Keyboard [pc/mac]: " kb
+            
+            cat > "$profile_file" << EOF
+UKE_OS="arch"
+UKE_FORM_FACTOR="${form:-$DETECTED_FORM}"
+UKE_MONITORS="${mons:-$DETECTED_MONITORS}"
+UKE_GPU="${gpu:-$DETECTED_GPU}"
+UKE_KEYBOARD="${kb:-pc}"
+EOF
+        fi
+        ok "Profile configured"
+    fi
+    
+    # Apply profile
+    if [[ -x "$UKE_ROOT/scripts/apply_profile.sh" ]]; then
+        "$UKE_ROOT/scripts/apply_profile.sh"
+    fi
+    
+    CURRENT_STEP=5
+    save_state
+}
+
+# ==============================================================================
+# Step 5: Service Setup
+# ==============================================================================
+step_services() {
+    echo ""
+    printf "%s[Step 5/6] Service Setup%s\n" "$BOLD" "$RESET"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Enable system services
+    for svc in keyd bluetooth NetworkManager; do
+        sudo systemctl enable "$svc" 2>/dev/null && ok "Enabled: $svc" || warn "Skipped: $svc"
+    done
+    
+    # Setup keyd
+    if [[ -x "$UKE_ROOT/scripts/keyd-setup.sh" ]]; then
+        "$UKE_ROOT/scripts/keyd-setup.sh" install 2>/dev/null || warn "keyd setup skipped"
+    fi
+    
+    # Setup user services
+    for svc in pipewire pipewire-pulse wireplumber; do
+        systemctl --user enable "$svc" 2>/dev/null || true
+    done
+    
+    CURRENT_STEP=6
+    save_state
+}
+
+# ==============================================================================
+# Step 6: Verification
+# ==============================================================================
+step_verify() {
+    echo ""
+    printf "%s[Step 6/6] Verification%s\n" "$BOLD" "$RESET"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    if [[ -x "$UKE_ROOT/bin/uke-doctor" ]]; then
+        "$UKE_ROOT/bin/uke-doctor" || true
+    fi
+    
+    clear_state
+    
+    echo ""
+    echo "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo "${GREEN}${BOLD}✓ UKE Setup Complete!${RESET}"
+    echo "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo ""
+    echo "Next steps:"
+    echo "  1. Reboot your system"
+    echo "  2. Login on TTY1 - Hyprland will auto-start"
+    echo "  3. Use Alt+Return for terminal"
+    echo "  4. Use Alt+Space for launcher (wofi)"
+    echo ""
+    echo "Quick commands:"
+    echo "  uke status     - Show UKE status"
+    echo "  uke doctor     - Diagnose issues"
+    echo "  uke-fix        - Fix common problems"
+    echo "  uke-update     - Update everything"
+    echo ""
+    echo "Shell features:"
+    echo "  Ctrl+R         - Fuzzy history search (fzf)"
+    echo "  Ctrl+T         - Fuzzy file search"
+    echo "  fcd            - Fuzzy cd with preview"
+    echo ""
+}
+
+# ==============================================================================
+# Main
+# ==============================================================================
+main() {
+    echo ""
+    printf "%s╔══════════════════════════════════════╗%s\n" "$CYAN" "$RESET"
+    printf "%s║%s      UKE Setup Wizard v7.2           %s║%s\n" "$CYAN" "$BOLD" "$CYAN" "$RESET"
+    printf "%s╚══════════════════════════════════════╝%s\n" "$CYAN" "$RESET"
+    
+    local start_step=1
+    
+    # Parse args
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --headless) HEADLESS=true ;;
+            --minimal)  MINIMAL=true ;;
+            --step)     start_step="$2"; shift ;;
+            --resume)   load_state; start_step=$CURRENT_STEP ;;
+            -h|--help)
+                echo "Usage: uke-setup [options]"
+                echo "Options:"
+                echo "  --headless  Non-interactive, use defaults"
+                echo "  --minimal   Essential packages only"
+                echo "  --step N    Start from step N"
+                echo "  --resume    Resume from last step"
+                exit 0
+                ;;
+        esac
+        shift
+    done
+    
+    CURRENT_STEP=$start_step
+    
+    [[ $CURRENT_STEP -le 1 ]] && step_system_check
+    [[ $CURRENT_STEP -le 2 ]] && step_packages
+    [[ $CURRENT_STEP -le 3 ]] && step_uke_install
+    [[ $CURRENT_STEP -le 4 ]] && step_hardware
+    [[ $CURRENT_STEP -le 5 ]] && step_services
+    [[ $CURRENT_STEP -le 6 ]] && step_verify
+}
+
+main "$@"

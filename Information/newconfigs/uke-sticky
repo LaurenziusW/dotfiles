@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Toggles sticky/floating state for the focused window
+
+OS="$(uname -s)"
+
+if [[ "$OS" == "Darwin" ]]; then
+    # macOS (yabai)
+    # Toggle float, sticky, and top-most
+    yabai -m window --toggle float
+    yabai -m window --toggle sticky
+    yabai -m window --toggle topmost
+    echo "Toggled sticky window (macOS)"
+
+elif [[ "$OS" == "Linux" ]]; then
+    # Linux (Hyprland)
+    hyprctl dispatch togglefloating
+    hyprctl dispatch pin
+    echo "Toggled sticky window (Linux)"
+fi

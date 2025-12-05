@@ -1,0 +1,37 @@
+# ==============================================================================
+# UKE v8 - ZSH Profile
+# ==============================================================================
+
+# Environment
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+# XDG Base Directory
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+
+# Path
+export PATH="$HOME/.local/bin:$PATH"
+
+# Platform Specifics
+case "$(uname -s)" in
+    Darwin)
+        # Homebrew
+        [[ -f "/opt/homebrew/bin/brew" ]] && eval "$(/opt/homebrew/bin/brew shellenv)"
+        [[ -f "/usr/local/bin/brew" ]] && eval "$(/usr/local/bin/brew shellenv)"
+        ;;
+    Linux)
+        # Auto-start Hyprland on TTY1 (Arch Linux)
+        if [[ -z "${DISPLAY:-}" ]] && \
+           [[ -z "${WAYLAND_DISPLAY:-}" ]] && \
+           [[ "${XDG_VTNR:-}" == "1" ]] && \
+           [[ ! -f "$HOME/.no-hyprland" ]]; then
+            
+            echo "Starting Hyprland in 2s... (Ctrl+C to abort)"
+            sleep 2
+            exec Hyprland
+        fi
+        ;;
+esac

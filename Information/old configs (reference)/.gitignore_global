@@ -1,0 +1,294 @@
+# ═══════════════════════════════════════════════════════════
+# GLOBAL GITIGNORE
+# Patterns to ignore across all repositories
+# ═══════════════════════════════════════════════════════════
+
+# ───────────────────────────────────────────────────────────
+# Operating System Files
+# ───────────────────────────────────────────────────────────
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ───────────────────────────────────────────────────────────
+# Editor & IDE Files
+# ───────────────────────────────────────────────────────────
+
+# Vim/Neovim
+*.swp
+*.swo
+*~
+.*.sw[a-p]
+Session.vim
+.netrwhist
+
+# VSCode
+.vscode/
+*.code-workspace
+.history/
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Emacs
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+
+# ───────────────────────────────────────────────────────────
+# Development Files
+# ───────────────────────────────────────────────────────────
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+venv/
+env/
+ENV/
+.venv
+
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+
+# ───────────────────────────────────────────────────────────
+# Build & Dependency Files
+# ───────────────────────────────────────────────────────────
+*.o
+*.obj
+*.a
+*.lib
+*.lo
+*.la
+*.so
+*.dll
+*.dylib
+
+# ───────────────────────────────────────────────────────────
+# Log Files
+# ───────────────────────────────────────────────────────────
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ───────────────────────────────────────────────────────────
+# Temporary Files
+# ───────────────────────────────────────────────────────────
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.orig
+*_backup
+*_old
+
+# ───────────────────────────────────────────────────────────
+# Database Files
+# ───────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# ───────────────────────────────────────────────────────────
+# Credentials & Secrets
+# ───────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.yml
+secrets.yaml
+*_secret*
+*_secrets*
+credentials.json
+.credentials
+
+# ───────────────────────────────────────────────────────────
+# Archives
+# ───────────────────────────────────────────────────────────
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.bz2
+*.xz
+
+# ───────────────────────────────────────────────────────────
+# Media Files (usually don't belong in repos)
+# ───────────────────────────────────────────────────────────
+# Uncomment if you want to ignore media files globally
+# *.mp3
+# *.mp4
+# *.avi
+# *.mov
+# *.wmv
+# *.flv
+# *.mkv
+# *.pdf
+# *.jpg
+# *.jpeg
+# *.png
+# *.gif
+# *.bmp
+# *.svg
+# *.ico
+
+# ───────────────────────────────────────────────────────────
+# Package Manager Lock Files (choose based on your workflow)
+# ───────────────────────────────────────────────────────────
+# Some prefer to commit lock files, others don't
+# Uncomment what you want to ignore:
+
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+# Gemfile.lock
+# composer.lock
+
+# ───────────────────────────────────────────────────────────
+# Testing
+# ───────────────────────────────────────────────────────────
+.coverage
+coverage/
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ───────────────────────────────────────────────────────────
+# Other Common Patterns
+# ───────────────────────────────────────────────────────────
+.cache/
+.sass-cache/
+*.pid
+*.seed
+*.pid.lock
+.grunt
+bower_components
+.lock-wscript
+.fusebox/
+.dynamodb/
+.tern-port
+.serverless/
+.fusebox/
+.dynamodb/
+.vuepress/dist
+.nuxt/
+dist/
+.cache-loader/
+.parcel-cache/
+.next/
+.docusaurus/
+.yarn-integrity

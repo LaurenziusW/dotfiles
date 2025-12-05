@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Snapshot - System Backup Wrapper
+# ==============================================================================
+# Wraps snapper/timeshift/btrfs based on availability.
+# ==============================================================================
+set -euo pipefail
+
+detect_backend() {
+    if command -v snapper &>/dev/null; then echo "snapper";
+    elif command -v timeshift &>/dev/null; then echo "timeshift";
+    else echo "none"; fi
+}
+
+BACKEND=$(detect_backend)
+DESC="${2:-Manual Snapshot}"
+
+create() {
+    case "$BACKEND" in
+        snapper)
+            sudo snapper create -d "$DESC" -c timeline
+            echo "Snapper snapshot created."
+            ;;
+        timeshift)
+            sudo timeshift --create --comments "$DESC" --scripted
+            echo "Timeshift snapshot created."
+            ;;
+        *)
+            echo "No snapshot backend found (snapper/timeshift)."
+            exit 1
+            ;;
+    esac
+}
+
+list() {
+    case "$BACKEND" in
+        snapper) sudo snapper list ;;
+        timeshift) sudo timeshift --list ;;
+        *) echo "No backend found." ;;
+    esac
+}
+
+case "${1:-list}" in
+    create) create ;;
+    list)   list ;;
+    *)      echo "Usage: uke-snapshot [create|list] [description]" ;;
+esac

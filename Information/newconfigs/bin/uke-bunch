@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Bunch Manager (v8)
+# ==============================================================================
+# Manages and runs environment presets found in ~/.config/uke/bunches
+# ==============================================================================
+
+set -e
+
+# Config
+BUNCH_DIR="$HOME/.config/uke/bunches"
+mkdir -p "$BUNCH_DIR"
+
+usage() {
+    echo "Usage: uke-bunch <command> [name]"
+    echo ""
+    echo "Commands:"
+    echo "  list          List available bunches"
+    echo "  create <name> Create a new bunch template"
+    echo "  edit <name>   Edit a bunch"
+    echo "  run <name>    Run a bunch (or just 'uke-bunch name')"
+    echo "  delete <name> Delete a bunch"
+    exit 1
+}
+
+# ---------------------------------------------------------
+# Commands
+# ---------------------------------------------------------
+
+cmd_list() {
+    echo "📂 Available Bunches:"
+    local found=0
+    for f in "$BUNCH_DIR"/*.sh; do
+        if [[ -f "$f" ]]; then
+            name=$(basename "$f" .sh)
+            # Grab description if available
+            desc=$(grep "^# Description:" "$f" | cut -d: -f2- | xargs)
+            printf "  • %-15s %s\n" "$name" "${desc:-}"
+            found=1
+        fi
+    done
+    [[ $found -eq 0 ]] && echo "  (None found. Create one with 'create')"
+}
+
+cmd_create() {
+    local name="$1"
+    [[ -z "$name" ]] && { echo "Error: Name required"; exit 1; }
+    local file="$BUNCH_DIR/$name.sh"
+    
+    if [[ -f "$file" ]]; then
+        echo "Error: Bunch '$name' already exists."
+        exit 1
+    fi
+
+    # Template based on v8 philosophy
+    cat > "$file" <<EOF
+#!/usr/bin/env bash
+# Bunch: $name
+# Description: Description of this workflow
+
+OS="\$(uname -s)"
+
+echo "🚀 Starting bunch: $name"
+
+# 1. Launch Applications
+if [[ "\$OS" == "Darwin" ]]; then
+    # macOS Apps
+    # open -a "Obsidian"
+    # open -a "Spotify"
+    true
+elif [[ "\$OS" == "Linux" ]]; then
+    # Linux Apps
+    # obsidian &
+    # spotify &
+    true
+fi
+
+# 2. Optional: Wait a moment for apps to open
+# sleep 2
+
+# 3. Organize Windows
+# Force windows to their assigned workspaces
+uke-gather
+
+echo "✅ Bunch complete"
+EOF
+
+    chmod +x "$file"
+    echo "Created: $file"
+    ${EDITOR:-nvim} "$file"
+}
+
+cmd_edit() {
+    local name="$1"
+    [[ -z "$name" ]] && { echo "Error: Name required"; exit 1; }
+    local file="$BUNCH_DIR/$name.sh"
+    
+    if [[ ! -f "$file" ]]; then
+        echo "Error: Bunch '$name' not found."
+        exit 1
+    fi
+    ${EDITOR:-nvim} "$file"
+}
+
+cmd_run() {
+    local name="$1"
+    [[ -z "$name" ]] && { echo "Error: Name required"; exit 1; }
+    local file="$BUNCH_DIR/$name.sh"
+    
+    if [[ ! -f "$file" ]]; then
+        echo "Error: Bunch '$name' not found."
+        exit 1
+    fi
+    
+    bash "$file"
+}
+
+cmd_delete() {
+    local name="$1"
+    [[ -z "$name" ]] && { echo "Error: Name required"; exit 1; }
+    local file="$BUNCH_DIR/$name.sh"
+    
+    if [[ ! -f "$file" ]]; then
+        echo "Error: Bunch '$name' not found."
+        exit 1
+    fi
+    rm -i "$file"
+}
+
+# ---------------------------------------------------------
+# Main Dispatch
+# ---------------------------------------------------------
+
+CMD="$1"
+ARG="$2"
+
+case "$CMD" in
+    list)     cmd_list ;;
+    create)   cmd_create "$ARG" ;;
+    edit)     cmd_edit "$ARG" ;;
+    delete)   cmd_delete "$ARG" ;;
+    run)      cmd_run "$ARG" ;;
+    help|-h)  usage ;;
+    "")       usage ;;
+    *)
+        # Shortcut: 'uke-bunch study' -> run study
+        if [[ -f "$BUNCH_DIR/$CMD.sh" ]]; then
+            cmd_run "$CMD"
+        else
+            echo "Unknown command: $CMD"
+            usage
+        fi
+        ;;
+esac

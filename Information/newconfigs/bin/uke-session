@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Session - Save/Restore Window Layouts
+# ==============================================================================
+# Usage: uke-session [save|restore] <name>
+# Data: ~/.local/state/uke/sessions/
+# ==============================================================================
+set -euo pipefail
+
+SESSION_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/uke/sessions"
+mkdir -p "$SESSION_DIR"
+
+CMD="${1:-help}"
+NAME="${2:-default}"
+
+save_macos() {
+    yabai -m query --windows | jq '[.[] | {app: .app, space: .space, frame: .frame}]' > "$SESSION_DIR/$1.json"
+    echo "Saved macOS session: $1"
+}
+
+restore_macos() {
+    local file="$SESSION_DIR/$1.json"
+    if [[ ! -f "$file" ]]; then echo "Session '$1' not found."; exit 1; fi
+    
+    # Simple restore: move apps to spaces. Exact frame restoration is complex and often buggy.
+    jq -c '.[]' "$file" | while read -r win; do
+        local app=$(echo "$win" | jq -r '.app')
+        local space=$(echo "$win" | jq -r '.space')
+        
+        # Find window ID by App name (first found)
+        local id=$(yabai -m query --windows | jq -r ".[] | select(.app == \"$app\") | .id" | head -1)
+        if [[ -n "$id" ]]; then
+            yabai -m window "$id" --space "$space" 2>/dev/null || true
+        fi
+    done
+    echo "Restored macOS session: $1"
+}
+
+save_linux() {
+    hyprctl clients -j | jq '[.[] | {class: .class, workspace: .workspace.id}]' > "$SESSION_DIR/$1.json"
+    echo "Saved Linux session: $1"
+}
+
+restore_linux() {
+    local file="$SESSION_DIR/$1.json"
+    if [[ ! -f "$file" ]]; then echo "Session '$1' not found."; exit 1; fi
+    
+    jq -c '.[]' "$file" | while read -r win; do
+        local class=$(echo "$win" | jq -r '.class')
+        local ws=$(echo "$win" | jq -r '.workspace')
+        
+        local addr=$(hyprctl clients -j | jq -r ".[] | select(.class == \"$class\") | .address" | head -1)
+        if [[ -n "$addr" ]]; then
+            hyprctl dispatch movetoworkspacesilent "$ws,address:$addr" >/dev/null
+        fi
+    done
+    echo "Restored Linux session: $1"
+}
+
+case "$CMD" in
+    save)
+        [[ "$(uname -s)" == "Darwin" ]] && save_macos "$NAME" || save_linux "$NAME"
+        ;;
+    restore)
+        [[ "$(uname -s)" == "Darwin" ]] && restore_macos "$NAME" || restore_linux "$NAME"
+        ;;
+    list)
+        ls "$SESSION_DIR"/*.json 2>/dev/null | xargs -n 1 basename .json
+        ;;
+    *)
+        echo "Usage: uke-session [save|restore|list] <name>"
+        exit 1
+        ;;
+esac

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Gather - Window Organization
+# ==============================================================================
+# Hand-crafted rules for organizing windows into workspaces.
+# Edit this file to change your layout preferences.
+# ==============================================================================
+set -euo pipefail
+
+# Helper for JSON parsing
+require_jq() {
+    if ! command -v jq &>/dev/null; then
+        echo "Error: jq is required."
+        exit 1
+    fi
+}
+
+gather_macos() {
+    require_jq
+    echo "Gathering windows (macOS)..."
+    
+    # 1. Browser
+    yabai -m query --windows | jq -r '.[] | select(.app | test("Safari|Brave|Firefox|Chrome")) | .id' | xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
+    
+    # 2. Notes
+    yabai -m query --windows | jq -r '.[] | select(.app | test("Obsidian|Notion")) | .id' | xargs -I {} yabai -m window {} --space 2 2>/dev/null || true
+    
+    # 3. Code
+    yabai -m query --windows | jq -r '.[] | select(.app | test("WezTerm|Code|Xcode")) | .id' | xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
+    
+    # 5. Documents
+    yabai -m query --windows | jq -r '.[] | select(.app | test("Preview|PDF")) | .id' | xargs -I {} yabai -m window {} --space 5 2>/dev/null || true
+    
+    # 7. Media
+    yabai -m query --windows | jq -r '.[] | select(.app | test("Spotify")) | .id' | xargs -I {} yabai -m window {} --space 7 2>/dev/null || true
+    
+    # 9. Comms
+    yabai -m query --windows | jq -r '.[] | select(.app | test("Slack|Discord|Mail")) | .id' | xargs -I {} yabai -m window {} --space 9 2>/dev/null || true
+
+    echo "Done."
+}
+
+gather_linux() {
+    require_jq
+    echo "Gathering windows (Linux)..."
+    
+    move() {
+        local regex="$1"
+        local ws="$2"
+        hyprctl clients -j | jq -r ".[] | select(.class | test(\"$regex\"; \"i\")) | .address" | while read -r addr; do
+            hyprctl dispatch movetoworkspacesilent "$ws,address:$addr" >/dev/null
+        done
+    }
+
+    move "brave|firefox|chromium" 1
+    move "obsidian|notion" 2
+    move "wezterm|code|kitty" 3
+    move "zathura|okular|evince" 5
+    move "spotify" 7
+    move "slack|discord|telegram|thunderbird" 9
+    
+    echo "Done."
+}
+
+case "$(uname -s)" in
+    Darwin) gather_macos ;;
+    Linux)  gather_linux ;;
+esac

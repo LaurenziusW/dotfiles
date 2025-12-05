@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+# =============================================================================
+# UKE v8 - Sticky Window Toggle
+# Makes the focused window floating + pinned + always-on-top
+# Press again to restore normal behavior
+# =============================================================================
+set -euo pipefail
+
+# Colors
+if [[ -t 1 ]]; then
+    C_GREEN=$'\e[32m' C_RED=$'\e[31m' C_YELLOW=$'\e[33m'
+    C_CYAN=$'\e[36m' C_RESET=$'\e[0m'
+else
+    C_GREEN='' C_RED='' C_YELLOW='' C_CYAN='' C_RESET=''
+fi
+
+ok()   { printf "%s✓%s %s\n" "$C_GREEN" "$C_RESET" "$*"; }
+fail() { printf "%s✗%s %s\n" "$C_RED" "$C_RESET" "$*"; }
+info() { printf "%s→%s %s\n" "$C_CYAN" "$C_RESET" "$*"; }
+
+# State file
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/uke"
+STICKY_STATE="$STATE_DIR/sticky_windows"
+mkdir -p "$STATE_DIR"
+touch "$STICKY_STATE"
+
+# OS Detection
+case "$(uname -s)" in
+    Darwin) OS="macos" ;;
+    Linux)  OS="linux" ;;
+    *)      fail "Unsupported OS"; exit 1 ;;
+esac
+
+# =============================================================================
+# Hyprland Implementation
+# =============================================================================
+hyprland_get_window_id() {
+    hyprctl activewindow -j | jq -r '.address'
+}
+
+hyprland_is_sticky() {
+    grep -qx "$1" "$STICKY_STATE" 2>/dev/null
+}
+
+hyprland_make_sticky() {
+    local addr="$1"
+    
+    # Make floating
+    hyprctl dispatch togglefloating
+    
+    # Pin to all workspaces
+    hyprctl dispatch pin
+    
+    # Resize and position (bottom-right area)
+    hyprctl dispatch resizeactive exact 40% 50%
+    hyprctl dispatch moveactive exact 58% 48%
+    
+    # Record as sticky
+    echo "$addr" >> "$STICKY_STATE"
+    
+    ok "Window is now sticky (floating + pinned)"
+    info "Press again to unstick, or drag to move"
+}
+
+hyprland_unmake_sticky() {
+    local addr="$1"
+    
+    # Unpin
+    hyprctl dispatch pin
+    
+    # Return to tiled
+    hyprctl dispatch togglefloating
+    
+    # Remove from state
+    sed -i "\|^${addr}$|d" "$STICKY_STATE"
+    
+    ok "Window restored to normal"
+}
+
+hyprland_toggle() {
+    local addr
+    addr=$(hyprland_get_window_id)
+    
+    if [[ -z "$addr" ]] || [[ "$addr" == "null" ]]; then
+        fail "No active window"
+        return 1
+    fi
+    
+    if hyprland_is_sticky "$addr"; then
+        hyprland_unmake_sticky "$addr"
+    else
+        hyprland_make_sticky "$addr"
+    fi
+}
+
+# =============================================================================
+# Yabai (macOS) Implementation
+# =============================================================================
+yabai_get_window_id() {
+    yabai -m query --windows --window | jq -r '.id'
+}
+
+yabai_is_sticky() {
+    grep -qx "$1" "$STICKY_STATE" 2>/dev/null
+}
+
+yabai_make_sticky() {
+    local wid="$1"
+    
+    # Make floating
+    yabai -m window --toggle float
+    
+    # Make sticky (visible on all spaces)
+    yabai -m window --toggle sticky
+    
+    # Make topmost (always on top)
+    yabai -m window --toggle topmost
+    
+    # Resize and position
+    yabai -m window --resize abs:800:500
+    yabai -m window --move abs:1100:550
+    
+    # Record as sticky
+    echo "$wid" >> "$STICKY_STATE"
+    
+    ok "Window is now sticky (floating + sticky + topmost)"
+    info "Press again to unstick, or drag to move"
+}
+
+yabai_unmake_sticky() {
+    local wid="$1"
+    
+    # Remove topmost
+    yabai -m window --toggle topmost
+    
+    # Remove sticky
+    yabai -m window --toggle sticky
+    
+    # Return to tiled
+    yabai -m window --toggle float
+    
+    # Remove from state (macOS sed)
+    sed -i '' "\|^${wid}$|d" "$STICKY_STATE" 2>/dev/null || \
+        sed -i "\|^${wid}$|d" "$STICKY_STATE"
+    
+    ok "Window restored to normal"
+}
+
+yabai_toggle() {
+    local wid
+    wid=$(yabai_get_window_id)
+    
+    if [[ -z "$wid" ]] || [[ "$wid" == "null" ]]; then
+        fail "No active window"
+        return 1
+    fi
+    
+    if yabai_is_sticky "$wid"; then
+        yabai_unmake_sticky "$wid"
+    else
+        yabai_make_sticky "$wid"
+    fi
+}
+
+# =============================================================================
+# Utility Commands
+# =============================================================================
+list_sticky() {
+    echo ""
+    echo "=== Sticky Windows ==="
+    
+    if [[ ! -s "$STICKY_STATE" ]]; then
+        info "No sticky windows"
+        return
+    fi
+    
+    while read -r addr; do
+        [[ -z "$addr" ]] && continue
+        if [[ "$OS" == "linux" ]]; then
+            local title
+            title=$(hyprctl clients -j | jq -r ".[] | select(.address == \"$addr\") | .title" 2>/dev/null)
+            echo "  • $addr: ${title:-unknown}"
+        else
+            echo "  • $addr"
+        fi
+    done < "$STICKY_STATE"
+}
+
+clear_sticky() {
+    info "Clearing sticky state..."
+    > "$STICKY_STATE"
+    ok "Sticky state cleared"
+}
+
+show_help() {
+    cat <<EOF
+Usage: uke-sticky [command]
+
+Commands:
+  toggle  Toggle sticky mode for focused window (default)
+  list    List all sticky windows
+  clear   Clear sticky state (reset)
+  help    Show this help
+
+Sticky windows are:
+  • Floating (not tiled)
+  • Pinned to all workspaces
+  • Always on top
+  • Draggable with mouse
+
+Keybinding: Cmd+Shift+S (macOS) / Alt+Shift+S (Linux)
+EOF
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+case "${1:-toggle}" in
+    toggle|"")
+        if [[ "$OS" == "linux" ]]; then
+            if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+                hyprland_toggle
+            else
+                fail "Hyprland not running"
+                exit 1
+            fi
+        else
+            yabai_toggle
+        fi
+        ;;
+    list)   list_sticky ;;
+    clear)  clear_sticky ;;
+    -h|--help|help) show_help ;;
+    *)
+        fail "Unknown command: $1"
+        show_help
+        exit 1
+        ;;
+esac

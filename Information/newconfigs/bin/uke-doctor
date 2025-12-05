@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE v8 Doctor - Health Check
+# ==============================================================================
+set -e
+
+# Colors
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}🏥 UKE v8 Doctor${NC}"
+echo "================="
+
+check() {
+    if command -v "$1" &>/dev/null; then
+        echo -e "${GREEN}✅ $1 found${NC}"
+    else
+        echo -e "${RED}❌ $1 MISSING${NC}"
+    fi
+}
+
+check_service() {
+    if pgrep -x "$1" >/dev/null; then
+        echo -e "${GREEN}✅ $1 running${NC}"
+    else
+        echo -e "${RED}❌ $1 STOPPED${NC}"
+    fi
+}
+
+echo "Checking Core Tools..."
+check "nvim"
+check "tmux"
+check "wezterm"
+check "zsh"
+check "stow"
+check "jq"
+check "fzf"
+check "zoxide"
+
+case "$(uname -s)" in
+    Darwin)
+        echo ""
+        echo "Checking macOS Tools..."
+        check "yabai"
+        check "skhd"
+        check_service "yabai"
+        check_service "skhd"
+        ;;
+    Linux)
+        echo ""
+        echo "Checking Linux Tools..."
+        check "hyprctl"
+        check "waybar"
+        check_service "Hyprland"
+        ;;
+esac
+
+echo ""
+echo "Done."
