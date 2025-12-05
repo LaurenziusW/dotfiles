@@ -84,9 +84,9 @@ sudo yabai --load-sa
 ### Arch Post-Install
 
 ```bash
-# Enable keyd for CapsLock → Escape with nav layer
-sudo cp ~/.config/keyd/default.conf /etc/keyd/default.conf
-sudo systemctl enable --now keyd
+# The installation script handles keyd setup automatically.
+# But if you need to trigger it manually:
+~/dotfiles/uke-v8/arch/.local/bin/uke-keyd-setup
 
 # Hyprland starts automatically when you log in
 ```
@@ -101,18 +101,23 @@ uke-v8/
 │       └── skhd/skhdrc           # Hotkeys
 │
 ├── arch/                         # Arch Linux only (stow package)
-│   └── .config/
-│       ├── hypr/hyprland.conf    # Wayland compositor (v0.51+)
-│       ├── waybar/               # Status bar
-│       ├── keyd/default.conf     # CapsLock nav layer
-│       └── zathura/zathurarc     # PDF viewer (Nord theme)
+│   ├── .config/
+│   │   ├── hypr/hyprland.conf    # Wayland compositor (v0.51+)
+│   │   ├── waybar/               # Status bar
+│   │   ├── keyd/default.conf     # CapsLock nav layer
+│   │   └── zathura/zathurarc     # PDF viewer (Nord theme)
+│   └── .local/bin/               # Arch-specific scripts
+│       ├── uke-autostart         # Hyprland launcher
+│       ├── uke-services          # Systemd health check
+│       ├── uke-update            # Pacman/AUR wrapper
+│       └── uke-keyd-setup        # Keyd installer/configurator
 │
 ├── shared/                       # Both platforms (stow package)
 │   ├── .config/
 │   │   ├── wezterm/wezterm.lua   # Terminal (OS-aware)
 │   │   ├── tmux/tmux.conf        # Multiplexer
 │   │   └── nvim/init.lua         # Editor
-│   ├── .local/bin/
+│   ├── .local/bin/               # Cross-platform scripts
 │   │   ├── uke-gather            # Organize windows
 │   │   ├── uke-bunch             # Environment presets
 │   │   ├── uke-doctor            # Health check

@@ -233,6 +233,15 @@ do_install() {
     # Install Platform
     if ! run_stow "$PLATFORM_DIR"; then failed=1; fi
 
+    # Platform Specific Setup
+    if [[ "$OS" == "linux" ]]; then
+        if [[ -f "$UKE_ROOT/arch/.local/bin/uke-keyd-setup" ]]; then
+            "$UKE_ROOT/arch/.local/bin/uke-keyd-setup" || failed=1
+        else
+            warn "uke-keyd-setup not found."
+        fi
+    fi
+
     # Post-Install
     chmod +x "$HOME/.local/bin/uke-"* 2>/dev/null || true
     

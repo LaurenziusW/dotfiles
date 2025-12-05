@@ -13,6 +13,7 @@ sudo pacman -S --needed --noconfirm \
     stow \
     neovim \
     hyprland \
+    keyd \
     waybar \
     wezterm \
     wofi \
@@ -20,17 +21,13 @@ sudo pacman -S --needed --noconfirm \
     firefox
 
 echo ">> [2/5] Creating Directory Structure..."
-# Ensure repo structure exists (if running standalone)
-mkdir -p ~/dotfiles/newuke/{mac,arch,shared}
-
 # Create the stow targets in HOME so stow doesn't symlink the parent folders
 mkdir -p ~/.config/{hypr,waybar,nvim,wezterm,yabai,skhd}
 mkdir -p ~/.local/{bin,state/uke,share}
 
 echo ">> [3/5] Creating Minimal Recovery Hyprland Config..."
-# This config is just enough to open a terminal and browser so you aren't stuck.
-# It will be replaced when you run 'installation_manager.sh install'
-cat > ~/.config/hypr/hyprland.conf <<EOF
+# IMPORTANT: We use 'EOF' (quoted) to prevent $variable expansion during generation
+cat > ~/.config/hypr/hyprland.conf <<'EOF'
 # --- RECOVERY CONFIG ---
 monitor=,preferred,auto,1
 
