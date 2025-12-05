@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE WezTerm Debugger
+# ==============================================================================
+# Use this if WezTerm refuses to launch.
+# It forces a new process (ignoring the daemon) and logs output to a file.
+# ==============================================================================
+
+LOG_FILE="$HOME/wezterm-debug.log"
+
+echo "=== Starting WezTerm Debug Session ==="
+echo "Log file: $LOG_FILE"
+echo "Time: $(date)"
+
+# Kill any existing daemon which might be stuck
+echo "Killing existing WezTerm processes..."
+pkill wezterm || true
+
+echo "Launching WezTerm..."
+# WEZTERM_LOG environment variable controls logging verbosity
+# --always-new-process ensures we don't connect to a broken daemon
+export WEZTERM_LOG=info
+wezterm start --always-new-process >> "$LOG_FILE" 2>&1
+
+echo "WezTerm exited. Check $LOG_FILE for details."
