@@ -64,8 +64,8 @@ cmd - 0x1D : yabai -m space --focus 10
 cmd - 0x21 : yabai -m space --focus prev
 cmd - 0x1E : yabai -m space --focus next
 
-# Alt+Tab to focus previous space
-alt - tab : yabai -m space --focus prev
+# Cmd+Tab to focus previous space (Note: Conflicts with macOS App Switcher)
+cmd - tab : yabai -m space --focus prev
 
 # =============================================================================
 # Move to Workspace (Cmd + Shift + 1-9, 0)
@@ -92,6 +92,9 @@ cmd + shift - return : open -a WezTerm
 
 # Gather windows to workspaces (Cmd + ` / Tilde)
 cmd - 0x32 : $HOME/.local/bin/uke-gather
+
+# Reveal & Gather ALL windows (Cmd + Shift + ` / Tilde)
+cmd + shift - 0x32 : $HOME/.local/bin/uke-reveal
 
 # Toggle fullscreen
 cmd + shift - f : yabai -m window --toggle zoom-fullscreen
