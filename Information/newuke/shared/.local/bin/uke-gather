@@ -29,11 +29,14 @@ require_cmd() {
 require_cmd jq
 
 gather_macos() {
-    local current_space
-    current_space=$(yabai -m query --spaces --space | jq -r '.index')
-    log_info "Gathering windows for space $current_space..."
+    local target_space="${1:-}"
+    if [[ -z "$target_space" ]]; then
+        target_space=$(yabai -m query --spaces --space | jq -r '.index')
+    fi
     
-    case $current_space in
+    log_info "Gathering windows for space $target_space..."
+    
+    case $target_space in
         1)
             yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser" or .app == "Firefox" or .app == "Raindrop.io") | .id' | \
                 xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
@@ -71,18 +74,21 @@ gather_macos() {
                 xargs -I {} yabai -m window {} --space 10 2>/dev/null || true
             ;;
         *)
-            log_info "No specific gather action for space $current_space"
+            log_info "No specific gather action for space $target_space"
             ;;
     esac
-    ok "Windows gathered"
+    ok "Windows gathered for space $target_space"
 }
 
 gather_linux() {
-    local current_ws
-    current_ws=$(hyprctl activeworkspace -j | jq -r '.id')
-    log_info "Gathering windows for workspace $current_ws..."
+    local target_ws="${1:-}"
+    if [[ -z "$target_ws" ]]; then
+        target_ws=$(hyprctl activeworkspace -j | jq -r '.id')
+    fi
     
-    case $current_ws in
+    log_info "Gathering windows for workspace $target_ws..."
+    
+    case $target_ws in
         1)
             hyprctl clients -j | jq -r '.[] | select(.class | test("brave|firefox|chromium|raindrop"; "i")) | .address' | \
                 while read -r addr; do hyprctl dispatch movetoworkspacesilent "1,address:$addr" 2>/dev/null; done
@@ -120,10 +126,13 @@ gather_linux() {
                 while read -r addr; do hyprctl dispatch movetoworkspacesilent "10,address:$addr" 2>/dev/null; done
             ;;
         *)
-            log_info "No specific gather action for workspace $current_ws"
+            log_info "No specific gather action for workspace $target_ws"
             ;;
     esac
-    ok "Windows gathered"
+    ok "Windows gathered for workspace $target_ws"
 }
 
-is_macos && gather_macos || gather_linux
+# If run directly (not sourced), execute
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    is_macos && gather_macos "$@" || gather_linux "$@"
+fi

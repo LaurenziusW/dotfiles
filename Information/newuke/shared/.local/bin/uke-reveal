@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Reveal - Restore all windows & Gather to Workspaces
+# ==============================================================================
+# Un-minimizes windows and distributes them to their assigned workspaces.
+# ==============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GATHER_SCRIPT="$SCRIPT_DIR/uke-gather"
+
+if [[ -f "$SCRIPT_DIR/../lib/core.sh" ]]; then
+    source "$SCRIPT_DIR/../lib/core.sh"
+else
+    log_info() { echo "INFO: $*"; }
+    is_macos() { [[ "$(uname -s)" == "Darwin" ]]; }
+fi
+
+# 1. Un-minimize Everything (macOS Only)
+if is_macos; then
+    log_info "Restoring minimized windows..."
+    # Query minimized windows and deminimize them
+    yabai -m query --windows | jq -r '.[] | select(."is-minimized" == true) | .id' | \
+        xargs -I {} yabai -m window {} --deminimize 2>/dev/null || true
+fi
+
+# 2. Run Gather for ALL Workspaces (1-10)
+log_info "Running Gather for all workspaces..."
+
+if [[ -f "$GATHER_SCRIPT" ]]; then
+    source "$GATHER_SCRIPT"
+    
+    # Loop through workspaces 1 to 10
+    for i in {1..10}; do
+        if is_macos; then
+            gather_macos "$i"
+        else
+            gather_linux "$i"
+        fi
+    done
+else
+    echo "Error: uke-gather script not found at $GATHER_SCRIPT"
+    exit 1
+fi
+
+log_info "All windows revealed and gathered."
