@@ -337,11 +337,17 @@ do_install() {
         fi
         
         echo ""
-        read -p "Select profile (number or name) [$current]: " choice_input
+        read -p "Enter profile number or name (default: $current): " choice_input
         
         local selected_profile="$current"
-        if [[ "$choice_input" =~ ^[0-9]+$ ]] && [[ "$choice_input" -ge 1 ]] && [[ "$choice_input" -le ${#profiles_array[@]} ]]; then
-            selected_profile="${profiles_array[$((choice_input-1))]}"
+        # If input is a number, try to map it to a profile name
+        if [[ "$choice_input" =~ ^[0-9]+$ ]]; then
+            local index=$((choice_input-1))
+            if [[ "$index" -ge 0 ]] && [[ "$index" -lt ${#profiles_array[@]} ]]; then
+                selected_profile="${profiles_array[$index]}"
+            else
+                warn "Invalid number. Falling back to default: $current"
+            fi
         elif [[ -n "$choice_input" ]]; then
             selected_profile="$choice_input"
         fi
