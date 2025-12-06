@@ -1,0 +1,23 @@
+#!/bin/bash
+
+CONFIG="$HOME/.config/karabiner/karabiner.json"
+CLI="/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
+
+# Check if jq is installed
+if ! command -v jq &> /dev/null; then
+    echo "Error: jq is required but not installed."
+    exit 1
+fi
+
+CURRENT_PROFILE=$(jq -r '.profiles[] | select(.selected == true) | .name' "$CONFIG")
+
+if [ "$CURRENT_PROFILE" = "Default profile" ]; then
+  NEXT_PROFILE="DisabledKeys"
+  MESSAGE="Keyboard disabled"
+else
+  NEXT_PROFILE="Default profile"
+  MESSAGE="Keyboard enabled"
+fi
+
+"$CLI" --select-profile "$NEXT_PROFILE"
+echo "$MESSAGE"

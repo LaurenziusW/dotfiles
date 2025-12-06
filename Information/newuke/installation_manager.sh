@@ -69,7 +69,7 @@ detect_system() {
         "$HOME/.config/tmux/tmux.conf"
         "$HOME/.config/wezterm/wezterm.lua"
     )
-    [[ "$OS" == "macos" ]] && check_list+=("$HOME/.config/skhd/skhdrc" "$HOME/.config/yabai/yabairc")
+    [[ "$OS" == "macos" ]] && check_list+=("$HOME/.config/skhd/skhdrc" "$HOME/.config/yabai/yabairc" "$HOME/.config/karabiner/karabiner.json")
     [[ "$OS" == "linux" ]] && check_list+=("$HOME/.config/hypr/hyprland.conf" "$HOME/.config/waybar/config" "$HOME/.config/keyd/default.conf")
 
     for path in "${check_list[@]}"; do
@@ -145,7 +145,7 @@ do_backup() {
     local items=(
         ".zshrc" ".zprofile" ".tmux.conf" ".wezterm.lua"
         ".config/nvim" ".config/wezterm" ".config/tmux"
-        ".config/yabai" ".config/skhd" 
+        ".config/yabai" ".config/skhd" ".config/karabiner"
         ".config/hypr" ".config/waybar" ".config/keyd" ".config/zathura"
         ".local/bin/uke-"*
     )
@@ -242,7 +242,7 @@ do_wipe() {
     local items=(
         ".zshrc" ".zprofile" ".tmux.conf" ".wezterm.lua"
         ".config/nvim" ".config/wezterm" ".config/tmux"
-        ".config/yabai" ".config/skhd" 
+        ".config/yabai" ".config/skhd" ".config/karabiner" 
         ".config/hypr" ".config/waybar" ".config/keyd" ".config/zathura"
         ".local/bin/uke-"*
     )

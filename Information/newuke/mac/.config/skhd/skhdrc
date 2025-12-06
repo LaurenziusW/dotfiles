@@ -16,6 +16,8 @@
 # =============================================================================
 # Focus window under mouse
 cmd - escape : yabai -m window --focus mouse
+# Toggle Keyboard (Karabiner Profile Switch)
+alt - escape : $HOME/.local/bin/uke-keyboard-toggle
 # Focus recent window
 cmd + shift - 0x32 : yabai -m window --focus recent
 
@@ -61,6 +63,9 @@ cmd - 0x1D : yabai -m space --focus 10
 # Workspace previous/next ([ and ])
 cmd - 0x21 : yabai -m space --focus prev
 cmd - 0x1E : yabai -m space --focus next
+
+# Alt+Tab to focus previous space
+alt - tab : yabai -m space --focus prev
 
 # =============================================================================
 # Move to Workspace (Cmd + Shift + 1-9, 0)
