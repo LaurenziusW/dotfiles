@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# UKE Battery Protection Daemon
+# ==============================================================================
+# Checks battery status every minute.
+# - Warns at 15%
+# - Critical Warning at 7%
+# - Hibernates at 5% to prevent deep discharge/degradation.
+# ==============================================================================
+
+while true; do
+    # Find battery (usually BAT0 or BAT1)
+    BAT_PATH=$(find /sys/class/power_supply -name "BAT*" | head -n 1)
+
+    if [[ -z "$BAT_PATH" ]]; then
+        # No battery found, exit (desktop)
+        exit 0
+    fi
+
+    STATUS=$(cat "$BAT_PATH/status")
+    CAPACITY=$(cat "$BAT_PATH/capacity")
+
+    if [[ "$STATUS" == "Discharging" ]]; then
+        if [[ "$CAPACITY" -le 5 ]]; then
+            # Critical: Hibernate immediately
+            notify-send -u critical "CRITICAL BATTERY ($CAPACITY%)" "Hibernating immediately to protect battery health..."
+            systemctl hibernate
+        elif [[ "$CAPACITY" -le 7 ]]; then
+            # Urgent Warning
+            notify-send -u critical "Low Battery ($CAPACITY%)" "System will hibernate at 5%!"
+        elif [[ "$CAPACITY" -le 15 ]]; then
+            # Warning
+            notify-send -u normal "Low Battery ($CAPACITY%)" "Please plug in charger."
+        fi
+    fi
+
+    sleep 60
+done

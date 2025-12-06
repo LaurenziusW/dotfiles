@@ -69,7 +69,7 @@ detect_system() {
         "$HOME/.config/tmux/tmux.conf"
         "$HOME/.config/wezterm/wezterm.lua"
     )
-    [[ "$OS" == "macos" ]] && check_list+=("$HOME/.config/skhd/skhdrc" "$HOME/.config/yabai/yabairc")
+    [[ "$OS" == "macos" ]] && check_list+=("$HOME/.config/skhd/skhdrc" "$HOME/.config/yabai/yabairc" "$HOME/.config/karabiner/karabiner.json")
     [[ "$OS" == "linux" ]] && check_list+=("$HOME/.config/hypr/hyprland.conf" "$HOME/.config/waybar/config" "$HOME/.config/keyd/default.conf")
 
     for path in "${check_list[@]}"; do
@@ -145,7 +145,7 @@ do_backup() {
     local items=(
         ".zshrc" ".zprofile" ".tmux.conf" ".wezterm.lua"
         ".config/nvim" ".config/wezterm" ".config/tmux"
-        ".config/yabai" ".config/skhd" 
+        ".config/yabai" ".config/skhd" ".config/karabiner"
         ".config/hypr" ".config/waybar" ".config/keyd" ".config/zathura"
         ".local/bin/uke-"*
     )
@@ -242,7 +242,7 @@ do_wipe() {
     local items=(
         ".zshrc" ".zprofile" ".tmux.conf" ".wezterm.lua"
         ".config/nvim" ".config/wezterm" ".config/tmux"
-        ".config/yabai" ".config/skhd" 
+        ".config/yabai" ".config/skhd" ".config/karabiner" 
         ".config/hypr" ".config/waybar" ".config/keyd" ".config/zathura"
         ".local/bin/uke-"*
     )
@@ -325,23 +325,40 @@ do_install() {
         
         info "Current profile: $current"
         echo "Available profiles:"
+        local profiles_array=()
+        local i=1
         if [[ -d "$HOME/.config/hypr/profiles" ]]; then
             for p in "$HOME/.config/hypr/profiles"/*.conf; do
-                echo "  - $(basename "$p" .conf)"
+                local p_name=$(basename "$p" .conf)
+                profiles_array+=("$p_name")
+                echo "  ${i}. $p_name"
+                i=$((i+1))
             done
         fi
         
         echo ""
-        read -p "Select profile [$current]: " choice
-        choice=${choice:-$current}
+        read -p "Enter profile number or name (default: $current): " choice_input
         
+        local selected_profile="$current"
+        # If input is a number, try to map it to a profile name
+        if [[ "$choice_input" =~ ^[0-9]+$ ]]; then
+            local index=$((choice_input-1))
+            if [[ "$index" -ge 0 ]] && [[ "$index" -lt ${#profiles_array[@]} ]]; then
+                selected_profile="${profiles_array[$index]}"
+            else
+                warn "Invalid number. Falling back to default: $current"
+            fi
+        elif [[ -n "$choice_input" ]]; then
+            selected_profile="$choice_input"
+        fi
+
         if [[ -x "$HOME/.local/bin/uke-profile" ]]; then
-            "$HOME/.local/bin/uke-profile" "$choice" || true
+            "$HOME/.local/bin/uke-profile" "$selected_profile" || true
         else
             warn "uke-profile tool not found. Linking manually..."
             mkdir -p "$HOME/.config/hypr"
-            ln -sf "$HOME/.config/hypr/profiles/$choice.conf" "$HOME/.config/hypr/machine.conf"
-            ok "Profile set to $choice"
+            ln -sf "$HOME/.config/hypr/profiles/$selected_profile.conf" "$HOME/.config/hypr/machine.conf"
+            ok "Profile set to $selected_profile"
         fi
     fi
 

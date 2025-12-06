@@ -98,6 +98,7 @@ yabai -m rule --add app="^Safari$" space=^1
 yabai -m rule --add app="^Brave Browser$" space=^1
 yabai -m rule --add app="^Firefox$" space=^1
 yabai -m rule --add app="^Google Chrome$" space=^1
+yabai -m rule --add app="^Raindrop.io$" space=^1
 
 # Workspace 2: Notes
 yabai -m rule --add app="^Obsidian$" space=^2
@@ -111,13 +112,15 @@ yabai -m rule --add app="^VSCodium$" space=^3
 yabai -m rule --add app="^Xcode$" space=^3
 yabai -m rule --add app="^Cursor$" space=^3
 
+# Workspace 4: Files
+yabai -m rule --add app="^Finder$" space=^4
+yabai -m rule --add app="^ForkLift$" space=^4
+yabai -m rule --add app="^Path Finder$" space=^4
+
 # Workspace 5: Documents
 yabai -m rule --add app="^Preview$" space=^5 manage=on
 yabai -m rule --add app="^PDF Expert$" space=^5
 yabai -m rule --add app="^Skim$" space=^5
-
-# Workspace 6: Raindrop
-yabai -m rule --add app="^Raindrop.io$" space=^6
 
 # Workspace 7: Media
 yabai -m rule --add app="^Spotify$" space=^7
@@ -147,11 +150,10 @@ yabai -m rule --add app="^Perplexity$" space=^10
 yabai -m rule --add app="^ChatGPT$" space=^10
 
 # =============================================================================
-# Catch-all Rule (Everything else -> Space 4)
+# Catch-all Rule (Everything else -> Space 6)
 # =============================================================================
-# This rule MUST be last. It sends any app not explicitly listed above to Space 4.
-# This keeps your specific workspaces clean.
-yabai -m rule --add app!="^(Safari|Brave Browser|Firefox|Google Chrome|Obsidian|Notion|WezTerm|Code|Visual Studio Code|VSCodium|Xcode|Cursor|Preview|PDF Expert|Skim|Raindrop.io|Spotify|Music|VLC|Microsoft Word|Microsoft Excel|Microsoft PowerPoint|Pages|Numbers|Keynote|Slack|Discord|Mail|Telegram|WhatsApp|Messages|Microsoft Teams|Claude|Perplexity|ChatGPT)$" space=^4
+# This rule MUST be last. It sends any app not explicitly listed above to Space 6.
+yabai -m rule --add app!="^(Safari|Brave Browser|Firefox|Google Chrome|Raindrop.io|Obsidian|Notion|WezTerm|Code|Visual Studio Code|VSCodium|Xcode|Cursor|Finder|ForkLift|Path Finder|Preview|PDF Expert|Skim|Spotify|Music|VLC|Microsoft Word|Microsoft Excel|Microsoft PowerPoint|Pages|Numbers|Keynote|Slack|Discord|Mail|Telegram|WhatsApp|Messages|Microsoft Teams|Claude|Perplexity|ChatGPT)$" space=^6
 
 # =============================================================================
 # Local Overrides

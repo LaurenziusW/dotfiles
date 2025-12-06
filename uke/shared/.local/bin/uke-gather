@@ -35,7 +35,7 @@ gather_macos() {
     
     case $current_space in
         1)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser" or .app == "Firefox") | .id' | \
+            yabai -m query --windows | jq -r '.[] | select(.app == "Safari" or .app == "Brave Browser" or .app == "Firefox" or .app == "Raindrop.io") | .id' | \
                 xargs -I {} yabai -m window {} --space 1 2>/dev/null || true
             ;;
         2)
@@ -46,13 +46,13 @@ gather_macos() {
             yabai -m query --windows | jq -r '.[] | select(.app == "WezTerm" or .app == "Code" or .app == "Xcode" or .app == "Cursor") | .id' | \
                 xargs -I {} yabai -m window {} --space 3 2>/dev/null || true
             ;;
+        4)
+            yabai -m query --windows | jq -r '.[] | select(.app == "Finder" or .app == "ForkLift" or .app == "Path Finder") | .id' | \
+                xargs -I {} yabai -m window {} --space 4 2>/dev/null || true
+            ;;
         5)
             yabai -m query --windows | jq -r '.[] | select(.app == "Preview" or .app == "PDF Expert") | .id' | \
                 xargs -I {} yabai -m window {} --space 5 2>/dev/null || true
-            ;;
-        6)
-            yabai -m query --windows | jq -r '.[] | select(.app == "Raindrop.io") | .id' | \
-                xargs -I {} yabai -m window {} --space 6 2>/dev/null || true
             ;;
         7)
             yabai -m query --windows | jq -r '.[] | select(.app == "Spotify") | .id' | \
@@ -71,7 +71,7 @@ gather_macos() {
                 xargs -I {} yabai -m window {} --space 10 2>/dev/null || true
             ;;
         *)
-            log_info "No gather action for space $current_space"
+            log_info "No specific gather action for space $current_space"
             ;;
     esac
     ok "Windows gathered"
@@ -84,7 +84,7 @@ gather_linux() {
     
     case $current_ws in
         1)
-            hyprctl clients -j | jq -r '.[] | select(.class | test("brave|firefox|chromium"; "i")) | .address' | \
+            hyprctl clients -j | jq -r '.[] | select(.class | test("brave|firefox|chromium|raindrop"; "i")) | .address' | \
                 while read -r addr; do hyprctl dispatch movetoworkspacesilent "1,address:$addr" 2>/dev/null; done
             ;;
         2)
@@ -95,16 +95,16 @@ gather_linux() {
             hyprctl clients -j | jq -r '.[] | select(.class | test("wezterm|code|alacritty|kitty"; "i")) | .address' | \
                 while read -r addr; do hyprctl dispatch movetoworkspacesilent "3,address:$addr" 2>/dev/null; done
             ;;
+        4)
+             hyprctl clients -j | jq -r '.[] | select(.class | test("thunar|nautilus|dolphin"; "i")) | .address' | \
+                while read -r addr; do hyprctl dispatch movetoworkspacesilent "4,address:$addr" 2>/dev/null; done
+            ;;
         5)
             hyprctl clients -j | jq -r '.[] | select(.class | test("evince|zathura|okular"; "i")) | .address' | \
                 while read -r addr; do hyprctl dispatch movetoworkspacesilent "5,address:$addr" 2>/dev/null; done
             ;;
-        6)
-            hyprctl clients -j | jq -r '.[] | select(.class | test("raindrop"; "i")) | .address' | \
-                while read -r addr; do hyprctl dispatch movetoworkspacesilent "6,address:$addr" 2>/dev/null; done
-            ;;
         7)
-            hyprctl clients -j | jq -r '.[] | select(.class | test("spotify"; "i")) | .address' | \
+            hyprctl clients -j | jq -r '.[] | select(.class | test("spotify|vlc"; "i")) | .address' | \
                 while read -r addr; do hyprctl dispatch movetoworkspacesilent "7,address:$addr" 2>/dev/null; done
             ;;
         8)
@@ -120,7 +120,7 @@ gather_linux() {
                 while read -r addr; do hyprctl dispatch movetoworkspacesilent "10,address:$addr" 2>/dev/null; done
             ;;
         *)
-            log_info "No gather action for workspace $current_ws"
+            log_info "No specific gather action for workspace $current_ws"
             ;;
     esac
     ok "Windows gathered"
